@@ -1,0 +1,6 @@
+# secrets
+.env
+
+# python env
+.python-version
+poetry.lock

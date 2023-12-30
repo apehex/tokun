@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "mlable"
+version = "0.0.1"
+description = "Getting up to speed on ML with atomic projects."
+authors = ["apehex <apehex@protonmail.com>"]
+readme = ".github/README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8, <4"
+tensorflow = ">=2"
+
+[tool.poetry.group.dev.dependencies]
+jupyterlab = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
