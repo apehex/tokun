@@ -8,13 +8,13 @@ import tensorflow as tf
 
 N_ENCODING = 27
 N_CONTEXT = 4
-N_EMBEDDING = 16
-N_HIDDEN = 128
+N_EMBEDDING = 32
+N_HIDDEN = 256
 N_SAMPLE = 32
 
 N_STEPS = 1024
-N_BATCH = 2**12
-TRAINING_RATE = 4
+N_BATCH = 4096
+TRAINING_RATE = 1
 
 # DATA ########################################################################
 
@@ -56,27 +56,29 @@ X_TRAIN, Y_TRAIN = dataset(words=USERNAMES[:N1], context=N_CONTEXT)
 X_DEV, Y_DEV = dataset(words=USERNAMES[N1:N2], context=N_CONTEXT)
 X_TEST, Y_TEST = dataset(words=USERNAMES[N2:], context=N_CONTEXT)
 
-# tf.argmax(X_TRAIN, axis=-1) # convert one_hot to indices and check the dataset
-# tf.argmax(Y_TRAIN, axis=-1)
-
 # MODEL #######################################################################
 
 class Model(tf.Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, n_context: int=N_CONTEXT, n_encoding: int=N_ENCODING, n_embedding: int=N_EMBEDDING, n_hidden: int=N_HIDDEN, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # save the parameters
+        self._N_CONTEXT = n_context
+        self._N_ENCODING = n_encoding
+        self._N_EMBEDDING = n_embedding
+        self._N_HIDDEN = n_hidden
         # embedding
-        self._C = tf.Variable(initial_value=tf.random.normal(shape=(N_ENCODING, N_EMBEDDING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='C')
+        self._C = tf.Variable(initial_value=tf.random.normal(shape=(self._N_ENCODING, self._N_EMBEDDING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='C')
         # hidden layer
-        self._W1 = tf.Variable(initial_value=tf.random.normal(shape=(N_EMBEDDING * N_CONTEXT, N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W1')
-        self._B1 = tf.Variable(initial_value=tf.random.normal(shape=(1, N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B1')
+        self._W1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(self._N_EMBEDDING * self._N_CONTEXT, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W1')
+        self._B1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(1, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B1')
         # head layer
-        self._W2 = tf.Variable(initial_value=tf.random.normal(shape=(N_HIDDEN, N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W2')
-        self._B2 = tf.Variable(initial_value=tf.random.normal(shape=(1, N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B2')
+        self._W2 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(self._N_HIDDEN, self._N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W2')
+        self._B2 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(1, self._N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B2')
         # parameters
         self.parameters = [self._C, self._W1, self._W2, self._B1, self._B2]
 
     def __call__(self, x):
-        __e = tf.reshape(x @ self._C, (x.shape[0], N_CONTEXT * N_EMBEDDING))
+        __e = tf.reshape(x @ self._C, (x.shape[0], self._N_CONTEXT * self._N_EMBEDDING))
         __h = tf.math.tanh(__e @ self._W1 + self._B1)
         return tf.nn.softmax(__h @ self._W2 + self._B2)
 
@@ -87,21 +89,36 @@ def loss(target_y: tf.Tensor, predicted_y: tf.Tensor):
     # __p = tf.math.multiply(x=target_y, y=1. - predicted_y) # low probability = high loss
     return __l(target_y, predicted_y)
 
-
 # SAMPLE ######################################################################
+
+def tensor(ngram: list, depth: int=N_ENCODING) -> tf.Tensor:
+    return tf.one_hot(indices=[ngram], depth=depth, dtype=tf.dtypes.float32)
+
+def _next(model: Model, x: tf.Tensor, classes: int=N_ENCODING, rand: bool=True) -> int:
+    __prob = model(x)[0]
+    __unigrams = tf.cast(x=100. * __prob, dtype=tf.dtypes.int32).numpy().tolist()
+    __highest = tf.argmax(__prob, axis=-1).numpy()
+    __random, _, _ = tf.nn.fixed_unigram_candidate_sampler(
+        true_classes = tf.convert_to_tensor([range(27)], dtype=tf.dtypes.int64),
+        num_true = classes,
+        num_sampled = 1,
+        unique = False,
+        range_max = classes,
+        unigrams = __unigrams)
+    return __random.numpy()[0] if rand else __highest
 
 def sample(model: Model, context: int=N_CONTEXT, depth: int=N_ENCODING, max_length: int=N_SAMPLE) -> str:
     __i = 0
     __start = int(random.uniform(0, 27))
     __result = itos(__start)
     __ngram = (context - 1) * [0,] + [__start]
-    __x = tf.one_hot(indices=[__ngram], depth=depth, dtype=tf.dtypes.float32)
-    __next = tf.math.reduce_max(tf.argmax(model(__x), axis=-1)).numpy()
-    while __next != 0 and __i < max_length:
-        __ngram = __ngram[1:] + [__next]
-        __x = tf.one_hot(indices=[__ngram], depth=depth, dtype=tf.dtypes.float32)
-        __next = tf.math.reduce_max(tf.argmax(model(__x), axis=-1)).numpy()
-        __result += itos(__next)
+    __x = tensor(ngram=__ngram, depth=depth)
+    __n = _next(model=model, x=__x)
+    while __n != 0 and __i < max_length:
+        __ngram = __ngram[1:] + [__n]
+        __x = tensor(ngram=__ngram, depth=depth)
+        __n = _next(model=model, x=__x)
+        __result += itos(__n)
         __i += 1
     return __result
 
@@ -119,7 +136,7 @@ def step(model: Model, x: tf.Tensor, y: tf.Tensor, rate: int=TRAINING_RATE) -> N
             model.parameters[__i].assign_sub(rate * __grad[__i])
 
 def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tensor, y_test:tf.Tensor, steps: int=N_STEPS, batch: int=N_BATCH, rate: int=TRAINING_RATE) -> None:
-    for __i in range(steps):
+    for __i in range(steps + 1):
         # random batch
         __indices = random.sample(population=range(x_train.shape[0]), k=batch)
         __x = tf.gather(params=x_train, indices=__indices, axis=0)
@@ -127,7 +144,7 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
         # update the model
         step(model=model, x=__x, y=__y, rate=rate)
         # compute loss
-        if __i % 32 == 0:
+        if __i % 128 == 0:
             __train_loss = loss(target_y=y_train, predicted_y=model(x_train))
             __test_loss = loss(target_y=y_test, predicted_y=model(x_test))
             # log the progress
@@ -139,3 +156,8 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
 
 MODEL = Model()
 train(model=MODEL, x_train=X_TRAIN, y_train=Y_TRAIN, x_test=X_TEST, y_test=Y_TEST, steps=N_STEPS, batch=N_BATCH, rate=TRAINING_RATE)
+
+# VIZ #########################################################################
+
+# tf.argmax(X_TRAIN, axis=-1) # convert one_hot to indices and check the dataset
+# tf.argmax(Y_TRAIN, axis=-1)

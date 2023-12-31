@@ -6,7 +6,7 @@ authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8, <4"
+python = ">=3.9"
 tensorflow = ">=2"
 
 [tool.poetry.group.dev.dependencies]
