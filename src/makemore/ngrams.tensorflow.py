@@ -70,16 +70,25 @@ class Model(tf.Module):
         self._C = tf.Variable(initial_value=tf.random.normal(shape=(self._N_ENCODING, self._N_EMBEDDING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='C')
         # hidden layer
         self._W1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(self._N_EMBEDDING * self._N_CONTEXT, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W1')
+        # normalization layer
+        self._G1 = tf.Variable(initial_value=tf.ones(shape=(1, self._N_HIDDEN), dtype=tf.dtypes.float32), name='G1')
         self._B1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(1, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B1')
         # head layer
         self._W2 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(self._N_HIDDEN, self._N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W2')
         self._B2 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(1, self._N_ENCODING), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B2')
         # parameters
-        self.parameters = [self._C, self._W1, self._W2, self._B1, self._B2]
+        self.parameters = [self._C, self._W1, self._W2, self._B1, self._B2, self._G1]
 
     def __call__(self, x):
+        # embed the input vector / matrix
         __e = tf.reshape(x @ self._C, (x.shape[0], self._N_CONTEXT * self._N_EMBEDDING))
-        __h = tf.math.tanh(__e @ self._W1 + self._B1)
+        # hidden layer
+        __i = __e @ self._W1
+        # normalize
+        __n = tf.math.divide(__i - tf.math.reduce_mean(__i, axis=0, keepdims=True), tf.math.reduce_std(__i, axis=0, keepdims=True))
+        # activation
+        __h = tf.math.tanh(tf.math.multiply(self._G1, __n) + self._B1)
+        # head layer
         return tf.nn.softmax(__h @ self._W2 + self._B2)
 
 # LOSS ########################################################################
