@@ -71,6 +71,8 @@ class Model(tf.Module):
         # hidden layer
         self._W1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(self._N_EMBEDDING * self._N_CONTEXT, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='W1')
         # normalization layer
+        self._M1 = tf.Variable(initial_value=tf.zeros(shape=(1, self._N_HIDDEN), dtype=tf.dtypes.float32), name='M1')
+        self._S1 = tf.Variable(initial_value=tf.ones(shape=(1, self._N_HIDDEN), dtype=tf.dtypes.float32), name='S1')
         self._G1 = tf.Variable(initial_value=tf.ones(shape=(1, self._N_HIDDEN), dtype=tf.dtypes.float32), name='G1')
         self._B1 = tf.Variable(initial_value=0.1 * tf.random.normal(shape=(1, self._N_HIDDEN), mean=0., stddev=1., dtype=tf.dtypes.float32), name='B1')
         # head layer
@@ -83,9 +85,13 @@ class Model(tf.Module):
         # embed the input vector / matrix
         __e = tf.reshape(x @ self._C, (x.shape[0], self._N_CONTEXT * self._N_EMBEDDING))
         # hidden layer
-        __i = __e @ self._W1
+        __i = __e @ self._W1 # no need for a bias
         # normalize
-        __n = tf.math.divide(__i - tf.math.reduce_mean(__i, axis=0, keepdims=True), tf.math.reduce_std(__i, axis=0, keepdims=True))
+        __i_mean = tf.math.reduce_mean(__i, axis=0, keepdims=True)
+        __i_std = tf.math.reduce_std(__i, axis=0, keepdims=True)
+        self._M1 = tf.stop_gradient(0.999 * self._M1 + 0.001 * __i_mean)
+        self._S1 = tf.stop_gradient(0.999 * self._S1 + 0.001 * __i_std)
+        __n = tf.math.divide(__i - self._M1, self._S1)
         # activation
         __h = tf.math.tanh(tf.math.multiply(self._G1, __n) + self._B1)
         # head layer
