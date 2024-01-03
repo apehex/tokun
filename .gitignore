@@ -4,3 +4,6 @@
 # python env
 .python-version
 poetry.lock
+
+# tensorflow logs
+.logs
