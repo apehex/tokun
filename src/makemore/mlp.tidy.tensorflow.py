@@ -10,9 +10,9 @@ import tensorflow as tf
 
 # META ########################################################################
 
-N_ENCODING = 27
+N_ENCODING = 37
 N_CONTEXT = 8
-N_EMBEDDING = 32
+N_EMBEDDING = 64
 N_HIDDEN = 512
 N_SAMPLE = 32
 
@@ -35,11 +35,27 @@ def ngrams(word: str, length: int=N_CONTEXT):
 
 # ENCODING ####################################################################
 
+def is_alpha(c: str):
+    return ord(c.lower()) > 96 and ord(c.lower()) < 123
+
+def is_num(c: str):
+    return ord(c.lower()) > 47 and ord(c.lower()) < 58
+
 def stoi(c: str) -> int:
-    return 0 if c == '.' else (ord(c.lower()) - 96)
+    __i = 0
+    if is_alpha(c):
+        __i = ord(c.lower()) - 96
+    if is_num(c):
+        __i = 27 + ord(c.lower()) - 48
+    return __i
 
 def itos(i: int) -> str:
-    return '.' if i == 0 else chr(i + 96)
+    __c = '.'
+    if 0 < i and i < 27:
+        __c = chr(i + 96)
+    if 26 < i:
+        __c = chr(i + 21)
+    return __c
 
 def encode(text: str) -> tf.Tensor:
     return [stoi(__c) for __c in text]
@@ -230,7 +246,7 @@ def _next(model: Model, x: tf.Tensor, classes: int=N_ENCODING, highest: bool=Fal
     __unigrams = tf.cast(x=100. * __prob, dtype=tf.dtypes.int32).numpy().tolist()
     __highest = tf.argmax(__prob, axis=-1).numpy()
     __random, _, _ = tf.nn.fixed_unigram_candidate_sampler(
-        true_classes = tf.convert_to_tensor([range(27)], dtype=tf.dtypes.int64),
+        true_classes = tf.convert_to_tensor([range(N_ENCODING)], dtype=tf.dtypes.int64),
         num_true = classes,
         num_sampled = 1,
         unique = False,
@@ -240,7 +256,7 @@ def _next(model: Model, x: tf.Tensor, classes: int=N_ENCODING, highest: bool=Fal
 
 def sample(model: Model, context: int=N_CONTEXT, depth: int=N_ENCODING, max_length: int=N_SAMPLE) -> str:
     __i = 0
-    __start = int(random.uniform(0, 27))
+    __start = int(random.uniform(0, N_ENCODING))
     __result = itos(__start)
     __ngram = (context - 1) * [0,] + [__start]
     __x = tensor(ngram=__ngram)
@@ -315,12 +331,17 @@ def save_ratios_plot(data: list, model: Model, summary: 'ResourceSummaryWriter',
 # DATA ########################################################################
 
 USERNAMES = open('.data/usernames.txt', 'r').read().splitlines()
+
+# filter non-ascii characters
+USERNAMES = [__w for __w in USERNAMES if all([is_num(__c) or is_alpha(__c) for __c in __w])]
+
+# randomize the order
 random.shuffle(USERNAMES)
+
+# SPLIT #######################################################################
 
 N1 = int(0.8 * len(USERNAMES))
 N2 = int(0.9 * len(USERNAMES))
-
-# SPLIT #######################################################################
 
 X_TRAIN, Y_TRAIN = dataset(words=USERNAMES[:N1], context=N_CONTEXT)
 X_DEV, Y_DEV = dataset(words=USERNAMES[N1:N2], context=N_CONTEXT)

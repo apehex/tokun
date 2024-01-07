@@ -6,9 +6,9 @@ import tensorflow as tf
 
 # META ########################################################################
 
-N_ENCODING = 27
+N_ENCODING = 37
 N_CONTEXT = 4
-N_EMBEDDING = 32
+N_EMBEDDING = 64
 N_HIDDEN = 256
 N_SAMPLE = 32
 
@@ -18,14 +18,6 @@ N_BATCH = 4096
 G_REGULARIZATION = 1.
 
 R_TRAINING = 1.
-
-# DATA ########################################################################
-
-USERNAMES = open('.data/usernames.txt', 'r').read().splitlines()
-random.shuffle(USERNAMES)
-
-N1 = int(0.8 * len(USERNAMES))
-N2 = int(0.9 * len(USERNAMES))
 
 # N-GRAMS #####################################################################
 
@@ -37,11 +29,27 @@ def ngrams(word: str, length: int=N_CONTEXT):
 
 # ENCODING ####################################################################
 
+def is_alpha(c: str):
+    return ord(c.lower()) > 96 and ord(c.lower()) < 123
+
+def is_num(c: str):
+    return ord(c.lower()) > 47 and ord(c.lower()) < 58
+
 def stoi(c: str) -> int:
-    return 0 if c == '.' else (ord(c.lower()) - 96)
+    __i = 0
+    if is_alpha(c):
+        __i = ord(c.lower()) - 96
+    if is_num(c):
+        __i = 27 + ord(c.lower()) - 48
+    return __i
 
 def itos(i: int) -> str:
-    return '.' if i == 0 else chr(i + 96)
+    __c = '.'
+    if 0 < i and i < 27:
+        __c = chr(i + 96)
+    if 26 < i:
+        __c = chr(i + 21)
+    return __c
 
 def encode(text: str) -> tf.Tensor:
     return [stoi(__c) for __c in text]
@@ -52,12 +60,6 @@ def dataset(words: list, context: int=N_CONTEXT, depth: int=N_ENCODING) -> tuple
     __x = [encode(__n) for __w in words for __n in ngrams(word=__w, length=context)]
     __y = [__i for __w in words for __i in encode(__w + '.')]
     return tf.one_hot(indices=__x, depth=depth, dtype=tf.dtypes.float32), tf.one_hot(indices=__y, depth=depth, dtype=tf.dtypes.float32)
-
-# SPLIT #######################################################################
-
-X_TRAIN, Y_TRAIN = dataset(words=USERNAMES[:N1], context=N_CONTEXT)
-X_DEV, Y_DEV = dataset(words=USERNAMES[N1:N2], context=N_CONTEXT)
-X_TEST, Y_TEST = dataset(words=USERNAMES[N2:], context=N_CONTEXT)
 
 # MODEL #######################################################################
 
@@ -117,7 +119,7 @@ def _next(model: Model, x: tf.Tensor, classes: int=N_ENCODING, rand: bool=True) 
     __unigrams = tf.cast(x=100. * __prob, dtype=tf.dtypes.int32).numpy().tolist()
     __highest = tf.argmax(__prob, axis=-1).numpy()
     __random, _, _ = tf.nn.fixed_unigram_candidate_sampler(
-        true_classes = tf.convert_to_tensor([range(27)], dtype=tf.dtypes.int64),
+        true_classes = tf.convert_to_tensor([range(N_ENCODING)], dtype=tf.dtypes.int64),
         num_true = classes,
         num_sampled = 1,
         unique = False,
@@ -127,7 +129,7 @@ def _next(model: Model, x: tf.Tensor, classes: int=N_ENCODING, rand: bool=True) 
 
 def sample(model: Model, context: int=N_CONTEXT, depth: int=N_ENCODING, max_length: int=N_SAMPLE) -> str:
     __i = 0
-    __start = int(random.uniform(0, 27))
+    __start = int(random.uniform(0, N_ENCODING))
     __result = itos(__start)
     __ngram = (context - 1) * [0,] + [__start]
     __x = tensor(ngram=__ngram, depth=depth)
@@ -169,6 +171,25 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
             print('[epoch {epoch}] train loss: {train} test loss: {test}'.format(epoch=__i, train=__train_loss, test=__test_loss))
 
 # TEST ########################################################################
+
+# DATA ########################################################################
+
+USERNAMES = open('.data/usernames.txt', 'r').read().splitlines()
+
+# filter non-ascii characters
+USERNAMES = [__w for __w in USERNAMES if all([is_num(__c) or is_alpha(__c) for __c in __w])]
+
+# randomize the order
+random.shuffle(USERNAMES)
+
+# SPLIT #######################################################################
+
+N1 = int(0.8 * len(USERNAMES))
+N2 = int(0.9 * len(USERNAMES))
+
+X_TRAIN, Y_TRAIN = dataset(words=USERNAMES[:N1], context=N_CONTEXT)
+X_DEV, Y_DEV = dataset(words=USERNAMES[N1:N2], context=N_CONTEXT)
+X_TEST, Y_TEST = dataset(words=USERNAMES[N2:], context=N_CONTEXT)
 
 # MAIN ########################################################################
 
