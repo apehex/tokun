@@ -112,16 +112,19 @@ class BatchNormalization(tf.keras.layers.Layer):
         self._bias = None
 
     def build(self, shape: tuple):
+        # shape
+        __axis = self._axis % len(shape) # positive index even when the axis is specified negatively, like -2
+        __shape = [__d for __i, __d in enumerate(shape) if __i != __axis]
         # values
         __mean_init = SmallNormal()
         __stddev_init = SmallNormal()
         __gain_init = SmallNormal()
         __bias_init = SmallNormal()
         # tensors
-        self._mean = self.add_weight("mean", shape=(shape[-1],), initializer=__mean_init)
-        self._stddev = self.add_weight("stddev", shape=(shape[-1],), initializer=__stddev_init)
-        self._gain = self.add_weight("gain", shape=(shape[-1],), initializer=__gain_init)
-        self._bias = self.add_weight("bias", shape=(shape[-1],), initializer=__bias_init)
+        self._mean = self.add_weight("mean", shape=__shape, initializer=__mean_init)
+        self._stddev = self.add_weight("stddev", shape=__shape, initializer=__stddev_init)
+        self._gain = self.add_weight("gain", shape=__shape, initializer=__gain_init)
+        self._bias = self.add_weight("bias", shape=__shape, initializer=__bias_init)
 
     def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
         if training:
