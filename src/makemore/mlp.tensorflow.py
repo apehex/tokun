@@ -12,8 +12,8 @@ import tensorflow as tf
 
 N_ENCODING = 37
 N_CONTEXT = 8
-N_EMBEDDING = 64
-N_HIDDEN = 512
+N_EMBEDDING = 32
+N_HIDDEN = 256
 N_SAMPLE = 32
 
 N_STEPS = 1024
@@ -23,7 +23,7 @@ G_REGULARIZATION = 1.
 
 R_TRAINING = 0.2
 
-VERSION = 'no-regularization'
+VERSION = 'mlp-78k'
 
 # N-GRAMS #####################################################################
 
@@ -232,6 +232,9 @@ class Model(tf.Module):
             __x = __l(__x, training=training)
         # return the output of the latest layer
         return __x
+
+    def n_trainable_elements(self):
+        return sum([tf.size(__v).numpy() for __v in MODEL.trainable_variables])
 
 # LOSS ########################################################################
 
