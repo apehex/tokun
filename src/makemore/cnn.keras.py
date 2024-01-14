@@ -12,16 +12,16 @@ import tensorflow as tf
 
 N_ENCODING = 37
 N_CONTEXT = 8
-N_EMBEDDING = 64
-N_HIDDEN = 256
+N_EMBEDDING = 32
+N_HIDDEN = 128
 N_SAMPLE = 32
 
 N_EPOCHS = 16
-N_BATCH = 1024
+N_BATCH = 2048
 
 R_TRAINING = 0.001
 
-VERSION = 'keras'
+VERSION = 'cnn-keras-80k'
 
 # N-GRAMS #####################################################################
 
@@ -137,6 +137,18 @@ def sample(model: tf.keras.Sequential, context: int=N_CONTEXT, depth: int=N_ENCO
 
 # SAVE ########################################################################
 
+def save_model_histograms(model: tf.keras.Sequential, epoch: int, summary: 'ResourceSummaryWriter') -> None:
+    with summary.as_default():
+        for __p in model.trainable_variables:
+            tf.summary.histogram(name=__p.name, data=__p, step=epoch)
+
+# log path
+LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+SUMMARY = tf.summary.create_file_writer(LOGPATH)
+
+# called during training
+CALLBACK = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
+
 # TEST ########################################################################
 
 # DATA ########################################################################
@@ -160,7 +172,7 @@ X_TEST, Y_TEST = dataset(words=USERNAMES[N2:], context=N_CONTEXT)
 
 # TRAIN #######################################################################
 
-MODEL.fit(
+TRAINING_HISTORY = MODEL.fit(
     x=X_TRAIN,
     y=Y_TRAIN,
     batch_size=N_BATCH,
@@ -168,22 +180,13 @@ MODEL.fit(
     validation_split=None,
     validation_data=(X_DEV, Y_DEV),
     validation_freq=[1, N_EPOCHS],
-    verbose=2)
+    verbose=2,
+    callbacks=[CALLBACK])
 
 # VIZ #########################################################################
 
 # tf.argmax(X_TRAIN, axis=-1) # convert one_hot to indices and check the dataset
 # tf.argmax(Y_TRAIN, axis=-1)
 
-PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-SUMMARY = tf.summary.create_file_writer(PATH)
-
 # plot model stats
-# save_model_histograms(model=MODEL, step=N_STEPS, summary=SUMMARY)
-
-# plot loss
-# save_loss_plot(data=L_TRAIN, name='train_loss', summary=SUMMARY, offset=0)
-# save_loss_plot(data=L_TEST, name='test_loss', summary=SUMMARY, offset=0)
-
-# plot log10(gradient / value)
-# save_ratios_plot(data=G_RATIOS, model=MODEL, summary=SUMMARY, offset=0)
+save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
