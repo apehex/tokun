@@ -23,7 +23,7 @@ G_REGULARIZATION = 1.
 
 R_TRAINING = 0.2
 
-VERSION = 'cnn'
+VERSION = 'cnn-tf-80k'
 
 # N-GRAMS #####################################################################
 
@@ -267,7 +267,7 @@ class Model(tf.Module):
         return __x
 
     def n_trainable_elements(self):
-        return sum([tf.size(__v).numpy() for __v in MODEL.trainable_variables])
+        return tf.reduce_sum([tf.size(__v) for __v in MODEL.trainable_variables]).numpy()
 
 # LOSS ########################################################################
 
@@ -340,7 +340,7 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
         # save loss
         __train_loss.append((__i, __loss))
         # save ratios grad / data
-        __ratios.append(__r)
+        __ratios.append((__i, __r))
         # log the progress
         if __i % int(0.1 * steps) == 0:
             __test_loss.append((__i, loss(target_y=y_test, predicted_y=model(x_test, training=False))))
@@ -351,7 +351,7 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
 
 def save_model_histograms(model: Model, step: int, summary: 'ResourceSummaryWriter') -> None:
     with summary.as_default():
-        for __p in model.variables:
+        for __p in model.trainable_variables:
             tf.summary.histogram(__p.name, __p, step=step)
 
 def save_loss_plot(data: list, name: str, summary: 'ResourceSummaryWriter', offset: int=0) -> None:
@@ -361,7 +361,7 @@ def save_loss_plot(data: list, name: str, summary: 'ResourceSummaryWriter', offs
 
 def save_ratios_plot(data: list, model: Model, summary: 'ResourceSummaryWriter', offset: int=0) -> None:
     with summary.as_default():
-        for __i, __ratios in enumerate(data):
+        for __i, __ratios in data:
             for __j, __r in enumerate(__ratios):
                 tf.summary.scalar(model.trainable_variables[__j].name + '_log10(gradient/value)', __r, step=__i + offset)
 

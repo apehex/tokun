@@ -23,7 +23,7 @@ G_REGULARIZATION = 1.
 
 R_TRAINING = 0.2
 
-VERSION = 'mlp-78k'
+VERSION = 'mlp-tf-80k'
 
 # N-GRAMS #####################################################################
 
