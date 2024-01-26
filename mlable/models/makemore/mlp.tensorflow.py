@@ -5,7 +5,6 @@ import math
 import os
 import random
 
-import tensorboard as tb
 import tensorflow as tf
 
 # META ########################################################################
@@ -13,7 +12,7 @@ import tensorflow as tf
 N_ENCODING = 37
 N_CONTEXT = 8
 N_EMBEDDING = 32
-N_HIDDEN = 128
+N_HIDDEN = 256
 N_SAMPLE = 32
 
 N_STEPS = 1024
@@ -23,7 +22,7 @@ G_REGULARIZATION = 1.
 
 R_TRAINING = 0.2
 
-VERSION = 'cnn-tf-80k'
+VERSION = 'mlp-tf-80k'
 
 # N-GRAMS #####################################################################
 
@@ -186,26 +185,6 @@ class Embedding(Dense):
         __x = tf.one_hot(indices=inputs, depth=self._input_dim, dtype=tf.dtypes.float32)
         return super(Embedding, self).call(inputs=__x, **kwargs)
 
-class Merge(tf.keras.layers.Layer):
-    def __init__(
-        self,
-        axis: int,
-        n: int,
-        **kwargs
-    ):
-        super(Merge, self).__init__(**kwargs)
-        self._axis = axis
-        self._n = n
-
-    def call(self, inputs: tf.Tensor, **kwargs):
-        __shape = list(inputs.shape)
-        __axis0 = self._axis % len(__shape)
-        __axis1 = (self._axis + 1) % len(__shape)
-        # merge n rows along the given axis
-        __shape[__axis0] = inputs.shape[__axis0] // self._n
-        __shape[__axis1] = inputs.shape[__axis1] * self._n
-        return tf.squeeze(tf.reshape(inputs, __shape))
-
 class Reshape(tf.keras.layers.Layer):
     def __init__(
         self,
@@ -237,24 +216,11 @@ class Model(tf.Module):
         super().__init__(*args, **kwargs)
         # layers
         self._layers = [
-            # embedding
             Embedding(input_dim=n_encoding, output_dim=n_embedding, name='embedding'),
-            # block 1
-            Merge(axis=1, n=2, name='merge-2'),
-            Dense(units=n_hidden, use_bias=False, name='hidden-2'),
-            BatchNormalization(axis=0, name='normalization-2'),
-            Activation(function=tf.math.tanh, name='activation-2'),
-            # block 2
-            Merge(axis=1, n=2, name='merge-4'),
-            Dense(units=n_hidden, use_bias=False, name='hidden-4'),
-            BatchNormalization(axis=0, name='normalization-4'),
-            Activation(function=tf.math.tanh, name='activation-4'),
-            # block 3
-            Merge(axis=1, n=2, name='merge-8'),
-            Dense(units=n_hidden, use_bias=False, name='hidden-8'),
-            BatchNormalization(axis=0, name='normalization-8'),
-            Activation(function=tf.math.tanh, name='activation-8'),
-            # head
+            Reshape(target_shape=(-1, n_context * n_embedding), name='reshape'),
+            Dense(units=n_hidden, use_bias=False, name='hidden'),
+            BatchNormalization(axis=0, name='normalization'),
+            Activation(function=tf.math.tanh, name='activation'),
             Dense(units=n_encoding, use_bias=True, name='head'),
             Softmax(axis=-1, name='softmax')]
 
@@ -267,7 +233,7 @@ class Model(tf.Module):
         return __x
 
     def n_trainable_elements(self):
-        return tf.reduce_sum([tf.size(__v) for __v in MODEL.trainable_variables]).numpy()
+        return sum([tf.size(__v).numpy() for __v in MODEL.trainable_variables])
 
 # LOSS ########################################################################
 
@@ -340,7 +306,7 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
         # save loss
         __train_loss.append((__i, __loss))
         # save ratios grad / data
-        __ratios.append((__i, __r))
+        __ratios.append(__r)
         # log the progress
         if __i % int(0.1 * steps) == 0:
             __test_loss.append((__i, loss(target_y=y_test, predicted_y=model(x_test, training=False))))
@@ -351,7 +317,7 @@ def train(model: Model, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tenso
 
 def save_model_histograms(model: Model, step: int, summary: 'ResourceSummaryWriter') -> None:
     with summary.as_default():
-        for __p in model.trainable_variables:
+        for __p in model.variables:
             tf.summary.histogram(__p.name, __p, step=step)
 
 def save_loss_plot(data: list, name: str, summary: 'ResourceSummaryWriter', offset: int=0) -> None:
@@ -361,7 +327,7 @@ def save_loss_plot(data: list, name: str, summary: 'ResourceSummaryWriter', offs
 
 def save_ratios_plot(data: list, model: Model, summary: 'ResourceSummaryWriter', offset: int=0) -> None:
     with summary.as_default():
-        for __i, __ratios in data:
+        for __i, __ratios in enumerate(data):
             for __j, __r in enumerate(__ratios):
                 tf.summary.scalar(model.trainable_variables[__j].name + '_log10(gradient/value)', __r, step=__i + offset)
 
