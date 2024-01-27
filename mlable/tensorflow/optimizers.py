@@ -1,10 +1,17 @@
+import math
+import random
 import tensorflow as tf
 
 # CONSTANTS ###################################################################
 
+N_BATCH = 64
+N_STEPS = 2**10
+
+R_TRAINING = 0.1
+
 # SGD #########################################################################
 
-def step(model: tf.Module, x: tf.Tensor, y: tf.Tensor, rate: float=R_TRAINING) -> tuple:
+def step(model: tf.Module, loss: callable, x: tf.Tensor, y: tf.Tensor, rate: float=R_TRAINING) -> tuple:
     with tf.GradientTape() as __tape:
         # grad / data
         __ratios = []
@@ -20,7 +27,7 @@ def step(model: tf.Module, x: tf.Tensor, y: tf.Tensor, rate: float=R_TRAINING) -
             __ratios.append(math.log10(tf.math.reduce_std(rate * __grad[__i]) / tf.math.reduce_std(model.trainable_variables[__i])))
     return __loss, __ratios
 
-def train(model: tf.Module, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tensor, y_test:tf.Tensor, steps: int=N_STEPS, batch: int=N_BATCH, rate: float=R_TRAINING) -> tuple:
+def train(model: tf.Module, loss: callable, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.Tensor, y_test:tf.Tensor, steps: int=N_STEPS, batch: int=N_BATCH, rate: float=R_TRAINING) -> tuple:
     __train_loss = []
     __test_loss = []
     __ratios = []
@@ -30,7 +37,7 @@ def train(model: tf.Module, x_train: tf.Tensor, y_train: tf.Tensor, x_test: tf.T
         __x = tf.gather(params=x_train, indices=__indices, axis=0)
         __y = tf.gather(params=y_train, indices=__indices, axis=0)
         # update the model
-        __loss, __r = step(model=model, x=__x, y=__y, rate=rate)
+        __loss, __r = step(model=model, x=__x, y=__y, loss=loss, rate=rate)
         # save loss
         __train_loss.append((__i, __loss))
         # save ratios grad / data
