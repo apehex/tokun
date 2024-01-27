@@ -130,7 +130,7 @@ class Dense(tf.keras.layers.Layer):
 class Attention(tf.keras.layers.Layer):
     def __init__(
         self,
-        dropout: float,
+        output_dim: int,
         **kwargs
     ):
         super(Attention, self).__init__(**kwargs)
@@ -149,46 +149,45 @@ class Attention(tf.keras.layers.Layer):
 
 # EMBEDDING ###################################################################
 
-class Embedding(Dense):
+class Embedding(tf.keras.layers.Layer):
     def __init__(
         self,
         input_dim: int,
         output_dim: int,
+        add_position: bool=False,
         **kwargs
     ):
-        super(Embedding, self).__init__(units=output_dim, use_bias=False, **kwargs)
+        super(Embedding, self).__init__(**kwargs)
+        self._add_position = add_position
         self._input_dim = input_dim
         self._output_dim = output_dim
-
-    def build(self, shape: tuple):
-        __shape = list(shape)
-        # add a direction for the one-hot encoding
-        __shape = __shape + [self._input_dim]
-        # init
-        super(Embedding, self).build(shape=__shape)
-
-    def call(self, inputs: tf.Tensor, **kwargs):
-        __x = tf.one_hot(indices=inputs, depth=self._input_dim, dtype=tf.dtypes.float32)
-        return super(Embedding, self).call(inputs=__x, **kwargs)
-
-class PositionEmbedding(Dense):
-    def __init__(
-        self,
-        output_dim: int,
-        **kwargs
-    ):
-        super(PositionEmbedding, self).__init__(units=output_dim, use_bias=False, **kwargs)
         self._time_dim = None
+        self._content_kernel = None
+        self._position_kernel = None
 
     def build(self, shape: tuple):
-        # save the time dim
+        # content
+        __content_kernel_init = _mti.SmallNormal()
+        self._content_kernel = self.add_weight("content-kernel", shape=[self._input_dim, self._output_dim], initializer=__content_kernel_init)
+        # position
         self._time_dim = list(shape)[-1]
-        # init
-        super(PositionEmbedding, self).build(shape=shape)
+        if self._add_position:
+            __position_kernel_init = _mti.SmallNormal()
+            self._position_kernel = self.add_weight("position-kernel", shape=[self._time_dim, self._output_dim], initializer=__position_kernel_init)
 
     def call(self, inputs: tf.Tensor, **kwargs):
-        __p = 0.
-        return super(PositionEmbedding, self).call(inputs=__x, **kwargs)
+        # content embedding
+        __x = tf.one_hot(indices=inputs, depth=self._input_dim, dtype=tf.dtypes.float32)
+        __y = tf.matmul(__x, self._content_kernel)
+        # position embedding
+        if self._add_position:
+            __diag = tf.convert_to_tensor(range(self._time_dim), dtype=tf.dtypes.float32)
+            __diag = (__values - tf.math.reduce_mean(__diag)) / tf.math.reduce_std(__diag) # normalize
+            __x_pos = tf.linalg.tensor_diag(__diag)
+            __y_pos = tf.matmul(__x_pos, self._position_kernel)
+            __y = __y + tf.reshape(tensor=__y_pos, shape=[1] + list(__y_pos.shape))
+        # overall embedding
+        return __y
 
 # RESIDUALS ###################################################################
 
