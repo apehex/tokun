@@ -1,11 +1,15 @@
+# CONSTANTS ###################################################################
+
+BLANK = '$'
+
 # LIST ########################################################################
 
-def capture(text: str, blank: str='$') -> str:
+def capture(text: str, blank: str=BLANK) -> str:
     return sorted(list(set(text).union({blank})))
 
 # MAPPINGS ####################################################################
 
-def mappings(vocabulary: list, blank='</>') -> dict:
+def mappings(vocabulary: list, blank=BLANK) -> dict:
     __itos = {__i: __c for __i, __c in enumerate(vocabulary)}
     __stoi = {__c: __i for __i, __c in enumerate(vocabulary)}
     # blank placeholder
