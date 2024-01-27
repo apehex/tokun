@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 import mlable.tensorflow.initializers as _mti
@@ -130,22 +131,48 @@ class Dense(tf.keras.layers.Layer):
 class Attention(tf.keras.layers.Layer):
     def __init__(
         self,
-        output_dim: int,
+        head_dim: int,
+        head_count: int=1,
         **kwargs
     ):
         super(Attention, self).__init__(**kwargs)
+        self._time_dim = None
+        self._head_dim = head_dim
+        self._head_count = head_count
+        self._key = None
+        self._query = None
+        self._value = None
 
-    def build(self, shape: tuple):
-        # kernel
-        __kernel_init = _mti.SmallNormal()
-        self._kernel = self.add_weight("kernel", shape=[int(shape[-1]), self._units], initializer=__kernel_init)
+    def build(self, shape: tuple) -> None:
+        self._time_dim = list(shape)[-1]
+        # init
+        __key_init = _mti.SmallNormal()
+        __query_init = _mti.SmallNormal()
+        __value_init = _mti.SmallNormal()
+        # kernels
+        self._key = self.add_weight("key", shape=[int(shape[-1]), self._head_dim], initializer=__key_init)
+        self._query = self.add_weight("query", shape=[int(shape[-1]), self._head_dim], initializer=__query_init)
+        self._value = self.add_weight("value", shape=[int(shape[-1]), self._head_dim], initializer=__value_init)
 
-    def call(self, inputs: tf.Tensor, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+        # transpose the last two axes
+        __perm = range(len(list(inputs.shape)))
+        __perm[-1] = len(__perm) - 2
+        __perm[-2] = len(__perm) - 1
         # key
+        __k = tf.matmul(inputs, self._key)
         # query
+        __q = tf.matmul(inputs, self._query)
+        # weight
+        __w = tf.matmul(__k, tf.transpose(__q, perm=__perm)) / tf.math.sqrt(float(self._head_dim))
+        # mask
+        __m = tf.linalg.band_part(tf.ones((self._time_dim, self._time_dim)), num_lower=0, num_upper=-1) - tf.linalg.diag(self._time_dim * [1.])
+        __u = tf.where(__m == 1., -np.inf, 0.)
+        __l = tf.linalg.band_part(__w, num_lower=-1, num_upper=0)
+        # probabilities
+        __w = tf.nn.softmax(__u + __l, axis=-1)
         # value
-        # score
-        return self._function(inputs)
+        return tf.matmul(__w, self._value)
 
 # EMBEDDING ###################################################################
 
