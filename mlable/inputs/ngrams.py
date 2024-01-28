@@ -9,7 +9,7 @@ BLANK = '$'
 
 # TEXT TO LIST ################################################################
 
-def tokenize(text: str, length: int=N_CONTEXT, blank=BLANK):
+def tokenize(text: str, length: int, blank=BLANK):
     __context = length * blank
     for __c in text:
         yield __context
@@ -17,7 +17,7 @@ def tokenize(text: str, length: int=N_CONTEXT, blank=BLANK):
 
 # TEXT TO VECTOR ##############################################################
 
-def dataset(text: list, stoi: callable, context: int=N_CONTEXT, depth: int=N_VOCABULARY) -> tuple:
+def dataset(text: list, stoi: callable, depth: int, context: int) -> tuple:
     __x = [_miv.encode(text=__n, stoi=stoi) for __n in tokenize(text=text, length=context)]
     __y = _miv.encode(text=text, stoi=stoi)
     return tf.convert_to_tensor(value=__x, dtype=tf.dtypes.int32), tf.one_hot(indices=__y, depth=depth, dtype=tf.dtypes.float32)
