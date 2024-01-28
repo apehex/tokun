@@ -18,7 +18,7 @@ import mlable.tensorflow.summary as _mts
 # META ########################################################################
 
 N_VOCABULARY = 37
-N_CONTEXT = 8
+N_CONTEXT = 16
 N_EMBEDDING = 32
 N_HIDDEN = 128
 N_SAMPLE = 256
@@ -34,9 +34,6 @@ VERSION = 'sat-tf-80k'
 
 TEXT = open('.data/shakespeare/othello.md', 'r').read() # .splitlines()
 TEXT += open('.data/shakespeare/hamlet.md', 'r').read() # .splitlines()
-
-# randomize the order
-# random.shuffle(TEXT)
 
 # VOCABULARY ##################################################################
 
@@ -74,6 +71,11 @@ class Model(tf.Module):
             _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-8'),
             _mtl.BatchNormalization(axis=0, name='normalization-8'),
             _mtl.Activation(function=tf.math.tanh, name='activation-8'),
+            # block 4
+            _mtl.Merge(axis=1, n=2, name='merge-16'),
+            _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-16'),
+            _mtl.BatchNormalization(axis=0, name='normalization-16'),
+            _mtl.Activation(function=tf.math.tanh, name='activation-16'),
             # head
             _mtl.Dense(units=N_VOCABULARY, use_bias=True, name='head'),
             _mtl.Softmax(axis=-1, name='softmax')]
@@ -84,7 +86,7 @@ class Model(tf.Module):
         for __l in self._layers:
             __x = __l(__x, training=training)
         # return the output of the latest layer
-        return __x
+        return tf.squeeze(__x)
 
     def n_trainable_elements(self):
         return tf.reduce_sum([tf.size(__v) for __v in MODEL.trainable_variables]).numpy()
