@@ -23,7 +23,7 @@ N_EMBEDDING = 32
 N_HIDDEN = 128
 N_SAMPLE = 256
 
-N_STEPS = 1024
+N_EPOCHS = 2
 N_BATCH = 128
 
 R_TRAINING = 0.1
@@ -49,13 +49,6 @@ MAPPINGS = _miv.mappings(vocabulary=VOCABULARY, blank='$')
 
 _stoi = MAPPINGS['encode']
 _itos = MAPPINGS['decode']
-
-# DATASETS ####################################################################
-
-def dataset(text: list, stoi: callable=_stoi, context: int=N_CONTEXT, depth: int=N_VOCABULARY) -> tuple:
-    __x = [_miv.encode(text=__n, stoi=stoi) for __n in _min.tokenize(text=text, length=context)]
-    __y = _miv.encode(text=text, stoi=stoi)
-    return tf.convert_to_tensor(value=__x, dtype=tf.dtypes.int32), tf.one_hot(indices=__y, depth=depth, dtype=tf.dtypes.float32)
 
 # MODEL #######################################################################
 
@@ -98,9 +91,7 @@ class Model(tf.Module):
 
 # LOSS ########################################################################
 
-def loss(target_y: tf.Tensor, predicted_y: tf.Tensor):
-    __l = tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss')
-    return __l(target_y, predicted_y)
+loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss')
 
 # TEST ########################################################################
 
@@ -109,18 +100,18 @@ def loss(target_y: tf.Tensor, predicted_y: tf.Tensor):
 N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
-X_TRAIN, Y_TRAIN = dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT)
-X_DEV, Y_DEV = dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT)
-X_TEST, Y_TEST = dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT)
+X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
 
 # TRAIN ########################################################################
 
 MODEL = Model()
-# L_TRAIN, L_TEST, G_RATIOS = _mto.train(model=MODEL, loss=loss, x_train=X_TRAIN, y_train=Y_TRAIN, x_test=X_TEST, y_test=Y_TEST, steps=N_STEPS, batch=N_BATCH, rate=R_TRAINING)
+# L_TRAIN, L_TEST, G_RATIOS = _mto.train(model=MODEL, loss=loss, x_train=X_TRAIN, y_train=Y_TRAIN, x_test=X_TEST, y_test=Y_TEST, epochs=N_EPOCHS, batch=N_BATCH, rate=R_TRAINING)
 
 # SAMPLING ####################################################################
 
-sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, max_length=N_SAMPLE, itos=_itos)
+sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, length=N_SAMPLE, itos=_itos)
 
 # VIZ #########################################################################
 
@@ -131,7 +122,7 @@ PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-
 SUMMARY = tf.summary.create_file_writer(PATH)
 
 # plot model stats
-# _mts.save_model_histograms(model=MODEL, step=N_STEPS, summary=SUMMARY)
+# _mts.save_model_histograms(model=MODEL, step=N_EPOCHS, summary=SUMMARY)
 
 # plot loss
 # _mts.save_loss_plot(data=L_TRAIN, name='train_loss', summary=SUMMARY, offset=0)

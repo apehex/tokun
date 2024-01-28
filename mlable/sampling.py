@@ -13,8 +13,6 @@ def sample(model: tf.Module, context: int, depth: int, length: int, itos: callab
     __result = itos(__start)
     __ngram = (context - 1) * [0,] + [__start]
     __x = tf.convert_to_tensor(value=[__ngram], dtype=tf.dtypes.int32)
-    print(__ngram)
-    print(__x)
     __n = _next(model=model, x=__x)
     for __i in range(length):
         __ngram = __ngram[1:] + [__n]
