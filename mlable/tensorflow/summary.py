@@ -2,10 +2,10 @@ import tensorflow as tf
 
 # HISTOGRAMS ##################################################################
 
-def save_model_histograms(model: tf.Module, step: int, summary: 'ResourceSummaryWriter') -> None:
+def save_model_histograms(model: tf.Module, epoch: int, summary: 'ResourceSummaryWriter') -> None:
     with summary.as_default():
         for __p in model.trainable_variables:
-            tf.summary.histogram(__p.name, __p, step=step)
+            tf.summary.histogram(__p.name, __p, step=epoch)
 
 # LOSS ########################################################################
 

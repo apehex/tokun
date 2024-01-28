@@ -124,7 +124,7 @@ PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-
 SUMMARY = tf.summary.create_file_writer(PATH)
 
 # plot model stats
-# _mts.save_model_histograms(model=MODEL, step=N_EPOCHS, summary=SUMMARY)
+# _mts.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
 
 # plot loss
 # _mts.save_loss_plot(data=L_TRAIN, name='train_loss', summary=SUMMARY, offset=0)
