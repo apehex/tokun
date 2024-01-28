@@ -36,6 +36,8 @@ class BatchNormalization(tf.keras.layers.Layer):
         self._stddev = self.add_weight("stddev", shape=__shape, initializer=__stddev_init)
         self._gain = self.add_weight("gain", shape=__shape, initializer=__gain_init)
         self._bias = self.add_weight("bias", shape=__shape, initializer=__bias_init)
+        # notify the model
+        self.built = True
 
     def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
         if training:
@@ -81,6 +83,8 @@ class LayerNormalization(tf.keras.layers.Layer):
         self._stddev = self.add_weight("stddev", shape=__shape, initializer=__stddev_init)
         self._gain = self.add_weight("gain", shape=__shape, initializer=__gain_init)
         self._bias = self.add_weight("bias", shape=__shape, initializer=__bias_init)
+        # notify the model
+        self.built = True
 
     def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
         if training:
@@ -122,6 +126,8 @@ class Dense(tf.keras.layers.Layer):
         if self._biased:
             __bias_init = _mti.SmallNormal()
             self._bias = self.add_weight("bias", shape=[self._units], initializer=__bias_init)
+        # notify the model
+        self.built = True
 
     def call(self, inputs: tf.Tensor, **kwargs):
         return tf.matmul(inputs, self._kernel) + self._bias if (self._biased and self._bias is not None) else tf.matmul(inputs, self._kernel)
@@ -153,6 +159,8 @@ class Attention(tf.keras.layers.Layer):
         self._key = self.add_weight("key", shape=[int(shape[-1]), self._head_dim], initializer=__key_init)
         self._query = self.add_weight("query", shape=[int(shape[-1]), self._head_dim], initializer=__query_init)
         self._value = self.add_weight("value", shape=[int(shape[-1]), self._head_dim], initializer=__value_init)
+        # notify the model
+        self.built = True
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         # transpose the last two axes
@@ -201,6 +209,8 @@ class Embedding(tf.keras.layers.Layer):
         if self._add_position:
             __position_kernel_init = _mti.SmallNormal()
             self._position_kernel = self.add_weight("position-kernel", shape=[self._time_dim, self._output_dim], initializer=__position_kernel_init)
+        # notify the model
+        self.built = True
 
     def call(self, inputs: tf.Tensor, **kwargs):
         # content embedding
