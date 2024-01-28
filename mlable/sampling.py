@@ -5,7 +5,7 @@ import tensorflow as tf
 # SAMPLE ######################################################################
 
 def _next(model: tf.Module, x: tf.Tensor) -> int:
-    __prob = model(x, training=False)[0]
+    __prob = tf.squeeze(model(x, training=False))
     return tf.argmax(__prob, axis=-1).numpy()
 
 def sample(model: tf.Module, context: int, depth: int, length: int, itos: callable) -> str:

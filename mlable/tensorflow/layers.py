@@ -264,7 +264,7 @@ class Merge(tf.keras.layers.Layer):
         # merge n rows along the given axis
         __shape[__axis0] = inputs.shape[__axis0] // self._n
         __shape[__axis1] = inputs.shape[__axis1] * self._n
-        return tf.squeeze(tf.reshape(inputs, __shape))
+        return tf.reshape(inputs, __shape) # tf.squeeze
 
 class Reshape(tf.keras.layers.Layer):
     def __init__(
