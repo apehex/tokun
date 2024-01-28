@@ -1,69 +1,49 @@
 """Tensorflow port of the tutorial by Andrej Karpathy: https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/"""
 
 import datetime
+import functools
 import math
 import os
 import random
 
-import tensorboard as tb
 import tensorflow as tf
+
+import mlable.sampling as _ms
+import mlable.inputs.ngrams as _min
+import mlable.inputs.vocabulary as _miv
+import mlable.tensorflow.summary as _mts
 
 # META ########################################################################
 
-N_ENCODING = 37
-N_CONTEXT = 8
+N_VOCABULARY = 37
+N_CONTEXT = 32
 N_EMBEDDING = 32
 N_HIDDEN = 128
-N_SAMPLE = 32
+N_SAMPLE = 256
 
 N_EPOCHS = 16
-N_BATCH = 2048
+N_BATCH = 128
 
-R_TRAINING = 0.001
+R_TRAINING = 0.0001
 
-VERSION = 'cnn-keras-80k'
+VERSION = 'sat-keras-80k'
 
-# N-GRAMS #####################################################################
+# DATA ########################################################################
 
-def ngrams(word: str, length: int=N_CONTEXT):
-    __context = length * '.'
-    for __c in word + '.':
-        yield __context
-        __context = __context[1:] + __c
+TEXT = open('.data/shakespeare/othello.md', 'r').read() # .splitlines()
+TEXT += open('.data/shakespeare/hamlet.md', 'r').read() # .splitlines()
 
-# ENCODING ####################################################################
+# VOCABULARY ##################################################################
 
-def is_alpha(c: str):
-    return ord(c.lower()) > 96 and ord(c.lower()) < 123
+VOCABULARY = _miv.capture(TEXT)
+N_VOCABULARY = len(VOCABULARY)
 
-def is_num(c: str):
-    return ord(c.lower()) > 47 and ord(c.lower()) < 58
+# MAPPINGS ####################################################################
 
-def stoi(c: str) -> int:
-    __i = 0
-    if is_alpha(c):
-        __i = ord(c.lower()) - 96
-    if is_num(c):
-        __i = 27 + ord(c.lower()) - 48
-    return __i
+MAPPINGS = _miv.mappings(vocabulary=VOCABULARY, blank='$')
 
-def itos(i: int) -> str:
-    __c = '.'
-    if 0 < i and i < 27:
-        __c = chr(i + 96)
-    if 26 < i:
-        __c = chr(i + 21)
-    return __c
-
-def encode(text: str) -> tf.Tensor:
-    return [stoi(__c) for __c in text]
-
-# DATASETS ####################################################################
-
-def dataset(words: list, context: int=N_CONTEXT, depth: int=N_ENCODING) -> tuple:
-    __x = [encode(__n) for __w in words for __n in ngrams(word=__w, length=context)]
-    __y = [__i for __w in words for __i in encode(__w + '.')]
-    return tf.convert_to_tensor(value=__x, dtype=tf.dtypes.int32), tf.one_hot(indices=__y, depth=depth, dtype=tf.dtypes.float32)
+_stoi = MAPPINGS['encode']
+_itos = MAPPINGS['decode']
 
 # MODEL #######################################################################
 
@@ -73,7 +53,7 @@ MODEL = tf.keras.Sequential()
 MODEL.add(tf.keras.Input(shape=(N_CONTEXT,)))
 
 # embedding
-MODEL.add(tf.keras.layers.Embedding(input_dim=N_ENCODING, output_dim=N_EMBEDDING, embeddings_initializer='he_normal', name='embedding'))
+MODEL.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY, output_dim=N_EMBEDDING, embeddings_initializer='he_normal', name='embedding'))
 
 # block 1
 MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 2, 2 * N_EMBEDDING,), name='merge-2'))
@@ -88,13 +68,25 @@ MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.0
 MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-4'))
 
 # block 3
-MODEL.add(tf.keras.layers.Reshape(target_shape=(2 * N_HIDDEN,), name='merge-8'))
+MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 8, 2 * N_HIDDEN,), name='merge-8'))
 MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-8'))
 MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-8'))
 MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-8'))
 
+# block 4
+MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 16, 2 * N_HIDDEN,), name='merge-16'))
+MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-16'))
+MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-16'))
+MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-16'))
+
+# block 4
+MODEL.add(tf.keras.layers.Reshape(target_shape=(2 * N_HIDDEN,), name='merge-32'))
+MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-32'))
+MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-32'))
+MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-32'))
+
 # head
-MODEL.add(tf.keras.layers.Dense(units=N_ENCODING, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
+MODEL.add(tf.keras.layers.Dense(units=N_VOCABULARY, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
 MODEL.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
 
 # compile
@@ -102,45 +94,7 @@ MODEL.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=R_TRAINING),
     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'))
 
-# SAMPLE ######################################################################
-
-def tensor(ngram: list) -> tf.Tensor:
-    return tf.convert_to_tensor(value=[ngram], dtype=tf.dtypes.int32)
-
-def _next(model: tf.keras.Sequential, x: tf.Tensor, classes: int=N_ENCODING, highest: bool=False) -> int:
-    __prob = model(x, training=False)[0]
-    __unigrams = tf.cast(x=100. * __prob, dtype=tf.dtypes.int32).numpy().tolist()
-    __highest = tf.argmax(__prob, axis=-1).numpy()
-    __random, _, _ = tf.nn.fixed_unigram_candidate_sampler(
-        true_classes = tf.convert_to_tensor([range(N_ENCODING)], dtype=tf.dtypes.int64),
-        num_true = classes,
-        num_sampled = 1,
-        unique = False,
-        range_max = classes,
-        unigrams = __unigrams)
-    return __highest if highest else __random.numpy()[0]
-
-def sample(model: tf.keras.Sequential, context: int=N_CONTEXT, depth: int=N_ENCODING, max_length: int=N_SAMPLE) -> str:
-    __i = 0
-    __start = int(random.uniform(0, N_ENCODING))
-    __result = itos(__start)
-    __ngram = (context - 1) * [0,] + [__start]
-    __x = tensor(ngram=__ngram)
-    __n = _next(model=model, x=__x)
-    while __n != 0 and __i < max_length:
-        __ngram = __ngram[1:] + [__n]
-        __x = tensor(ngram=__ngram)
-        __n = _next(model=model, x=__x)
-        __result += itos(__n)
-        __i += 1
-    return __result
-
 # SAVE ########################################################################
-
-def save_model_histograms(model: tf.keras.Sequential, epoch: int, summary: 'ResourceSummaryWriter') -> None:
-    with summary.as_default():
-        for __p in model.trainable_variables:
-            tf.summary.histogram(name=__p.name, data=__p, step=epoch)
 
 # log path
 LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -149,26 +103,14 @@ SUMMARY = tf.summary.create_file_writer(LOGPATH)
 # called during training
 CALLBACK = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 
-# TEST ########################################################################
-
-# DATA ########################################################################
-
-USERNAMES = open('.data/usernames.txt', 'r').read().splitlines()
-
-# filter non-ascii characters
-USERNAMES = [__w for __w in USERNAMES if all([is_num(__c) or is_alpha(__c) for __c in __w])]
-
-# randomize the order
-random.shuffle(USERNAMES)
-
-N1 = int(0.8 * len(USERNAMES))
-N2 = int(0.9 * len(USERNAMES))
-
 # SPLIT #######################################################################
 
-X_TRAIN, Y_TRAIN = dataset(words=USERNAMES[:N1], context=N_CONTEXT)
-X_DEV, Y_DEV = dataset(words=USERNAMES[N1:N2], context=N_CONTEXT)
-X_TEST, Y_TEST = dataset(words=USERNAMES[N2:], context=N_CONTEXT)
+N1 = int(0.8 * len(TEXT))
+N2 = int(0.9 * len(TEXT))
+
+X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
 
 # TRAIN #######################################################################
 
@@ -183,10 +125,14 @@ TRAINING_HISTORY = MODEL.fit(
     verbose=2,
     callbacks=[CALLBACK])
 
+# SAMPLE ######################################################################
+
+sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, length=N_SAMPLE, itos=_itos)
+
 # VIZ #########################################################################
 
 # tf.argmax(X_TRAIN, axis=-1) # convert one_hot to indices and check the dataset
 # tf.argmax(Y_TRAIN, axis=-1)
 
 # plot model stats
-save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
+_mts.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
