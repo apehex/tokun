@@ -150,7 +150,7 @@ class Attention(tf.keras.layers.Layer):
         self._value = None
 
     def build(self, shape: tuple) -> None:
-        self._time_dim = list(shape)[-1]
+        self._time_dim = list(shape)[-2]
         # init
         __key_init = _mti.SmallNormal()
         __query_init = _mti.SmallNormal()
@@ -158,7 +158,7 @@ class Attention(tf.keras.layers.Layer):
         # kernels
         self._key = self.add_weight("key", shape=[int(shape[-1]), self._head_dim], initializer=__key_init)
         self._query = self.add_weight("query", shape=[int(shape[-1]), self._head_dim], initializer=__query_init)
-        self._value = self.add_weight("value", shape=[int(shape[-1]), self._head_dim], initializer=__value_init)
+        self._value = self.add_weight("value", shape=[self._time_dim, self._head_dim], initializer=__value_init)
         # notify the model
         self.built = True
 
@@ -168,19 +168,19 @@ class Attention(tf.keras.layers.Layer):
         __perm[-1] = len(__perm) - 2
         __perm[-2] = len(__perm) - 1
         # key
-        __k = tf.matmul(inputs, self._key)
+        __k = tf.matmul(inputs, self._key) # (B, T, E) * (E, H) = (B, T, H)
         # query
-        __q = tf.matmul(inputs, self._query)
+        __q = tf.matmul(inputs, self._query) # (B, T, E) * (E, H) = (B, T, H)
         # weight
-        __w = tf.matmul(__k, tf.transpose(__q, perm=__perm)) / tf.math.sqrt(float(self._head_dim))
+        __w = tf.matmul(__k, tf.transpose(__q, perm=__perm)) / tf.math.sqrt(float(self._head_dim)) # (B, T, H) * (B, H, T) = (B, T, T)
         # mask
-        __m = tf.linalg.band_part(tf.ones((self._time_dim, self._time_dim)), num_lower=0, num_upper=-1) - tf.linalg.diag(self._time_dim * [1.])
-        __u = tf.where(__m == 1., -np.inf, 0.)
-        __l = tf.linalg.band_part(__w, num_lower=-1, num_upper=0)
+        __m = tf.linalg.band_part(tf.ones((self._time_dim, self._time_dim)), num_lower=0, num_upper=-1) - tf.linalg.diag(self._time_dim * [1.]) # (T, T)
+        __u = tf.where(__m == 1., -np.inf, 0.) # (T, T)
+        __l = tf.linalg.band_part(__w, num_lower=-1, num_upper=0) # (B, T, T) may fail because of the first dimension => diag of tensor with 3 axes
         # probabilities
-        __w = tf.nn.softmax(__u + __l, axis=-1)
+        __w = tf.nn.softmax(__u + __l, axis=-1) # (T, T) + (B, T, T) = (B, T, T)
         # value
-        return tf.matmul(__w, self._value)
+        return tf.matmul(__w, self._value) # (B, T, T) * (T, H) = (B, T, H)
 
 # EMBEDDING ###################################################################
 
