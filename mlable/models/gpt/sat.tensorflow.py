@@ -22,6 +22,7 @@ N_VOCABULARY = 37
 N_CONTEXT = 16
 N_EMBEDDING = 64
 N_ATTENTION = 64
+N_HIDDEN = 4 * N_ATTENTION
 
 N_EPOCHS = 2
 N_BATCH = 128
@@ -30,7 +31,7 @@ N_SAMPLE = 256
 
 R_TRAINING = 0.1
 
-VERSION = 'sat-tf-80k'
+VERSION = 'sat-tf-125k'
 
 # DATA ########################################################################
 
@@ -52,7 +53,7 @@ _itos = MAPPINGS['decode']
 # MODEL #######################################################################
 
 class Model(tf.Module):
-    def __init__(self, n_context: int=N_CONTEXT, n_vocabulary: int=N_VOCABULARY, n_embedding: int=N_EMBEDDING, n_attention: int=N_ATTENTION, *args, **kwargs):
+    def __init__(self, n_context: int=N_CONTEXT, n_vocabulary: int=N_VOCABULARY, n_embedding: int=N_EMBEDDING, n_attention: int=N_ATTENTION, n_hidden: int=N_HIDDEN, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # layers
         self._layers = [
@@ -61,11 +62,11 @@ class Model(tf.Module):
             # block 1
             _mtm.ResidualSelfAttentionBlock(attention_head_dim=n_attention, attention_head_count=1, name='attention-block-1'),
             # block 2
-            _mtm.ResidualSelfAttentionBlock(attention_head_dim=n_attention, attention_head_count=1, name='attention-block-2'),
-            # block 3
-            _mtm.FeedForwardResidualBlock(name='feedforward-block-1'),
+            _mtm.FeedForwardResidualBlock(hidden_dim=n_hidden, name='feedforward-block-1'),
+            # because of the residual connections, all internal layers have shape (-1, n_context, n_embedding) = (-1, n_context, n_attention)
+            _mtl.Reshape(target_shape=(-1, n_context * n_embedding)),
             # head
-            _mtl.Dense(units=N_VOCABULARY, use_bias=True, name='head'),
+            _mtl.Dense(units=n_vocabulary, use_bias=True, name='head'),
             _mtl.Softmax(axis=-1, name='softmax')]
 
     def __call__(self, x, training: bool=True):
