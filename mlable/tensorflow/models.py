@@ -4,48 +4,54 @@ import mlable.tensorflow.layers as _mtl
 
 # FEED FORWARD BLOCK ##########################################################
 
-class FeedForwardResidualBlock(tf.keras.Model):
+class FeedForwardResidualBlock(tf.keras.layers.Layer):
     def __init__(
         self,
-        norm_momentum=0.99,
-        norm_epsilon=0.001,
+        hidden_dim: int,
+        norm_epsilon: float=0.001,
         **kwargs
     ):
         super(FeedForwardResidualBlock, self).__init__(**kwargs)
-        self._normalization = _mtl.LayerNormalization(axis=-1, momentum=norm_momentum, epsilon=norm_epsilon)
+        self._normalization = _mtl.LayerNormalization(axis=-1, epsilon=norm_epsilon)
+        self._hidden_dim = hidden_dim
+        self._hidden = _mtl.Dense(units=self._hidden_dim, use_bias=True)
+        self._activation = _mtl.Activation(function=tf.math.tanh)
         self._projection = None
 
     def build(self, shape: tuple) -> None:
-        # create the projection layer to matche the input shape
-        self._projection = _mtl.Dense(units=shape[-1], use_bias=False)
-        # build
+        # create the projection layer to match the input shape
+        self._projection = _mtl.Dense(units=shape[-1], use_bias=True)
+        # no need to build the activation layer
         self._normalization.build(shape=shape)
-        self._projection.build(shape=shape)
+        self._hidden.build(shape=shape)
+        self._projection.build(shape=list(shape)[:-1] + [self._hidden_dim])
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs):
         __dx = inputs
         # normalize the features
-        __dx = self._normalization(__dx, training=training, **kwargs)
+        __dx = self._normalization(__dx, **kwargs)
+        # expand inside the hidden layer
+        __dx = self._hidden(__dx, **kwargs)
+        __dx = self._activation(__dx, **kwargs)
         # projection: match the input shape
-        __dx = self._projection(__dx, training=training, **kwargs)
+        __dx = self._projection(__dx, **kwargs)
         # residual
         return inputs + __dx
 
 # ATTENTION BLOCK #############################################################
 
-class ResidualSelfAttentionBlock(tf.keras.Model):
+class ResidualSelfAttentionBlock(tf.keras.layers.Layer):
     def __init__(
         self,
         attention_head_dim: int,
         attention_head_count: int=1,
-        norm_momentum=0.99,
         norm_epsilon=0.001,
         **kwargs
     ):
         super(ResidualSelfAttentionBlock, self).__init__(**kwargs)
-        self._normalization = _mtl.LayerNormalization(axis=-1, momentum=norm_momentum, epsilon=norm_epsilon)
+        self._normalization = _mtl.LayerNormalization(axis=-1, epsilon=norm_epsilon)
         self._attention = _mtl.Attention(head_dim=attention_head_dim, head_count=attention_head_count)
         self._projection = None
 
@@ -59,13 +65,13 @@ class ResidualSelfAttentionBlock(tf.keras.Model):
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs):
         __dx = inputs
         # normalize the features
-        __dx = self._normalization(__dx, training=training, **kwargs)
+        __dx = self._normalization(__dx, **kwargs)
         # self-attention
-        __dx = self._attention(__dx, training=training, **kwargs)
+        __dx = self._attention(__dx, **kwargs)
         # projection: match the input shape
-        __dx = self._projection(__dx, training=training, **kwargs)
+        __dx = self._projection(__dx, **kwargs)
         # residual
         return inputs + __dx
