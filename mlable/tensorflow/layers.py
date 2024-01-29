@@ -60,7 +60,7 @@ class LayerNormalization(tf.keras.layers.Layer):
         epsilon=0.001,
         **kwargs
     ):
-        super(BatchNormalization, self).__init__(**kwargs)
+        super(LayerNormalization, self).__init__(**kwargs)
         self._axis = axis
         self._momentum = momentum
         self._epsilon = epsilon
@@ -219,7 +219,7 @@ class Embedding(tf.keras.layers.Layer):
         # position embedding
         if self._add_position:
             __diag = tf.convert_to_tensor(range(self._time_dim), dtype=tf.dtypes.float32)
-            __diag = (__values - tf.math.reduce_mean(__diag)) / tf.math.reduce_std(__diag) # normalize
+            __diag = (__diag - tf.math.reduce_mean(__diag)) / tf.math.reduce_std(__diag) # normalize
             __x_pos = tf.linalg.tensor_diag(__diag)
             __y_pos = tf.matmul(__x_pos, self._position_kernel)
             __y = __y + tf.reshape(tensor=__y_pos, shape=[1] + list(__y_pos.shape))
