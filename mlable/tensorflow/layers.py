@@ -8,9 +8,9 @@ import mlable.tensorflow.initializers as _mti
 class BatchNormalization(tf.keras.layers.Layer):
     def __init__(
         self,
-        axis=0,
-        momentum=0.99,
-        epsilon=0.001,
+        axis: int=0,
+        momentum: float=0.99,
+        epsilon: float=0.001,
         **kwargs
     ):
         super(BatchNormalization, self).__init__(**kwargs)
@@ -25,7 +25,7 @@ class BatchNormalization(tf.keras.layers.Layer):
     def build(self, shape: tuple):
         # shape
         __axis = self._axis % len(shape) # positive index even when the axis is specified negatively, like -2
-        __shape = [__d for __i, __d in enumerate(shape) if __i != __axis]
+        __shape = [1 if __i == __axis else __d for __i, __d in enumerate(shape)]
         # values
         __mean_init = _mti.SmallNormal()
         __stddev_init = _mti.SmallNormal()
@@ -55,49 +55,36 @@ class BatchNormalization(tf.keras.layers.Layer):
 class LayerNormalization(tf.keras.layers.Layer):
     def __init__(
         self,
-        axis=-1,
-        momentum=0.99,
-        epsilon=0.001,
+        axis: int=-1,
+        epsilon: float=0.001,
         **kwargs
     ):
         super(LayerNormalization, self).__init__(**kwargs)
         self._axis = axis
-        self._momentum = momentum
         self._epsilon = epsilon
-        self._mean = None
-        self._stddev = None
         self._gain = None
         self._bias = None
 
     def build(self, shape: tuple):
         # shape
-        __axis = self._axis % len(shape) # positive index even when the axis is specified negatively, like -2
-        __shape = [__d for __i, __d in enumerate(shape) if __i != __axis]
+        __shape = [1] + shape[1:]
         # values
-        __mean_init = _mti.SmallNormal()
-        __stddev_init = _mti.SmallNormal()
         __gain_init = _mti.SmallNormal()
         __bias_init = _mti.SmallNormal()
         # tensors
-        self._mean = self.add_weight("mean", shape=__shape, initializer=__mean_init)
-        self._stddev = self.add_weight("stddev", shape=__shape, initializer=__stddev_init)
         self._gain = self.add_weight("gain", shape=__shape, initializer=__gain_init)
         self._bias = self.add_weight("bias", shape=__shape, initializer=__bias_init)
         # notify the model
         self.built = True
 
     def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
-        if training:
-            # current values
-            __layer_mean = tf.math.reduce_mean(inputs, axis=self._axis, keepdims=True)
-            __layer_stddev = tf.math.reduce_std(inputs, axis=self._axis, keepdims=True)
-            # update parameters
-            self._mean = tf.stop_gradient(self._momentum * self._mean + (1. - self._momentum) * __layer_mean)
-            self._stddev = tf.stop_gradient(self._momentum * self._stddev + (1. - self._momentum) * __layer_stddev)
+        # current values
+        __layer_mean = tf.math.reduce_mean(inputs, axis=self._axis, keepdims=True)
+        __layer_stddev = tf.math.reduce_std(inputs, axis=self._axis, keepdims=True)
         # normalize
-        __normalized = tf.math.divide(inputs - self._mean, self._stddev + self._epsilon)
+        __normalized = tf.math.divide(inputs - __layer_mean, __layer_stddev + self._epsilon)
         # scale
-        return tf.math.multiply(self._gain, __normalized) + self._bias
+        return tf.math.add(tf.math.multiply(self._gain, __normalized), self._bias)
 
 # REGULARIZATION ##############################################################
 
@@ -164,7 +151,7 @@ class Attention(tf.keras.layers.Layer):
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         # transpose the last two axes
-        __perm = range(len(list(inputs.shape)))
+        __perm = list(range(len(list(inputs.shape))))
         __perm[-1] = len(__perm) - 2
         __perm[-2] = len(__perm) - 1
         # key
