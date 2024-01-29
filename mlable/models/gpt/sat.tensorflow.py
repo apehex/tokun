@@ -12,6 +12,7 @@ import mlable.sampling as _ms
 import mlable.inputs.ngrams as _min
 import mlable.inputs.vocabulary as _miv
 import mlable.tensorflow.layers as _mtl
+import mlable.tensorflow.models as _mtm
 import mlable.tensorflow.optimizers as _mto
 import mlable.tensorflow.summary as _mts
 
@@ -19,12 +20,13 @@ import mlable.tensorflow.summary as _mts
 
 N_VOCABULARY = 37
 N_CONTEXT = 16
-N_EMBEDDING = 32
-N_HIDDEN = 128
-N_SAMPLE = 256
+N_EMBEDDING = 64
+N_ATTENTION = 64
 
 N_EPOCHS = 2
 N_BATCH = 128
+
+N_SAMPLE = 256
 
 R_TRAINING = 0.1
 
@@ -50,32 +52,18 @@ _itos = MAPPINGS['decode']
 # MODEL #######################################################################
 
 class Model(tf.Module):
-    def __init__(self, n_context: int=N_CONTEXT, N_VOCABULARY: int=N_VOCABULARY, n_embedding: int=N_EMBEDDING, n_hidden: int=N_HIDDEN, *args, **kwargs):
+    def __init__(self, n_context: int=N_CONTEXT, n_vocabulary: int=N_VOCABULARY, n_embedding: int=N_EMBEDDING, n_attention: int=N_ATTENTION, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # layers
         self._layers = [
             # embedding
-            _mtl.Embedding(input_dim=N_VOCABULARY, output_dim=n_embedding, name='embedding'),
+            _mtl.Embedding(input_dim=n_vocabulary, output_dim=n_embedding, add_position=True, name='embedding'),
             # block 1
-            _mtl.Merge(axis=1, n=2, name='merge-2'),
-            _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-2'),
-            _mtl.BatchNormalization(axis=0, name='normalization-2'),
-            _mtl.Activation(function=tf.math.tanh, name='activation-2'),
+            _mtm.ResidualSelfAttentionBlock(attention_head_dim=n_attention, attention_head_count=1, name='attention-block-1'),
             # block 2
-            _mtl.Merge(axis=1, n=2, name='merge-4'),
-            _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-4'),
-            _mtl.BatchNormalization(axis=0, name='normalization-4'),
-            _mtl.Activation(function=tf.math.tanh, name='activation-4'),
+            _mtm.ResidualSelfAttentionBlock(attention_head_dim=n_attention, attention_head_count=1, name='attention-block-2'),
             # block 3
-            _mtl.Merge(axis=1, n=2, name='merge-8'),
-            _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-8'),
-            _mtl.BatchNormalization(axis=0, name='normalization-8'),
-            _mtl.Activation(function=tf.math.tanh, name='activation-8'),
-            # block 4
-            _mtl.Merge(axis=1, n=2, name='merge-16'),
-            _mtl.Dense(units=n_hidden, use_bias=False, name='hidden-16'),
-            _mtl.BatchNormalization(axis=0, name='normalization-16'),
-            _mtl.Activation(function=tf.math.tanh, name='activation-16'),
+            _mtm.FeedForwardResidualBlock(name='feedforward-block-1'),
             # head
             _mtl.Dense(units=N_VOCABULARY, use_bias=True, name='head'),
             _mtl.Softmax(axis=-1, name='softmax')]
