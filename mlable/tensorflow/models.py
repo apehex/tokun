@@ -4,14 +4,14 @@ import mlable.tensorflow.layers as _mtl
 
 # FEED FORWARD BLOCK ##########################################################
 
-class FeedForwardResidualBlock(tf.keras.layers.Layer):
+class ResidualFeedForwardBlock(tf.keras.layers.Layer):
     def __init__(
         self,
         hidden_dim: int,
         norm_epsilon: float=0.001,
         **kwargs
     ):
-        super(FeedForwardResidualBlock, self).__init__(**kwargs)
+        super(ResidualFeedForwardBlock, self).__init__(**kwargs)
         self._normalization = _mtl.LayerNormalization(axis=-1, epsilon=norm_epsilon)
         self._hidden_dim = hidden_dim
         self._hidden = _mtl.Dense(units=self._hidden_dim, use_bias=True)
@@ -75,3 +75,33 @@ class ResidualSelfAttentionBlock(tf.keras.layers.Layer):
         __dx = self._projection(__dx, **kwargs)
         # residual
         return inputs + __dx
+
+# META BLOCK ##################################################################
+
+class ResidualSelfAttentionDecoderBlock(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        hidden_dim: int,
+        attention_head_dim: int,
+        attention_head_count: int=1,
+        norm_epsilon=0.001,
+        **kwargs
+    ):
+        super(ResidualSelfAttentionDecoderBlock, self).__init__(**kwargs)
+        self._feedforward = ResidualFeedForwardBlock(hidden_dim=hidden_dim, norm_epsilon=norm_epsilon)
+        self._attention = ResidualSelfAttentionBlock(attention_head_dim=attention_head_dim, attention_head_count=attention_head_count, norm_epsilon=norm_epsilon)
+
+    def build(self, shape: tuple) -> None:
+        self._feedforward.build(shape=shape)
+        self._attention.build(shape=shape)
+        # notify the model
+        self.built = True
+
+    def call(self, inputs: tf.Tensor, **kwargs):
+        __dx = inputs
+        # self-attention
+        __dx = self._attention(__dx, **kwargs)
+        # projection: match the input shape
+        __dx = self._feedforward(__dx, **kwargs)
+        # residual
+        return __dx

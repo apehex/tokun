@@ -24,7 +24,7 @@ N_EMBEDDING = 64
 N_ATTENTION = 64
 N_HIDDEN = 4 * N_ATTENTION
 
-N_EPOCHS = 2
+N_EPOCHS = 1
 N_BATCH = 128
 
 N_SAMPLE = 256
@@ -60,9 +60,7 @@ class Model(tf.Module):
             # embedding
             _mtl.Embedding(input_dim=n_vocabulary, output_dim=n_embedding, add_position=True, name='embedding'),
             # block 1
-            _mtm.ResidualSelfAttentionBlock(attention_head_dim=n_attention, attention_head_count=1, name='attention-block-1'),
-            # block 2
-            _mtm.FeedForwardResidualBlock(hidden_dim=n_hidden, name='feedforward-block-1'),
+            _mtm.ResidualSelfAttentionDecoderBlock(hidden_dim=n_hidden, attention_head_dim=n_attention, attention_head_count=1, name='decoder-block-1'),
             # because of the residual connections, all internal layers have shape (-1, n_context, n_embedding) = (-1, n_context, n_attention)
             _mtl.Reshape(target_shape=(-1, n_context * n_embedding)),
             # head
