@@ -11,22 +11,26 @@ import tensorflow as tf
 import mlable.sampling as _ms
 import mlable.inputs.ngrams as _min
 import mlable.inputs.vocabulary as _miv
+import mlable.keras.models as _mkm
 import mlable.tensorflow.summary as _mts
 
 # META ########################################################################
 
-N_VOCABULARY = 37
-N_CONTEXT = 32
-N_EMBEDDING = 32
-N_HIDDEN = 128
-N_SAMPLE = 256
+N_VOCABULARY_DIM = 37
+N_CONTEXT_DIM = 16
+N_EMBEDDING_DIM = 64
+N_ATTENTION_HEAD = 4
+N_ATTENTION_DIM = N_EMBEDDING_DIM // N_ATTENTION_HEAD
+N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # = 4 * N_ATTENTION_DIM * N_ATTENTION_HEAD
 
-N_EPOCHS = 16
+N_EPOCHS = 2
 N_BATCH = 128
+
+N_SAMPLE = 256
 
 R_TRAINING = 0.0001
 
-VERSION = 'sat-keras-80k'
+VERSION = 'sat-keras-125k'
 
 # DATA ########################################################################
 
@@ -36,7 +40,7 @@ TEXT += open('.data/shakespeare/hamlet.md', 'r').read() # .splitlines()
 # VOCABULARY ##################################################################
 
 VOCABULARY = _miv.capture(TEXT)
-N_VOCABULARY = len(VOCABULARY)
+N_VOCABULARY_DIM = len(VOCABULARY)
 
 # MAPPINGS ####################################################################
 
@@ -49,45 +53,19 @@ _itos = MAPPINGS['decode']
 
 MODEL = tf.keras.Sequential()
 
-# layers
-MODEL.add(tf.keras.Input(shape=(N_CONTEXT,)))
-
 # embedding
-MODEL.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY, output_dim=N_EMBEDDING, embeddings_initializer='he_normal', name='embedding'))
+MODEL.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY_DIM, output_dim=N_EMBEDDING_DIM, embeddings_initializer='he_normal', name='embedding'))
 
-# block 1
-MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 2, 2 * N_EMBEDDING,), name='merge-2'))
-MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-2'))
-MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-2'))
-MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-2'))
-
-# block 2
-MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 4, 2 * N_HIDDEN,), name='merge-4'))
-MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-4'))
-MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-4'))
-MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-4'))
-
-# block 3
-MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 8, 2 * N_HIDDEN,), name='merge-8'))
-MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-8'))
-MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-8'))
-MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-8'))
-
-# block 4
-MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT // 16, 2 * N_HIDDEN,), name='merge-16'))
-MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-16'))
-MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-16'))
-MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-16'))
-
-# block 4
-MODEL.add(tf.keras.layers.Reshape(target_shape=(2 * N_HIDDEN,), name='merge-32'))
-MODEL.add(tf.keras.layers.Dense(units=N_HIDDEN, activation=None, use_bias=False, kernel_initializer='he_normal', name='compress-32'))
-MODEL.add(tf.keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='normal', moving_mean_initializer='zeros', moving_variance_initializer='normal', name='normalization-32'))
-MODEL.add(tf.keras.layers.Activation(activation='tanh', name='activation-32'))
+# blocks
+MODEL.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=N_HIDDEN_DIM, attention_head_dim=N_ATTENTION_DIM, attention_head_count=N_ATTENTION_HEAD, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-1'))
 
 # head
-MODEL.add(tf.keras.layers.Dense(units=N_VOCABULARY, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
+MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT_DIM * N_EMBEDDING_DIM,), input_shape=(N_CONTEXT_DIM, N_EMBEDDING_DIM)))
+MODEL.add(tf.keras.layers.Dense(units=N_VOCABULARY_DIM, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
 MODEL.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
+
+# build
+# MODEL(tf.keras.Input(shape=(N_CONTEXT_DIM,), batch_size=N_BATCH))
 
 # compile
 MODEL.compile(
@@ -108,9 +86,9 @@ CALLBACK = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
-X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
-X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
-X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
+X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
+X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
 
 # TRAIN #######################################################################
 
@@ -127,7 +105,7 @@ TRAINING_HISTORY = MODEL.fit(
 
 # SAMPLE ######################################################################
 
-sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, length=N_SAMPLE, itos=_itos)
+sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM, length=N_SAMPLE, itos=_itos)
 
 # VIZ #########################################################################
 
