@@ -22,10 +22,10 @@ class BatchNormalization(tf.keras.layers.Layer):
         self._gain = None
         self._bias = None
 
-    def build(self, shape: tuple):
+    def build(self, input_shape: tuple):
         # shape
-        __axis = self._axis % len(shape) # positive index even when the axis is specified negatively, like -2
-        __shape = [1 if __i == __axis else __d for __i, __d in enumerate(shape)]
+        __axis = self._axis % len(input_shape) # positive index even when the axis is specified negatively, like -2
+        __shape = [1 if __i == __axis else __d for __i, __d in enumerate(input_shape)]
         # values
         __mean_init = _mti.SmallNormal()
         __stddev_init = _mti.SmallNormal()
@@ -65,9 +65,9 @@ class LayerNormalization(tf.keras.layers.Layer):
         self._gain = None
         self._bias = None
 
-    def build(self, shape: tuple):
+    def build(self, input_shape: tuple):
         # shape
-        __shape = [1] + shape[1:]
+        __shape = [1] + input_shape[1:]
         # values
         __gain_init = _mti.SmallNormal()
         __bias_init = _mti.SmallNormal()
@@ -105,10 +105,10 @@ class Dense(tf.keras.layers.Layer):
         self._kernel = None
         self._bias = None
 
-    def build(self, shape: tuple):
+    def build(self, input_shape: tuple):
         # kernel
         __kernel_init = _mti.SmallNormal()
-        self._kernel = self.add_weight("kernel", shape=[int(shape[-1]), self._units], initializer=__kernel_init)
+        self._kernel = self.add_weight("kernel", shape=[int(input_shape[-1]), self._units], initializer=__kernel_init)
         # bias
         if self._biased:
             __bias_init = _mti.SmallNormal()
@@ -136,15 +136,15 @@ class Attention(tf.keras.layers.Layer):
         self._query = None
         self._value = None
 
-    def build(self, shape: tuple) -> None:
-        self._time_dim = list(shape)[-2]
+    def build(self, input_shape: tuple) -> None:
+        self._time_dim = list(input_shape)[-2]
         # init
         __key_init = _mti.SmallNormal()
         __query_init = _mti.SmallNormal()
         __value_init = _mti.SmallNormal()
         # kernels
-        self._key = self.add_weight("key", shape=[int(shape[-1]), self._head_dim], initializer=__key_init)
-        self._query = self.add_weight("query", shape=[int(shape[-1]), self._head_dim], initializer=__query_init)
+        self._key = self.add_weight("key", shape=[int(input_shape[-1]), self._head_dim], initializer=__key_init)
+        self._query = self.add_weight("query", shape=[int(input_shape[-1]), self._head_dim], initializer=__query_init)
         self._value = self.add_weight("value", shape=[self._time_dim, self._head_dim], initializer=__value_init)
         # notify the model
         self.built = True
@@ -187,12 +187,12 @@ class Embedding(tf.keras.layers.Layer):
         self._content_kernel = None
         self._position_kernel = None
 
-    def build(self, shape: tuple):
+    def build(self, input_shape: tuple):
         # content
         __content_kernel_init = _mti.SmallNormal()
         self._content_kernel = self.add_weight("content-kernel", shape=[self._input_dim, self._output_dim], initializer=__content_kernel_init)
         # position
-        self._time_dim = list(shape)[-1]
+        self._time_dim = list(input_shape)[-1]
         if self._add_position:
             __position_kernel_init = _mti.SmallNormal()
             self._position_kernel = self.add_weight("position-kernel", shape=[self._time_dim, self._output_dim], initializer=__position_kernel_init)

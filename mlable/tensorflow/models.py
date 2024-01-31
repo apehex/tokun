@@ -18,13 +18,13 @@ class ResidualFeedForwardBlock(tf.keras.layers.Layer):
         self._activation = _mtl.Activation(function=tf.math.tanh)
         self._projection = None
 
-    def build(self, shape: tuple, **kwargs) -> None:
+    def build(self, input_shape: tuple, **kwargs) -> None:
         # create the projection layer to match the input shape
-        self._projection = _mtl.Dense(units=shape[-1], use_bias=True)
+        self._projection = _mtl.Dense(units=input_shape[-1], use_bias=True)
         # no need to build the activation layer
-        self._normalization.build(shape=shape) # no weights
-        self._hidden.build(shape=shape) # (C, H)
-        self._projection.build(shape=list(shape)[:-1] + [self._hidden_dim]) # (H, C)
+        self._normalization.build(input_shape=input_shape) # no weights
+        self._hidden.build(input_shape=input_shape) # (C, H)
+        self._projection.build(input_shape=list(input_shape)[:-1] + [self._hidden_dim]) # (H, C)
         # notify the model
         self.built = True
 
@@ -55,13 +55,13 @@ class ResidualSelfAttentionBlock(tf.keras.layers.Layer):
         self._attention = _mtl.Attention(head_dim=attention_head_dim, head_count=attention_head_count)
         self._projection = None
 
-    def build(self, shape: tuple, **kwargs) -> None:
+    def build(self, input_shape: tuple, **kwargs) -> None:
         # create the projection layer to matche the input shape
-        self._projection = _mtl.Dense(units=shape[-1], use_bias=False)
+        self._projection = _mtl.Dense(units=input_shape[-1], use_bias=False)
         # build
-        self._normalization.build(shape=shape)
-        self._attention.build(shape=shape)
-        self._projection.build(shape=list(shape)[:-1] + [self._attention._head_dim])
+        self._normalization.build(input_shape=input_shape)
+        self._attention.build(input_shape=input_shape)
+        self._projection.build(input_shape=list(input_shape)[:-1] + [self._attention._head_dim])
         # notify the model
         self.built = True
 
@@ -91,9 +91,9 @@ class ResidualSelfAttentionDecoderBlock(tf.keras.layers.Layer):
         self._feedforward = ResidualFeedForwardBlock(hidden_dim=hidden_dim, normalization_epsilon=normalization_epsilon)
         self._attention = ResidualSelfAttentionBlock(attention_head_dim=attention_head_dim, attention_head_count=attention_head_count, normalization_epsilon=normalization_epsilon)
 
-    def build(self, shape: tuple, **kwargs) -> None:
-        self._feedforward.build(shape=shape)
-        self._attention.build(shape=shape)
+    def build(self, input_shape: tuple, **kwargs) -> None:
+        self._feedforward.build(input_shape=input_shape)
+        self._attention.build(input_shape=input_shape)
         # notify the model
         self.built = True
 
