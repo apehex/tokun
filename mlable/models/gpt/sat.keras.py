@@ -19,16 +19,22 @@ import mlable.tensorflow.summary as _mts
 N_VOCABULARY_DIM = 37
 N_CONTEXT_DIM = 16
 N_EMBEDDING_DIM = 64
+N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # = 4 * N_ATTENTION_DIM * N_ATTENTION_HEAD
+N_ATTENTION_BLOCK = 1
 N_ATTENTION_HEAD = 4
 N_ATTENTION_DIM = N_EMBEDDING_DIM // N_ATTENTION_HEAD
-N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # = 4 * N_ATTENTION_DIM * N_ATTENTION_HEAD
 
-N_EPOCHS = 2
+N_EPOCHS = 8
+N_EPOCHS_RAMPUP = 4
+N_EPOCHS_SUSTAIN = 0
+
 N_BATCH = 128
 
 N_SAMPLE = 256
 
-R_TRAINING = 0.0001
+R_MIN = 0.00001
+R_MAX = 0.0001
+R_EXP = .8
 
 VERSION = 'sat-keras-125k'
 
@@ -51,22 +57,34 @@ _itos = MAPPINGS['decode']
 
 # MODEL #######################################################################
 
-def create_model() -> tf.keras.Model:
+def create_model(
+    n_context_dim: int=N_CONTEXT_DIM,
+    n_vocabulary_dim: int=N_VOCABULARY_DIM,
+    n_embedding_dim: int=N_EMBEDDING_DIM,
+    n_hidden_dim: int=N_HIDDEN_DIM,
+    n_attention_block: int=N_ATTENTION_BLOCK,
+    n_attention_head: int=N_ATTENTION_HEAD,
+    n_attention_dim: int=N_ATTENTION_DIM,
+    lr_min: float=R_MIN
+) -> tf.keras.Model:
     __model = tf.keras.Sequential()
     # embedding
-    __model.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY_DIM, output_dim=N_EMBEDDING_DIM, embeddings_initializer='he_normal', name='embedding'))
+    __model.add(tf.keras.layers.Embedding(input_dim=n_vocabulary_dim, output_dim=n_embedding_dim, embeddings_initializer='he_normal', name='embedding'))
     # blocks
-    __model.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=N_HIDDEN_DIM, attention_head_dim=N_ATTENTION_DIM, attention_head_count=N_ATTENTION_HEAD, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-1'))
+    for __i in range(n_attention_block):
+        __model.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=n_hidden_dim, attention_head_dim=n_attention_dim, attention_head_count=n_attention_head, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-' + str(__i)))
     # head
-    __model.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT_DIM * N_EMBEDDING_DIM,), input_shape=(N_CONTEXT_DIM, N_EMBEDDING_DIM)))
-    __model.add(tf.keras.layers.Dense(units=N_VOCABULARY_DIM, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
+    __model.add(tf.keras.layers.Reshape(target_shape=(n_context_dim * n_embedding_dim,), input_shape=(n_context_dim, n_embedding_dim)))
+    __model.add(tf.keras.layers.Dense(units=n_vocabulary_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
     __model.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
     # build
-    # __model(tf.keras.Input(shape=(N_CONTEXT_DIM,), batch_size=N_BATCH))
+    # __model(tf.keras.Input(shape=(n_context_dim,), batch_size=N_BATCH))
     # compile
     __model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=R_TRAINING),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'))
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr_min),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        metrics=['accuracy'])
+    return __model
 
 MODEL = create_model()
 
@@ -77,7 +95,7 @@ LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m
 SUMMARY = tf.summary.create_file_writer(LOGPATH)
 
 # called during training
-CALLBACK = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
+tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 
 # SPLIT #######################################################################
 
@@ -87,6 +105,20 @@ N2 = int(0.9 * len(TEXT))
 X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
 X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
 X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
+
+# LEARNING RATE ###############################################################
+
+def lrfn(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int):
+  __lr = lr_min
+  if epoch < rampup:
+    __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
+  elif epoch < rampup + sustain:
+    __lr = lr_max
+  else:
+    __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+  return __lr
+
+lr_callback = tf.keras.callbacks.LearningRateScheduler(lambda epoch: lrfn(epoch, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 # TRAIN #######################################################################
 
@@ -99,7 +131,7 @@ TRAINING_HISTORY = MODEL.fit(
     validation_data=(X_DEV, Y_DEV),
     validation_freq=[1, N_EPOCHS],
     verbose=2,
-    callbacks=[CALLBACK])
+    callbacks=[lr_callback, tb_callback])
 
 # SAMPLE ######################################################################
 
