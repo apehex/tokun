@@ -51,26 +51,24 @@ _itos = MAPPINGS['decode']
 
 # MODEL #######################################################################
 
-MODEL = tf.keras.Sequential()
+def create_model() -> tf.keras.Model:
+    __model = tf.keras.Sequential()
+    # embedding
+    __model.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY_DIM, output_dim=N_EMBEDDING_DIM, embeddings_initializer='he_normal', name='embedding'))
+    # blocks
+    __model.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=N_HIDDEN_DIM, attention_head_dim=N_ATTENTION_DIM, attention_head_count=N_ATTENTION_HEAD, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-1'))
+    # head
+    __model.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT_DIM * N_EMBEDDING_DIM,), input_shape=(N_CONTEXT_DIM, N_EMBEDDING_DIM)))
+    __model.add(tf.keras.layers.Dense(units=N_VOCABULARY_DIM, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
+    __model.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
+    # build
+    # __model(tf.keras.Input(shape=(N_CONTEXT_DIM,), batch_size=N_BATCH))
+    # compile
+    __model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=R_TRAINING),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'))
 
-# embedding
-MODEL.add(tf.keras.layers.Embedding(input_dim=N_VOCABULARY_DIM, output_dim=N_EMBEDDING_DIM, embeddings_initializer='he_normal', name='embedding'))
-
-# blocks
-MODEL.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=N_HIDDEN_DIM, attention_head_dim=N_ATTENTION_DIM, attention_head_count=N_ATTENTION_HEAD, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-1'))
-
-# head
-MODEL.add(tf.keras.layers.Reshape(target_shape=(N_CONTEXT_DIM * N_EMBEDDING_DIM,), input_shape=(N_CONTEXT_DIM, N_EMBEDDING_DIM)))
-MODEL.add(tf.keras.layers.Dense(units=N_VOCABULARY_DIM, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
-MODEL.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
-
-# build
-# MODEL(tf.keras.Input(shape=(N_CONTEXT_DIM,), batch_size=N_BATCH))
-
-# compile
-MODEL.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=R_TRAINING),
-    loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'))
+MODEL = create_model()
 
 # SAVE ########################################################################
 
