@@ -1,9 +1,9 @@
-# Password Manager
+# GPM: Generative Password Manager
 
 > Stateless password manager, powered by AI tensors.
 
-Up there with cookie popups, password management is a massive pain in the ass.
-Here's an elegant solution using tools from the AI world.
+Password management is up there with cookie popups and ads, a major pain in the ass.
+Here's an elegant solution using tools from the AI field.
 
 ## Features
 
@@ -11,6 +11,8 @@ Here's an elegant solution using tools from the AI world.
 - passwords are **never transmited**, there is no need to sync devices
 - all the passwords are generated from a **single master key**
 - password generation on the fly
+
+## CLI
 
 ## Process Overview
 
@@ -41,10 +43,17 @@ Master key => hyper parameters
 
 ## Model
 
-## Inputs
+## Preprocessing The Inputs
 
 - site
 - login
+
+Want to:
+
+- increase entropy to trigger different parts of the NN (context to have unique inputs)
+- have  deterministic (replicable) operations
+- filter out non ASCII characters
+- output the same value, whether or not there's unicode characters
 
 ## Sampling = Password Generation
 
@@ -59,3 +68,9 @@ Issues:
 - overhead? actually a feature? (hinders bruteforcing attempts)
 - security:
 	- the model should not be stored in memory / disk
+
+## Improvements
+
+- performance:
+	- use the base `numpy` instead of `tensorflow`
+	- replace the model with its base weight tensors and matrix multiplications
