@@ -9,7 +9,7 @@ def capture(text: str, blank: str=BLANK) -> str:
 
 # MAPPINGS ####################################################################
 
-def mappings(vocabulary: list, blank=BLANK) -> dict:
+def mappings(vocabulary: list) -> dict:
     __itos = {__i: __c for __i, __c in enumerate(vocabulary)}
     __stoi = {__c: __i for __i, __c in enumerate(vocabulary)}
     # blank placeholder
@@ -27,7 +27,7 @@ def mappings(vocabulary: list, blank=BLANK) -> dict:
 # ENCODING ####################################################################
 
 def encode(text: str, stoi: callable) -> list:
-    return [stoi(__c) for __c in text]
+    return [stoi(__c) for __c in text] # defaults to 0 if a character is not in the vocabulary
 
 def decode(sequence: list, itos: callable) -> list:
-    return ''.join([itos(__i) for __i in sequence])
+    return ''.join([itos(__i) for __i in sequence]) # defaults to the first character

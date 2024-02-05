@@ -45,7 +45,7 @@ N_VOCABULARY = len(VOCABULARY)
 
 # MAPPINGS ####################################################################
 
-MAPPINGS = _miv.mappings(vocabulary=VOCABULARY, blank=_miv.BLANK)
+MAPPINGS = _miv.mappings(vocabulary=VOCABULARY)
 
 _stoi = MAPPINGS['encode']
 _itos = MAPPINGS['decode']
