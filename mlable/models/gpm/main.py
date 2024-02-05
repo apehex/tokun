@@ -152,9 +152,9 @@ def main():
     __parser.add_argument('--id', '-i', action='store', dest='login_id', type=str, default='', help='the login id (username, email, etc)')
     __parser.add_argument('--length', '-l', action='store', dest='password_length', type=int, default=16, help='the length of the password (default 16)')
     __parser.add_argument('--nonce', '-n', action='store', dest='password_nonce', type=int, default=1, help='the nonce of the password (default 1)')
-    __parser.add_argument('--lower', '-a', action='store_true', dest='include_lower', default=True, help='include lowercase letters in the password')
-    __parser.add_argument('--upper', '-A', action='store_true', dest='include_upper', default=True, help='include uppercase letters in the password')
-    __parser.add_argument('--digits', '-d', action='store_true', dest='include_digits', default=True, help='include digits in the password')
+    __parser.add_argument('--lower', '-a', action='store_false', dest='include_lower', default=True, help='exclude lowercase letters from the password')
+    __parser.add_argument('--upper', '-A', action='store_false', dest='include_upper', default=True, help='exclude uppercase letters from the password')
+    __parser.add_argument('--digits', '-d', action='store_false', dest='include_digits', default=True, help='exclude digits from the password')
     __parser.add_argument('--symbols', '-s', action='store_true', dest='include_symbols', default=False, help='include symbols in the password')
     # parse
     try:

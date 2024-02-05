@@ -24,6 +24,16 @@ Even though the process generates high entropy passwords, it is deterministic an
 
 ## CLI
 
+Only 3 arguments are required:
+
+- the master key
+- the login target
+- the login id
+
+If they are not specified on the command line, the user will be prompted during the execution.
+
+The full list of parameters is the following:
+
 ```shell
 Generate / retrieve the password matching the input information
 
@@ -34,9 +44,9 @@ optional arguments:
   --id LOGIN_ID, -i LOGIN_ID                    the login id (username, email, etc)
   --length PASSWORD_LENGTH, -l PASSWORD_LENGTH  the length of the password (default 16)
   --nonce PASSWORD_NONCE, -n PASSWORD_NONCE     the nonce of the password
-  --lower, -a                                   include lowercase letters in the password
-  --upper, -A                                   include uppercase letters in the password
-  --digits, -d                                  include digits in the password
+  --lower, -a                                   exclude lowercase letters from the password
+  --upper, -A                                   exclude uppercase letters from the password
+  --digits, -d                                  exclude digits from the password
   --symbols, -s                                 include symbols in the password
 ```
 
@@ -53,15 +63,20 @@ The user provides:
     - the composition of its vocabulary (upper / lower letters, numbers, symbols)
     - a nonce, to allow multiple passwords per website
 
-And the program
+The inputs are then processed:
 
-0. setup: desired output vocabulary + length
-1. master password => hyper parameters
-2. model creation
-3. input encoding
-4. sampling / password generation
+0. setup the hyper-parameters:
+    - use the whole ASCII table as input vocabulary and save its shape
+    - compose the output vocabulary and save its shape
+    - cast the master-key into an integer seed
+1. define the mappings between IO strings and tensors
+2. preprocess / clean the string inputs
+3. encode the inputs as a sequence tensor X for the MLP
+4. create the model corresponding to the hyper-parameters
+5. sample / generate the password as a tensor Y
+6. decode the probability tensor Y into an actual password string
 
-## Hyper Parameters
+## 0) Setup The Hyper Parameters
 
 The generative function is a MLP: it is defined by hyper-parameters.
 
@@ -85,16 +100,20 @@ N_PASSWORD_DIM = 16
 N_PASSWORD_NONCE = 1
 ```
 
-Only `N_OUTPUT_DIM`, `N_PASSWORD_DIM` and `N_PASSWORD_NONCE` can be overwritten.
+Only `N_OUTPUT_DIM`, `N_PASSWORD_DIM` and `N_PASSWORD_NONCE` can be overwritten by the user.
 
-## Master Key
+### Defining the Input Vocabulary
+
+### Composing The Output Vocabulary
+
+### Casting The Master Key Into The Seed
 
 The seed is derived from the master-key of the user.
 
 ```python
 ```
 
-## Model
+## Creating The MLP Model
 
 ## Preprocessing The Inputs
 
