@@ -1,4 +1,4 @@
-"""Tensorflow port of the tutorial by Andrej Karpathy: https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/"""
+"""GPM: stateless password manager using a MLP generator."""
 
 import argparse
 import datetime
@@ -45,8 +45,8 @@ def seed(key: str) -> int:
 
 # VOCABULARY ##################################################################
 
-def compose(lower: bool=True, upper: bool=True, numbers: bool=True, symbols: bool=False) -> str:
-    return sorted(set(lower * VOCABULARY_ALPHA_LOWER + upper * VOCABULARY_ALPHA_UPPER + numbers * VOCABULARY_NUMBERS + symbols * VOCABULARY_SYMBOLS))
+def compose(lower: bool=True, upper: bool=True, digits: bool=True, symbols: bool=False) -> str:
+    return sorted(set(lower * VOCABULARY_ALPHA_LOWER + upper * VOCABULARY_ALPHA_UPPER + digits * VOCABULARY_NUMBERS + symbols * VOCABULARY_SYMBOLS))
 
 # MODEL #######################################################################
 
@@ -115,8 +115,8 @@ def process(
     password_nonce: int,
     include_lower: bool,
     include_upper: bool,
-    include_number: bool,
-    include_symbol: bool,
+    include_digits: bool,
+    include_symbols: bool,
     input_vocabulary: str=INPUT_VOCABULARY,
     model_context_dim: int=N_CONTEXT_DIM,
     model_embedding_dim: int=N_EMBEDDING_DIM
@@ -127,7 +127,7 @@ def process(
     __input_mappings = _miv.mappings(vocabulary=input_vocabulary)
     __input_dim = len(input_vocabulary)
     # output vocabulary
-    __output_vocabulary = compose(lower=include_lower, upper=include_upper, numbers=include_number, symbols=include_symbol)
+    __output_vocabulary = compose(lower=include_lower, upper=include_upper, digits=include_digits, symbols=include_symbols)
     __output_mappings = _miv.mappings(vocabulary=__output_vocabulary)
     __output_dim = len(__output_vocabulary)
     # inputs
@@ -142,6 +142,42 @@ def process(
 
 # CLI #########################################################################
 
+def main():
+    # init
+    __password = ''
+    # CLI args
+    __parser = argparse.ArgumentParser(description='Generate / retrieve the password matching the input informations.')
+    __parser.add_argument('--key', '-k', action='store', dest='master_key', type=str, default='', help='the master key (all ASCII)')
+    __parser.add_argument('--target', '-t', action='store', dest='login_target', type=str, default='', help='the login target (URL, IP, name, etc)')
+    __parser.add_argument('--id', '-i', action='store', dest='login_id', type=str, default='', help='the login id (username, email, etc)')
+    __parser.add_argument('--length', '-l', action='store', dest='password_length', type=int, default=16, help='the length of the password (default 16)')
+    __parser.add_argument('--nonce', '-n', action='store', dest='password_nonce', type=int, default=1, help='the nonce of the password (default 1)')
+    __parser.add_argument('--lower', '-a', action='store_true', dest='include_lower', default=True, help='include lowercase letters in the password')
+    __parser.add_argument('--upper', '-A', action='store_true', dest='include_upper', default=True, help='include uppercase letters in the password')
+    __parser.add_argument('--digits', '-d', action='store_true', dest='include_digits', default=True, help='include digits in the password')
+    __parser.add_argument('--symbols', '-s', action='store_true', dest='include_symbols', default=False, help='include symbols in the password')
+    # parse
+    try:
+        __args = vars(__parser.parse_args())
+        # fill the missing arguments
+        if not __args.get('master_key', ''):
+            __args['master_key'] = input('Master key:\n')
+        if not __args.get('login_target', ''):
+            __args['login_target'] = input('Login target:\n')
+        if not __args.get('login_id', ''):
+            __args['login_id'] = input('Login id:\n')
+        # generate the password
+        __password = process(
+            input_vocabulary=INPUT_VOCABULARY,
+            model_context_dim=N_CONTEXT_DIM,
+            model_embedding_dim=N_EMBEDDING_DIM,
+            **__args)
+    except:
+        pass # automatically prints the help message
+    # return it
+    print(__password)
+
 # MAIN ########################################################################
 
-process(master_key='yolomofo', login_target='huggingface.co', login_id='apehex', password_length=16, password_nonce=1, include_lower=True, include_upper=True, include_number=True, include_symbol=False, input_vocabulary=INPUT_VOCABULARY, model_context_dim=N_CONTEXT_DIM, model_embedding_dim=N_EMBEDDING_DIM)
+if __name__ == '__main__':
+    main()
