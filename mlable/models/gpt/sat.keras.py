@@ -74,7 +74,7 @@ def create_model(
     for __i in range(n_attention_block):
         __model.add(_mkm.ResidualSelfAttentionDecoderBlock(hidden_dim=n_hidden_dim, attention_head_dim=n_attention_dim, attention_head_count=n_attention_head, normalization_epsilon=0.001, dropout=0.0, name='decoder-block-' + str(__i)))
     # head
-    __model.add(tf.keras.layers.Reshape(target_shape=(n_context_dim * n_embedding_dim,), input_shape=(n_context_dim, n_embedding_dim)))
+    __model.add(tf.keras.layers.Reshape(target_shape=(n_context_dim * n_embedding_dim,), input_shape=(n_context_dim, n_embedding_dim), name='reshape'))
     __model.add(tf.keras.layers.Dense(units=n_vocabulary_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'))
     __model.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
     # build
