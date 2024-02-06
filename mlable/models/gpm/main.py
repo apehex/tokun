@@ -7,6 +7,7 @@ import itertools
 import math
 import os
 import random
+import re
 
 import tensorflow as tf
 
@@ -73,15 +74,20 @@ def create_model(
 # PREPROCESS ##################################################################
 
 def remove_prefix(text: str) -> str:
-    return
+    __r = r'^((?:ftp|https?):\/\/)'
+    return re.sub(pattern=__r, repl='', string=text, flags=re.IGNORECASE)
 
 def remove_suffix(text: str) -> str:
-    return
+    __r = r'(\/+)$'
+    return re.sub(pattern=__r, repl='', string=text, flags=re.IGNORECASE)
 
-def preprocess(target: str, login: str, stoi: callable) -> list:
-    __left = _miv.encode(text=target.lower(), stoi=stoi)
-    __right = _miv.encode(text=login.lower(), stoi=stoi)
-    return __left + __right
+def remove_spaces(text: str) -> str:
+    return text.replace(' ', '').replace('\t', '')
+
+def preprocess(target: str, login: str) -> list:
+    __left = remove_suffix(text=remove_prefix(text=remove_spaces(text=target.lower())))
+    __right = remove_spaces(text=login.lower())
+    return __left + '|' + __right
 
 # ENTROPY #####################################################################
 
@@ -131,7 +137,8 @@ def process(
     __output_mappings = _miv.mappings(vocabulary=__output_vocabulary)
     __output_dim = len(__output_vocabulary)
     # inputs
-    __source = preprocess(target=login_target, login=login_id, stoi=__input_mappings['encode'])
+    __inputs = preprocess(target=login_target, login=login_id)
+    __source = _miv.encode(text=__inputs, stoi=__input_mappings['encode'])
     __feed = feed(source=__source, nonce=password_nonce, dimension=__input_dim)
     __x = tensor(feed=__feed, length=password_length, context=model_context_dim)
     # model
@@ -161,11 +168,11 @@ def main():
         __args = vars(__parser.parse_args())
         # fill the missing arguments
         if not __args.get('master_key', ''):
-            __args['master_key'] = input('Master key:\n')
+            __args['master_key'] = input('> Master key:\n')
         if not __args.get('login_target', ''):
-            __args['login_target'] = input('Login target:\n')
+            __args['login_target'] = input('> Login target:\n')
         if not __args.get('login_id', ''):
-            __args['login_id'] = input('Login id:\n')
+            __args['login_id'] = input('> Login id:\n')
         # generate the password
         __password = process(
             input_vocabulary=INPUT_VOCABULARY,
