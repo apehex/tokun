@@ -85,21 +85,21 @@ The user provides:
 These inputs are then processed:
 
 0. setup the hyper-parameters:
-    a. use the whole ASCII table as input vocabulary and save its shape
-    b. compose the output vocabulary and save its shape
-    c. cast the master key into an integer seed
+    - use the whole ASCII table as input vocabulary and save its shape
+    - compose the output vocabulary and save its shape
+    - cast the master key into an integer seed
 1. preprocess / clean the string inputs:
-    a. remove unwanted characters
-    b. normalize the strings
+    - remove unwanted characters
+    - normalize the strings
 2. encode the inputs as a sequence tensor X for the MLP:
-    a. map the input characters to integers
-    b. add entropy to avoid repetitions in the output
-    c. format as a tensor
+    - map the input characters to integers
+    - add entropy to avoid repetitions in the output
+    - format as a tensor
 3. create the model corresponding to the hyper-parameters
 4. sample / generate the password as a tensor Y
 5. decode the probability tensor Y into an actual password string
 
-## 0) Setup The Hyper Parameters
+## 0. Setup The Hyper Parameters
 
 The generative function is a MLP: it is defined by hyper-parameters.
 
@@ -125,7 +125,7 @@ N_PASSWORD_NONCE = 1
 
 Only `N_OUTPUT_DIM`, `N_PASSWORD_DIM` and `N_PASSWORD_NONCE` can be overwritten by the user.
 
-### a) Defining the Input Vocabulary
+### 0.1. Defining the Input Vocabulary
 
 The inputs are projected on the ASCII table, all unicode characters are ignored.
 
@@ -135,7 +135,7 @@ This vocabulary is fixed, whatever the user typed:
 INPUT_VOCABULARY = ''.join(chr(__i) for __i in range(128))
 ```
 
-### b) Composing The Output Vocabulary
+### 0.2. Composing The Output Vocabulary
 
 The output vocabulary dictates the composition of the model output, IE the password.
 
@@ -169,7 +169,7 @@ By default it is:
 
 Another possibility would be to form the password out of whole words.
 
-### c) Casting The Master Key Into The Seed
+### 0.3. Casting The Master Key Into The Seed
 
 The master key is interpreted as a HEX sequence, which is than cast into the integer seed:
 
@@ -181,7 +181,7 @@ def seed(key: str) -> int:
 
 Notice the modulo operation to keep the seed in the valid range of the `random` library.
 
-## 1) Preprocessing The Inputs
+## 1. Preprocessing The Inputs
 
 The inputs are the login information for which the user wants a password:
 
@@ -190,7 +190,7 @@ The inputs are the login information for which the user wants a password:
 
 Before being handled to the model, they need to be preprocessed to guarantee that the output matches the user expectations.
 
-### a) Removing Unwanted Characters
+### 1.1. Removing Unwanted Characters
 
 First, the inputs should be cleaned to:
 
@@ -206,7 +206,7 @@ def remove_spaces(text: str) -> str:
 
 While the encoding function detailed below will automatically replace characters outside of the input vocabulary (ASCII table) with the default character of index 0.
 
-### b) Normalizing The Strings
+### 1.2. Normalizing The Strings
 
 Several variants can be used to point to the same service:
 
@@ -247,9 +247,9 @@ preprocess(target='example.com/', login='USER')
 # 'example.com|user'
 ```
 
-## 2) Encoding The Inputs
+## 2. Encoding The Inputs
 
-### a) Mapping The Characters To Integers
+### 2.1. Mapping The Characters To Integers
 
 The mapping between character and integer is a straightforward enumeration:
 
@@ -272,7 +272,7 @@ def mappings(vocabulary: list) -> dict:
 
 It will remove all the characters outside the input vocabulary, EG unicode characters.
 
-### b) Adding Entropy
+### 2.2. Adding Entropy
 
 With a character level embedding the input tensor would look like:
 
@@ -333,7 +333,7 @@ def feed(source: list, nonce: int, dimension: int) -> iter:
 
 This will allow to create passwords longer than the input text.
 
-### c) Formatting As A Tensor
+### 2.3. Formatting As A Tensor
 
 Finally, the iterator of encoded inputs is used to generate the tensor X:
 
@@ -370,7 +370,7 @@ Even though the input strings `'example.com|user'` had repetitions ("e" and "m")
 
 The process detailed here will always produce the same tensor X.
 
-## 3) Creating The MLP Model
+## 3. Creating The MLP Model
 
 Now that all the hyper-parameters are set, creating the MLP is just a formality:
 
@@ -399,7 +399,7 @@ def create_model(
 For the purpose of this POC we are using Tensorflow and Keras, but it could actually be done with basic matrix multiplications.
 Numpy would be almost as convenient to use and yield the same result.
 
-## 4) Sampling = Password Generation
+## 4. Sampling = Password Generation
 
 The forward pass of the tensor X in the above model will result in the probabilities for each character in the output vocabulary.
 
