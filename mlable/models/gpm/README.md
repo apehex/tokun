@@ -10,7 +10,9 @@ Here's an elegant implementation using tools from the AI field.
 ## Features
 
 > passwords are **never stored**, so they can't be leaked
+
 > passwords are **never transmited**, there is no need to sync devices
+
 > all the passwords are generated from a **single master key**
 
 ## Principle
@@ -460,3 +462,7 @@ This POC could be turned into a full-fledge product with:
     - generate the password as a bag of words
     - create whole sentences / quotes
     - force the use of certain characters / sub-vocabularies (like the symbols)
+- an actual distribution as:
+    - browser extension
+    - binary executable (CLI)
+    - mobile app
