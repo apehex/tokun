@@ -1,6 +1,6 @@
 # GPM: Generative Password Manager
 
-> Stateless password manager, powered by AI tensors.
+> Stateless password manager, powered by ML neural networks.
 
 Password management is up there with cookie popups and ads, a major pain in the ass.
 
@@ -11,7 +11,7 @@ Here's an elegant implementation using tools from the AI field.
 
 > passwords are **never stored**, so they can't be leaked
 
-> passwords are **never transmited**, there is no need to sync devices
+> passwords are **never transmitted**, there is no need to sync devices
 
 > all the passwords are generated from a **single master key**
 
@@ -383,11 +383,14 @@ def create_model(
     n_embedding_dim: int=N_EMBEDDING_DIM,
 ) -> tf.keras.Model:
     __model = tf.keras.Sequential()
+    # initialize the weights
+    __embedding_init = tf.keras.initializers.GlorotNormal(seed=seed)
+    __dense_init = tf.keras.initializers.GlorotNormal(seed=(seed ** 2) % (2 ** 64)) # different values
     # embedding
-    __model.add(tf.keras.layers.Embedding(input_dim=n_input_dim, output_dim=n_embedding_dim, embeddings_initializer=tf.keras.initializers.GlorotNormal(seed=seed), name='embedding'))
+    __model.add(tf.keras.layers.Embedding(input_dim=n_input_dim, output_dim=n_embedding_dim, embeddings_initializer=__embedding_init, name='embedding'))
     # head
     __model.add(tf.keras.layers.Reshape(target_shape=(n_context_dim * n_embedding_dim,), input_shape=(n_context_dim, n_embedding_dim), name='reshape'))
-    __model.add(tf.keras.layers.Dense(units=n_output_dim, activation='tanh', use_bias=False, kernel_initializer=tf.keras.initializers.GlorotNormal(seed=seed), name='head'))
+    __model.add(tf.keras.layers.Dense(units=n_output_dim, activation='tanh', use_bias=False, kernel_initializer=__dense_init, name='head'))
     __model.add(tf.keras.layers.Softmax(axis=-1, name='softmax'))
     # compile
     __model.compile(
