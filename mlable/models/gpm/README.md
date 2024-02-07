@@ -9,11 +9,11 @@ Here's an elegant implementation using tools from the AI field.
 
 ## Features
 
-> passwords are **never stored**, so they can't be leaked
+> Passwords are **never stored**, so they can't be leaked
 
-> passwords are **never transmitted**, there is no need to sync devices
+> Passwords are **never transmitted**, there is no need to sync devices
 
-> all the passwords are generated from a **single master key**
+> All the passwords are generated from a **single master key**
 
 ## Principle
 
@@ -32,7 +32,7 @@ Only 3 arguments are required:
 
 ```shell
 python  mlable/models/gpm/main.py --key 'never seen before combination of letters' --target 'http://example.com' --id 'user@e.mail'
-# uYaNR6I2FoJF2Wsi
+# YRLabEDKqWQrN6JF
 ```
 
 - the master key
@@ -171,15 +171,45 @@ Another possibility would be to form the password out of whole words.
 
 ### 0.3. Casting The Master Key Into The Seed
 
-The master key is interpreted as a HEX sequence, which is than cast into the integer seed:
+A naive approach is to interpret the master key as a HEX sequence, then cast into the integer seed:
 
 ```python
 def seed(key: str) -> int:
     __key = ''.join(__c for __c in key if ord(__c) < 128) # keep only ASCII characters
-    return int(bytes(__key, 'utf-8').hex(), 16) % (2 ** 64) # dword
+    return int(bytes(__key, 'utf-8').hex(), 16) % (2 ** 32) # dword
 ```
 
-Notice the modulo operation to keep the seed in the valid range of the `random` library.
+This doesn't work though:
+
+```python
+seed('never seen before combination of letters')
+# 1952805491
+seed('combination of letters')
+# 1952805491
+b'combination of letters'.hex()
+# '636f6d62696e6174696f6e206f66206c657474657273'
+```
+
+The encoding of the string `'combination of letters'` requires 22 bytes, so it is greater than `2 ** 168`.
+Prepending a prefix means adding a number times `2 ** 176` which leads to the same value modulo `2 ** 32`.
+
+To separate the encoding of similar mater keys, it is first hashed using `sha256`:
+
+```python
+def seed(key: str) -> int:
+    __key = ''.join(__c for __c in key if ord(__c) < 128) # keep only ASCII characters
+    __hash = hashlib.sha256(string=__key.encode('utf-8')).hexdigest()
+    return int(__hash[:8], 16) # take the first 4 bytes: the seed is lower than 2 ** 32
+```
+
+Now:
+
+```python
+seed('never seen before combination of letters')
+# 3588870616
+seed('combination of letters')
+# 3269272188
+```
 
 ## 1. Preprocessing The Inputs
 
@@ -385,7 +415,7 @@ def create_model(
     __model = tf.keras.Sequential()
     # initialize the weights
     __embedding_init = tf.keras.initializers.GlorotNormal(seed=seed)
-    __dense_init = tf.keras.initializers.GlorotNormal(seed=(seed ** 2) % (2 ** 64)) # different values
+    __dense_init = tf.keras.initializers.GlorotNormal(seed=(seed ** 2) % (2 ** 32)) # different values
     # embedding
     __model.add(tf.keras.layers.Embedding(input_dim=n_input_dim, output_dim=n_embedding_dim, embeddings_initializer=__embedding_init, name='embedding'))
     # head
@@ -439,9 +469,9 @@ Which makes it easier to test the password generation:
 
 ```python
 _process(master_key='test', login_target='example.com', login_id='user')
-# 'JOhtxA7PcAppex2gYbPtnEVCYJ8pVL6Z'
+# 'AfBOO0MGvFGikU2ZBVleuXDUFQpgR4Zg'
 _process(master_key='test', login_target='http://example.com', login_id='USER')
-# 'JOhtxA7PcAppex2gYbPtnEVCYJ8pVL6Z'
+# 'AfBOO0MGvFGikU2ZBVleuXDUFQpgR4Zg'
 ```
 
 As expected the whole process is deterministic:
@@ -449,14 +479,14 @@ calls with equivalent inputs will always yield the same password, there is no ne
 
 ```python
 _process(master_key='verysecretpassphrase', login_target='example.com', login_id='u s e r@EMAIL.COM')
-# '75cENkJYXRcwxB6LJqF8RHNGMVM8eCMJ'
+# '4ZUHYALvuXvcSoS1p9j7R64freclXKvf'
 _process(master_key='verysecretpassphrase', login_target='HTTPS://example.com/', login_id='user@email.com')
-# '75cENkJYXRcwxB6LJqF8RHNGMVM8eCMJ'
+# '4ZUHYALvuXvcSoS1p9j7R64freclXKvf'
 ```
 
 ## Improvements
 
-This POC could be turned into a full-fledge product with:
+This POC could be turned into a full-fledged product with:
 
 - performance improvements:
     - use the base `numpy` instead of `tensorflow`

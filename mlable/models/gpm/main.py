@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import functools
+import hashlib
 import itertools
 import math
 import os
@@ -42,7 +43,8 @@ N_PASSWORD_NONCE = 1
 
 def seed(key: str) -> int:
     __key = ''.join(__c for __c in key if ord(__c) < 128) # keep only ASCII characters
-    return int(bytes(__key, 'utf-8').hex(), 16) % (2 ** 64) # dword
+    __hash = hashlib.sha256(string=__key.encode('utf-8')).hexdigest()
+    return int(__hash[:8], 16) # take the first 4 bytes: the seed is lower than 2 ** 32
 
 # VOCABULARY ##################################################################
 
@@ -61,7 +63,7 @@ def create_model(
     __model = tf.keras.Sequential()
     # initialize the weights
     __embedding_init = tf.keras.initializers.GlorotNormal(seed=seed)
-    __dense_init = tf.keras.initializers.GlorotNormal(seed=(seed ** 2) % (2 ** 64)) # different values
+    __dense_init = tf.keras.initializers.GlorotNormal(seed=(seed ** 2) % (2 ** 32)) # different values
     # embedding
     __model.add(tf.keras.layers.Embedding(input_dim=n_input_dim, output_dim=n_embedding_dim, embeddings_initializer=__embedding_init, name='embedding'))
     # head
