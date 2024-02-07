@@ -20,7 +20,8 @@ Here's an elegant implementation using tools from the AI field.
 Contrary to traditional password managers, the passwords are not saved on disk:
 they are (re)generated each time.
 
-The master key is used to randomly fill the tensor weights, which constitute a MLP model.
+The master key is encoded and used as seed to initiate the random number generator.
+Thanks to this generator, the tensor weights of a MLP are filled.
 
 This MLP model then takes the login information as input and outputs a password.
 
