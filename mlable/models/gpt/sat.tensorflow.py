@@ -11,6 +11,7 @@ import tensorflow as tf
 import mlable.sampling as _ms
 import mlable.inputs.ngrams as _min
 import mlable.inputs.vocabulary as _miv
+import mlable.tensorflow.data as _mtd
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.models as _mtm
 import mlable.tensorflow.optimizers as _mto
@@ -89,9 +90,12 @@ loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothin
 N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
-X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
-X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
-X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT, depth=N_VOCABULARY)
+__x, __y = _min.tokenize(text=TEXT, stoi=_stoi, context_length=N_CONTEXT)
+__X, __Y = _mtd.dataset(x=__x, y=__y, depth=N_VOCABULARY)
+
+X_TRAIN, Y_TRAIN = __X[:N1], __Y[:N1]
+X_DEV, Y_DEV = __X[N1:N2], __Y[N1:N2]
+X_TEST, Y_TEST = __X[N2:], __Y[N2:]
 
 # TRAIN ########################################################################
 

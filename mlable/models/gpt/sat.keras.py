@@ -11,6 +11,7 @@ import tensorflow as tf
 import mlable.sampling as _ms
 import mlable.inputs.ngrams as _min
 import mlable.inputs.vocabulary as _miv
+import mlable.tensorflow.data as _mtd
 import mlable.keras.models as _mkm
 import mlable.tensorflow.summary as _mts
 
@@ -102,9 +103,12 @@ tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
-X_TRAIN, Y_TRAIN = _min.dataset(text=TEXT[:N1], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
-X_DEV, Y_DEV = _min.dataset(text=TEXT[N1:N2], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
-X_TEST, Y_TEST = _min.dataset(text=TEXT[N2:], stoi=_stoi, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM)
+__x, __y = _min.tokenize(text=TEXT, stoi=_stoi, context_length=N_CONTEXT_DIM)
+__X, __Y = _mtd.dataset(x=__x, y=__y, depth=N_VOCABULARY_DIM)
+
+X_TRAIN, Y_TRAIN = __X[:N1], __Y[:N1]
+X_DEV, Y_DEV = __X[N1:N2], __Y[N1:N2]
+X_TEST, Y_TEST = __X[N2:], __Y[N2:]
 
 # LEARNING RATE ###############################################################
 
