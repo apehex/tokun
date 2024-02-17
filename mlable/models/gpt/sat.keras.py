@@ -112,15 +112,15 @@ X_TEST, Y_TEST = __X[N2:], __Y[N2:]
 
 # LEARNING RATE ###############################################################
 
-def lrfn(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int):
-  __lr = lr_min
-  if epoch < rampup:
-    __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
-  elif epoch < rampup + sustain:
-    __lr = lr_max
-  else:
-    __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
-  return __lr
+def lrfn(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
+    __lr = lr_min
+    if epoch < rampup:
+        __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
+    elif epoch < rampup + sustain:
+        __lr = lr_max
+    else:
+        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+    return __lr
 
 lr_callback = tf.keras.callbacks.LearningRateScheduler(lambda epoch: lrfn(epoch, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
