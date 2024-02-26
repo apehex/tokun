@@ -5,8 +5,7 @@ import random
 
 import torch
 
-import mlable.inputs.ngrams as _min
-import mlable.inputs.vocabulary as _miv
+import mlable.tokens.ngrams as _mtn
 
 # META ########################################################################
 
@@ -39,12 +38,12 @@ random.shuffle(USERNAMES)
 
 # VOCABULARY ##################################################################
 
-VOCABULARY = _miv.capture(''.join(USERNAMES))
+VOCABULARY = _mtn.vocabulary(''.join(USERNAMES))
 N_VOCABULARY = len(VOCABULARY)
 
 # MAPPINGS ####################################################################
 
-MAPPINGS = _miv.mappings(vocabulary=VOCABULARY)
+MAPPINGS = _mtn.mappings(vocabulary=VOCABULARY)
 
 _stoi = MAPPINGS['encode']
 _itos = MAPPINGS['decode']
@@ -52,8 +51,8 @@ _itos = MAPPINGS['decode']
 # DATASETS ####################################################################
 
 def build_dataset(words: list, context: int=N_CONTEXT, depth: int=N_VOCABULARY) -> tuple:
-    __x = [_miv.encode(text=__n, stoi=_stoi) for __w in words for __n in _min.context(text=__w + _miv.BLANK, length=context)]
-    __y = [__i for __w in words for __i in _miv.encode(text=__w + _miv.BLANK, stoi=_stoi)]
+    __x = [_mtn.encode(text=__n, stoi=_stoi) for __w in words for __n in _mtn.context(text=__w + _mtn.BLANK, length=context)]
+    __y = [__i for __w in words for __i in _mtn.encode(text=__w + _mtn.BLANK, stoi=_stoi)]
     return torch.tensor(__x), torch.tensor(__y)
 
 N1 = int(0.8 * len(USERNAMES))
@@ -173,14 +172,14 @@ def batch(x: torch.Tensor, y: torch.Tensor, size: int=N_BATCH) -> tuple:
     __indices = torch.randint(0, x.shape[0], (size,))
     return x[__indices], y[__indices]
 
-def rate(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
-    __lr = lr_min
+def rate(epoch: int, lr_mtn: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
+    __lr = lr_mtn
     if epoch < rampup:
-        __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
+        __lr = lr_mtn + (epoch * (lr_max - lr_mtn) / rampup)
     elif epoch < rampup + sustain:
         __lr = lr_max
     else:
-        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+        __lr = lr_mtn + (lr_max - lr_mtn) * lr_exp ** (epoch - rampup - sustain)
     return __lr
 
 def step(model: Sequential, loss: callable, x: torch.Tensor, y: torch.Tensor, lr: float=0.001) -> torch.Tensor:
@@ -202,7 +201,7 @@ def sgd(model:Sequential, x: torch.Tensor, y: torch.Tensor, n_epoch: int=N_EPOCH
     # iterate on the whole dataset
     for __e in range(n_epoch):
         # learning rate
-        __lr = rate(epoch=__e, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=4, sustain=0)
+        __lr = rate(epoch=__e, lr_mtn=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=4, sustain=0)
         # iterate on batchs
         for __s in range(__steps):
             # track the overall iteration

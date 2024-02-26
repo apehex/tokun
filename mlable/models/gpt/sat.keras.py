@@ -9,9 +9,8 @@ import random
 import tensorflow as tf
 
 import mlable.sampling as _ms
-import mlable.inputs.ngrams as _min
-import mlable.inputs.vocabulary as _miv
 import mlable.tensorflow.data as _mtd
+import mlable.tokens.ngrams as _mtn
 import mlable.keras.models as _mkm
 import mlable.tensorflow.summary as _mts
 
@@ -46,12 +45,12 @@ TEXT += open('.data/shakespeare/hamlet.md', 'r').read() # .splitlines()
 
 # VOCABULARY ##################################################################
 
-VOCABULARY = _miv.capture(TEXT)
+VOCABULARY = _mtn.vocabulary(TEXT)
 N_VOCABULARY_DIM = len(VOCABULARY)
 
 # MAPPINGS ####################################################################
 
-MAPPINGS = _miv.mappings(vocabulary=VOCABULARY)
+MAPPINGS = _mtn.mappings(vocabulary=VOCABULARY)
 
 _stoi = MAPPINGS['encode']
 _itos = MAPPINGS['decode']
@@ -66,7 +65,7 @@ def create_model(
     n_attention_block: int=N_ATTENTION_BLOCK,
     n_attention_head: int=N_ATTENTION_HEAD,
     n_attention_dim: int=N_ATTENTION_DIM,
-    lr_min: float=R_MIN
+    lr_mtn: float=R_MIN
 ) -> tf.keras.Model:
     __model = tf.keras.Sequential()
     # embedding
@@ -82,7 +81,7 @@ def create_model(
     # __model(tf.keras.Input(shape=(n_context_dim,), batch_size=N_BATCH))
     # compile
     __model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=lr_min),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr_mtn),
         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
         metrics=['accuracy'])
     return __model
@@ -103,7 +102,7 @@ tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
-__x, __y = _min.tokenize(text=TEXT, stoi=_stoi, context_length=N_CONTEXT_DIM)
+__x, __y = _mtn.tokenize(text=TEXT, stoi=_stoi, context_length=N_CONTEXT_DIM)
 __X, __Y = _mtd.dataset(x=__x, y=__y, depth=N_VOCABULARY_DIM)
 
 X_TRAIN, Y_TRAIN = __X[:N1], __Y[:N1]
@@ -112,17 +111,17 @@ X_TEST, Y_TEST = __X[N2:], __Y[N2:]
 
 # LEARNING RATE ###############################################################
 
-def lrfn(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
-    __lr = lr_min
+def lrfn(epoch: int, lr_mtn: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
+    __lr = lr_mtn
     if epoch < rampup:
-        __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
+        __lr = lr_mtn + (epoch * (lr_max - lr_mtn) / rampup)
     elif epoch < rampup + sustain:
         __lr = lr_max
     else:
-        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+        __lr = lr_mtn + (lr_max - lr_mtn) * lr_exp ** (epoch - rampup - sustain)
     return __lr
 
-lr_callback = tf.keras.callbacks.LearningRateScheduler(lambda epoch: lrfn(epoch, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
+lr_callback = tf.keras.callbacks.LearningRateScheduler(lambda epoch: lrfn(epoch, lr_mtn=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 # TRAIN #######################################################################
 
