@@ -311,7 +311,7 @@ With a character level embedding the input tensor would look like:
 array([101, 120,  97, 109, 112, 108, 101,  46,  99, 111, 109, 124, 117, 115, 101, 114], dtype=int32)
 ```
 
-Which means that each repetition in the input would also yield a repetition in the output password.
+Which means that *each repetition in the input would also yield a repetition in the output password*.
 
 Just like regular transformer models, using a context as input will make each sample more unique.
 Instead of a single character, a sample is now composed of the N latest characters:

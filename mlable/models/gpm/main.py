@@ -13,7 +13,6 @@ import re
 import tensorflow as tf
 
 import mlable.inputs.vocabulary as _miv
-import mlable.sampling as _ms
 
 # DEFAULT INPUT VOCABULARY ####################################################
 
@@ -33,7 +32,7 @@ OUTPUT_VOCABULARY = INPUT_VOCABULARY # placeholder
 N_INPUT_DIM = len(INPUT_VOCABULARY) # all ASCII characters
 N_OUTPUT_DIM = N_INPUT_DIM # placeholder, it depends on the user settings
 
-N_CONTEXT_DIM = 8 # necessary?
+N_CONTEXT_DIM = 8
 N_EMBEDDING_DIM = 128
 
 N_PASSWORD_DIM = 16

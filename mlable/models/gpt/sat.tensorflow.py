@@ -8,12 +8,12 @@ import random
 
 import tensorflow as tf
 
-import mlable.sampling as _ms
 import mlable.tensorflow.data as _mtd
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.models as _mtm
 import mlable.tensorflow.optimizers as _mto
-import mlable.tensorflow.summary as _mts
+import mlable.tensorflow.sampling as _sam
+import mlable.tensorflow.summary as _sum
 import mlable.tokens.ngrams as _mtn
 
 # META ########################################################################
@@ -103,7 +103,7 @@ MODEL = Model()
 
 # SAMPLING ####################################################################
 
-sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, length=N_SAMPLE, itos=_itos)
+sample = functools.partial(_sam.sample, model=MODEL, context=N_CONTEXT, depth=N_VOCABULARY, length=N_SAMPLE, itos=_itos)
 
 # VIZ #########################################################################
 
@@ -114,11 +114,11 @@ PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-
 SUMMARY = tf.summary.create_file_writer(PATH)
 
 # plot model stats
-# _mts.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
+# _sum.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
 
 # plot loss
-# _mts.save_loss_plot(data=L_TRAIN, name='train_loss', summary=SUMMARY, offset=0)
-# _mts.save_loss_plot(data=L_TEST, name='test_loss', summary=SUMMARY, offset=0)
+# _sum.save_loss_plot(data=L_TRAIN, name='train_loss', summary=SUMMARY, offset=0)
+# _sum.save_loss_plot(data=L_TEST, name='test_loss', summary=SUMMARY, offset=0)
 
 # plot log10(gradient / value)
-# _mts.save_ratios_plot(data=G_RATIOS, model=MODEL, summary=SUMMARY, offset=0)
+# _sum.save_ratios_plot(data=G_RATIOS, model=MODEL, summary=SUMMARY, offset=0)

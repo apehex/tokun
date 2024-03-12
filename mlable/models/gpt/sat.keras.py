@@ -8,11 +8,11 @@ import random
 
 import tensorflow as tf
 
-import mlable.sampling as _ms
 import mlable.tensorflow.data as _mtd
 import mlable.tokens.ngrams as _mtn
 import mlable.keras.models as _mkm
-import mlable.tensorflow.summary as _mts
+import mlable.tensorflow.sampling as _sam
+import mlable.tensorflow.summary as _sum
 
 # META ########################################################################
 
@@ -138,7 +138,7 @@ TRAINING_HISTORY = MODEL.fit(
 
 # SAMPLE ######################################################################
 
-sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM, length=N_SAMPLE, itos=_itos)
+sample = functools.partial(_sam.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_VOCABULARY_DIM, length=N_SAMPLE, itos=_itos)
 
 # VIZ #########################################################################
 
@@ -146,4 +146,4 @@ sample = functools.partial(_ms.sample, model=MODEL, context=N_CONTEXT_DIM, depth
 # tf.argmax(Y_TRAIN, axis=-1)
 
 # plot model stats
-_mts.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
+_sum.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
