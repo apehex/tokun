@@ -110,18 +110,18 @@ class CausalSelfAttention(torch.nn.Module):
         # calculate query, key, values for all heads in batch
         __q, __k, __v  = self._attention(x).split(self._head_dim, dim=-1)
         # group by head rather than time
-        __k = __k.view(*__shape).transpose(1, 2) # (B, H, T, E)
-        __q = __q.view(*__shape).transpose(1, 2) # (B, H, T, E)
-        __v = __v.view(*__shape).transpose(1, 2) # (B, H, T, E)
+        __k = __k.view(*__shape).transpose(1, 2) # (B, H, T, E/H)
+        __q = __q.view(*__shape).transpose(1, 2) # (B, H, T, E/H)
+        __v = __v.view(*__shape).transpose(1, 2) # (B, H, T, E/H)
         # self-attention
-        __w = (__q @ __k.transpose(-2, -1)) * (1.0 / math.sqrt(__shape[-1])) # (B, H, T, E) x (B, H, E, T) -> (B, H, T, T)
+        __w = (__q @ __k.transpose(-2, -1)) * (1.0 / math.sqrt(__shape[-1])) # (B, H, T, E/H) x (B, H, E/H, T) -> (B, H, T, T)
         # causal: only attend to past tokens
         __w = __w.masked_fill(self._mask == 0, float('-inf'))
         __w = torch.nn.functional.softmax(__w, dim=-1)
         # values
-        __y = __w @ __v # (B, H, T, T) x (B, H, T, E) -> (B, H, T, E)
+        __y = __w @ __v # (B, H, T, T) x (B, H, T, E/H) -> (B, H, T, E/H)
         # assemble heads
-        __y = __y.transpose(1, 2).contiguous().view(*x.shape) # original shape
+        __y = __y.transpose(1, 2).contiguous().view(*x.shape) # original shape (B, T, E)
         # output projection
         return self._projection(__y)
 
