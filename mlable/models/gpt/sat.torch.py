@@ -13,8 +13,6 @@ import mlable.torch.sampling as _mts
 
 # META ########################################################################
 
-RESUME = False
-
 N_VOCABULARY = 37
 N_CONTEXT = 16
 N_EMBEDDING = 64
@@ -38,10 +36,12 @@ R_DECAY = 0.01
 VERSION = 'sat-torch-180k'
 
 LOGS_PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-SAVE_PATH = os.path.join('.models/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+LOAD_PATH = os.path.join('.models/', VERSION, '20240315-201242', 'model.pt')
+SAVE_PATH = os.path.join('.models/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), 'model.pt')
 
 os.makedirs(LOGS_PATH, exist_ok=True)
-os.makedirs(SAVE_PATH, exist_ok=True)
+os.makedirs(os.path.dirname(SAVE_PATH), exist_ok=True)
 
 # WRITER = torch.utils.tensorboard.SummaryWriter(log_dir=LOGS_PATH)
 
@@ -107,36 +107,30 @@ class Transformer(torch.nn.Module):
 
 # TRAIN ########################################################################
 
-def main() -> None:
-    __model = Transformer(time_dim=N_CONTEXT, token_dim=N_VOCABULARY, embed_dim=N_ATTENTION, block_count=N_BLOCKS, head_count=N_HEADS)
-    print(f"model #params: {sum(__p.numel() for __p in __model.parameters(recurse=True))}")
-
-    if RESUME:
-        print("resuming from existing model in the workdir")
-        __model.load_state_dict(torch.load(os.path.join(SAVE_PATH, 'model.pt')))
-
-    # Adam optimizer
-    __optimizer = torch.optim.AdamW(__model.parameters(recurse=True), lr=R_MAX, weight_decay=R_DECAY, betas=(0.9, 0.99), eps=1e-8)
-
-    # SGD optimizer
-    # __steps_per_epoch = X_TRAIN.shape[0] // N_BATCH
-    # __rate = functools.partial(_mto.rate, lr_min=0.05, lr_max=0.1, lr_exp=R_EXP, rampup=1, sustain=0, steps_per_epoch=__steps_per_epoch)
-    # __optimizer = _mto.SGD(params=__model.parameters(recurse=True), rate=__rate)
-
+def main(model: torch.nn.Module, loss: callable=torch.nn.functional.cross_entropy, x: torch.Tensor=X_TRAIN, y: torch.Tensor=Y_TRAIN, n_epoch: int=N_EPOCHS, n_batch: int=N_BATCH, lr: float=R_MAX, decay: float=R_DECAY, training: bool=True) -> None:
     # train
-    _mto.train(model=__model, loss=torch.nn.functional.cross_entropy, optimizer=__optimizer, x=X_TRAIN, y=Y_TRAIN, n_epoch=N_EPOCHS, n_batch=N_BATCH)
-
-    # WRITER.add_scalar("Loss/train", train_loss, step)
-    # WRITER.add_scalar("Loss/test", test_loss, step)
-
-    # save for later
-    torch.save(__model.state_dict(), os.path.join(SAVE_PATH, 'model.pt'))
-
-    # generate sample text
-    __s = _mts.sample(model=__model, context=N_CONTEXT, length=2**10)
-    print(_mtn.decode(sequence=__s, itos=_itos))
+    if training:
+        # SGD optimizer
+        # __steps_per_epoch = x.shape[0] // n_batch
+        # __rate = functools.partial(_mto.rate, lr_min=0.05, lr_max=0.1, lr_exp=decay, rampup=1, sustain=0, steps_per_epoch=__steps_per_epoch)
+        # __optimizer = _mto.SGD(params=__model.parameters(recurse=True), rate=__rate)
+        __optimizer = torch.optim.AdamW(model.parameters(recurse=True), lr=lr, weight_decay=decay, betas=(0.9, 0.99), eps=1e-8)
+        _mto.train(model=model, loss=loss, optimizer=__optimizer, x=x, y=y, n_epoch=n_epoch, n_batch=n_batch)
+    # evaluate
 
 # MAIN ########################################################################
 
 if __name__ == '__main__':
-    main()
+    __model = Transformer(time_dim=N_CONTEXT, token_dim=N_VOCABULARY, embed_dim=N_ATTENTION, block_count=N_BLOCKS, head_count=N_HEADS)
+    # load pre-trained weights
+    if os.path.isfile(LOAD_PATH):
+        print('[loading] {path}...'.format(path=LOAD_PATH))
+        __model.load_state_dict(torch.load(LOAD_PATH))
+    # train
+    main(__model)
+    # save for later
+    print('[saving] {path}...'.format(path=SAVE_PATH))
+    torch.save(__model.state_dict(), SAVE_PATH)
+    # generate sample text
+    __s = _mts.sample(model=__model, context=N_CONTEXT, length=2**10)
+    print(_mtn.decode(sequence=__s, itos=_itos))
