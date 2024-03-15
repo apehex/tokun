@@ -105,28 +105,38 @@ class Transformer(torch.nn.Module):
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         return self._transformer(self._embed(x))
 
+# TRAIN ########################################################################
+
+def main() -> None:
+    __model = Transformer(time_dim=N_CONTEXT, token_dim=N_VOCABULARY, embed_dim=N_ATTENTION, block_count=N_BLOCKS, head_count=N_HEADS)
+    print(f"model #params: {sum(__p.numel() for __p in __model.parameters(recurse=True))}")
+
+    if RESUME:
+        print("resuming from existing model in the workdir")
+        __model.load_state_dict(torch.load(os.path.join(SAVE_PATH, 'model.pt')))
+
+    # Adam optimizer
+    __optimizer = torch.optim.AdamW(__model.parameters(recurse=True), lr=R_MAX, weight_decay=R_DECAY, betas=(0.9, 0.99), eps=1e-8)
+
+    # SGD optimizer
+    # __steps_per_epoch = X_TRAIN.shape[0] // N_BATCH
+    # __rate = functools.partial(_mto.rate, lr_min=0.05, lr_max=0.1, lr_exp=R_EXP, rampup=1, sustain=0, steps_per_epoch=__steps_per_epoch)
+    # __optimizer = _mto.SGD(params=__model.parameters(recurse=True), rate=__rate)
+
+    # train
+    _mto.train(model=__model, loss=torch.nn.functional.cross_entropy, optimizer=__optimizer, x=X_TRAIN, y=Y_TRAIN, n_epoch=N_EPOCHS, n_batch=N_BATCH)
+
+    # WRITER.add_scalar("Loss/train", train_loss, step)
+    # WRITER.add_scalar("Loss/test", test_loss, step)
+
+    # save for later
+    torch.save(__model.state_dict(), os.path.join(SAVE_PATH, 'model.pt'))
+
+    # generate sample text
+    __s = _mts.sample(model=__model, context=N_CONTEXT, length=2**10)
+    print(_mtn.decode(sequence=__s, itos=_itos))
+
 # MAIN ########################################################################
 
-MODEL = Transformer(time_dim=N_CONTEXT, token_dim=N_VOCABULARY, embed_dim=N_ATTENTION, block_count=N_BLOCKS, head_count=N_HEADS)
-print(f"model #params: {sum(__p.numel() for __p in MODEL.parameters(recurse=True))}")
-
-if RESUME:
-    print("resuming from existing model in the workdir")
-    MODEL.load_state_dict(torch.load(os.path.join(SAVE_PATH, 'model.pt')))
-
-# init optimizer
-# rate = functools.partial(_mto.rate, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=4, sustain=0)
-OPTIMIZER = torch.optim.AdamW(MODEL.parameters(recurse=True), lr=R_MAX, weight_decay=R_DECAY, betas=(0.9, 0.99), eps=1e-8)
-
-# train
-_mto.train(model=MODEL, loss=torch.nn.functional.cross_entropy, optimizer=OPTIMIZER, x=X_TRAIN, y=Y_TRAIN, n_epoch=N_EPOCHS, n_batch=N_BATCH)
-
-# WRITER.add_scalar("Loss/train", train_loss, step)
-# WRITER.add_scalar("Loss/test", test_loss, step)
-
-# save for later
-torch.save(MODEL.state_dict(), os.path.join(SAVE_PATH, 'model.pt'))
-
-# generate sample text
-__s = _mts.sample(model=MODEL, context=N_CONTEXT, length=2**10)
-print(_mtn.decode(sequence=__s, itos=_itos))
+if __name__ == '__main__':
+    main()

@@ -1,31 +1,37 @@
+import functools
+
 import torch
 
 import mlable.torch.data as _mtd
 
 # LEARNING RATE ###############################################################
 
-def rate(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
+def rate(step: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int, steps_per_epoch: int=1024) -> float:
     __lr = lr_min
-    if epoch < rampup:
-        __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
-    elif epoch < rampup + sustain:
+    __epoch = step // steps_per_epoch
+    if __epoch < rampup:
+        __lr = lr_min + (__epoch * (lr_max - lr_min) / rampup)
+    elif __epoch < rampup + sustain:
         __lr = lr_max
     else:
-        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (__epoch - rampup - sustain)
     return __lr
 
 # SGD #########################################################################
 
 class SGD(torch.optim.Optimizer):
     def __init__(self, params: list, rate: callable, **kwargs) -> None:
-        super(SGD, self).__init__(**kwargs)
+        __default_rate = functools.partial(rate, lr_min=0.00001, lr_max=0.0001, lr_exp=0.8, rampup=4, sustain=2, steps_per_epoch=1024)
+        super(SGD, self).__init__(params, {'rate': __default_rate}, **kwargs)
         self._parameters = list(params)
         self._rate = rate
+        self._iteration = -1
 
-    def step(epoch: int) -> None:
+    def step(self) -> None:
+        self._iteration += 1
         with torch.no_grad():
             for __p in self._parameters:
-                __p -= self._rate(epoch) * __p.grad
+                __p += -self._rate(self._iteration) * __p.grad
 
 # GENERIC #####################################################################
 
