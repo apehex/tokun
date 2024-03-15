@@ -87,22 +87,22 @@ class Embedding(torch.nn.Module):
 
 # RECURRENT ###################################################################
 
-class RNNCell(nn.Module):
+class RNNCell(torch.nn.Module):
     def __init__(self, embed_dim: int, state_dim: int, **kwargs) -> None:
         super(RNNCell, self).__init__(**kwargs)
-        self._weights = nn.Linear(embed_dim + state_dim, state_dim)
+        self._weights = Linear(in_features=embed_dim + state_dim, out_features=state_dim)
 
     def forward(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         __xh = torch.cat([x, h], dim=-1)
         return torch.nn.functional.tanh(self._weights(__xh))
 
-class GRUCell(nn.Module):
+class GRUCell(torch.nn.Module):
     def __init__(self, embed_dim: int, state_dim: int, **kwargs) -> None:
         super(GRUCell, self).__init__(**kwargs)
         # input, forget, output, gate
-        self._xh_to_z = nn.Linear(embed_dim + state_dim, state_dim)
-        self._xh_to_r = nn.Linear(embed_dim + state_dim, state_dim)
-        self._xh_to_hhat = nn.Linear(embed_dim + state_dim, state_dim)
+        self._xh_to_z = Linear(in_features=embed_dim + state_dim, out_features=state_dim)
+        self._xh_to_r = Linear(in_features=embed_dim + state_dim, out_features=state_dim)
+        self._xh_to_hhat = Linear(in_features=embed_dim + state_dim, out_features=state_dim)
 
     def forward(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         # state
