@@ -85,6 +85,39 @@ class Embedding(torch.nn.Module):
         __x = torch.nn.functional.one_hot(input=x, num_classes=self._depth)
         return torch.matmul(__x.float(), self._weight)
 
+# RECURRENT ###################################################################
+
+class RNNCell(nn.Module):
+    def __init__(self, embed_dim: int, state_dim: int, **kwargs) -> None:
+        super(RNNCell, self).__init__(**kwargs)
+        self._weights = nn.Linear(embed_dim + state_dim, state_dim)
+
+    def forward(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        __xh = torch.cat([x, h], dim=-1)
+        return torch.nn.functional.tanh(self._weights(__xh))
+
+class GRUCell(nn.Module):
+    def __init__(self, embed_dim: int, state_dim: int, **kwargs) -> None:
+        super(GRUCell, self).__init__(**kwargs)
+        # input, forget, output, gate
+        self._xh_to_z = nn.Linear(embed_dim + state_dim, state_dim)
+        self._xh_to_r = nn.Linear(embed_dim + state_dim, state_dim)
+        self._xh_to_hhat = nn.Linear(embed_dim + state_dim, state_dim)
+
+    def forward(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        # state
+        __xh = torch.cat([x, h], dim=-1)
+        # reset gate
+        __r = torch.nn.functional.sigmoid(self._xh_to_r(__xh))
+        # switch gate
+        __z = torch.nn.functional.sigmoid(self._xh_to_z(__xh))
+        # reset state
+        __xhr = torch.cat([x, __r * h], dim=-1)
+        # candidate state
+        __hhat = torch.nn.functional.tanh(self._xh_to_hhat(__xhr))
+        # combine candidate and previous states
+        return (1. - __z) * h + __z * __hhat
+
 # ATTENTION ###################################################################
 
 class CausalSelfAttention(torch.nn.Module):
