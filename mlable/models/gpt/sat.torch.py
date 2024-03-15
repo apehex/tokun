@@ -23,7 +23,7 @@ N_HEADS = 4
 N_ATTENTION = 64
 N_HIDDEN = 4 * N_ATTENTION
 
-N_EPOCHS = 1
+N_EPOCHS = 2
 N_BATCH = 128
 
 N_SAMPLE = 256
@@ -35,10 +35,13 @@ R_DECAY = 0.01
 
 # IO ##########################################################################
 
-VERSION = 'sat-torch-100k'
+VERSION = 'sat-torch-180k'
 
 LOGS_PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 SAVE_PATH = os.path.join('.models/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+os.makedirs(LOGS_PATH, exist_ok=True)
+os.makedirs(SAVE_PATH, exist_ok=True)
 
 # WRITER = torch.utils.tensorboard.SummaryWriter(log_dir=LOGS_PATH)
 
@@ -65,7 +68,7 @@ N1 = int(0.8 * len(TEXT))
 N2 = int(0.9 * len(TEXT))
 
 __x, __y = _mtn.tokenize(text=TEXT, stoi=_stoi, context_length=N_CONTEXT)
-__X, __Y = torch.Tensor(__x).type(dtype=torch.int64), torch.nn.functional.one_hot(input=torch.Tensor(__y).type(dtype=torch.int64), num_classes=N_VOCABULARY)
+__X, __Y = torch.Tensor(__x).type(dtype=torch.int64), torch.nn.functional.one_hot(input=torch.Tensor(__y).type(dtype=torch.int64), num_classes=N_VOCABULARY).type(torch.float32)
 
 X_TRAIN, Y_TRAIN = __X[:N1], __Y[:N1]
 X_DEV, Y_DEV = __X[N1:N2], __Y[N1:N2]
@@ -85,8 +88,9 @@ class Transformer(torch.nn.Module):
         # transformer
         self._transformer = torch.nn.Sequential(
             *[_mtl.TransformerBlock(time_dim=time_dim, embed_dim=embed_dim, num_heads=head_count) for _ in range(block_count)],
-            torch.nn.LayerNorm(normalized_shape=embed_dim),
-            _mtl.Linear(in_features=embed_dim, out_features=token_dim, bias=False))
+            torch.nn.Flatten(start_dim=1, end_dim=2),
+            torch.nn.LayerNorm(normalized_shape=time_dim * embed_dim),
+            _mtl.Linear(in_features=time_dim * embed_dim, out_features=token_dim, bias=False))
 
     def _embed(self, x: torch.Tensor) -> torch.Tensor: # could be a new layer type
         __shape = x.shape
