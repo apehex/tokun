@@ -85,6 +85,20 @@ class Embedding(torch.nn.Module):
         __x = torch.nn.functional.one_hot(input=x, num_classes=self._depth)
         return torch.matmul(__x.float(), self._weight)
 
+class PositionalEmbedding(torch.nn.Module):
+    def __init__(self, time_dim: int, token_dim: int, embed_dim: int, **kwargs) -> None:
+        super(PositionalEmbedding, self).__init__(**kwargs)
+        # simultaneous embedding of tokens and position
+        self._token_embedding = Embedding(num_embeddings=token_dim, embedding_dim=embed_dim)
+        self._position_embedding = Embedding(num_embeddings=time_dim, embedding_dim=embed_dim)
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        __shape = list(x.shape)
+        # time position
+        __p = torch.arange(0, __shape[1], dtype=torch.long).view(1, __shape[1]) # (1, T)
+        # combine
+        return self._token_embedding(x) + self._position_embedding(__p) # (B, T, E) + (1, T, E)
+
 # RECURRENT ###################################################################
 
 class RNNCell(torch.nn.Module):

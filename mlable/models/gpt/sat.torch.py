@@ -37,7 +37,7 @@ VERSION = 'sat-torch-180k'
 
 LOGS_PATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
-LOAD_PATH = os.path.join('.models/', VERSION, '20240315-201242', 'model.pt')
+LOAD_PATH = os.path.join('.models/', VERSION, '_', 'model.pt')
 SAVE_PATH = os.path.join('.models/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), 'model.pt')
 
 os.makedirs(LOGS_PATH, exist_ok=True)
@@ -81,29 +81,16 @@ class Transformer(torch.nn.Module):
 
     def __init__(self, time_dim: int, token_dim: int, embed_dim: int, block_count: int, head_count: int, **kwargs) -> None:
         super(Transformer, self).__init__(**kwargs)
-        self._time_dim = time_dim
-        # simultaneous embedding of tokens and position
-        self._token_embedding = _mtl.Embedding(num_embeddings=token_dim, embedding_dim=embed_dim)
-        self._position_embedding = _mtl.Embedding(num_embeddings=time_dim, embedding_dim=embed_dim)
         # transformer
         self._transformer = torch.nn.Sequential(
+            _mtl.PositionalEmbedding(time_dim=token_dim, token_dim=token_dim, embed_dim=embed_dim),
             *[_mtl.TransformerBlock(time_dim=time_dim, embed_dim=embed_dim, num_heads=head_count) for _ in range(block_count)],
             torch.nn.Flatten(start_dim=1, end_dim=2),
             torch.nn.LayerNorm(normalized_shape=time_dim * embed_dim),
             _mtl.Linear(in_features=time_dim * embed_dim, out_features=token_dim, bias=False))
 
-    def _embed(self, x: torch.Tensor) -> torch.Tensor: # could be a new layer type
-        __shape = x.shape
-        # time position
-        __p = torch.arange(0, __shape[1], dtype=torch.long).unsqueeze(0) # (1, T)
-        # combine
-        return self._token_embedding(x) + self._position_embedding(__p) # (B, T, E) + (1, T, E)
-
-    def get_time_dim(self):
-        return self._time_dim
-
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
-        return self._transformer(self._embed(x))
+        return self._transformer(x)
 
 # TRAIN ########################################################################
 
