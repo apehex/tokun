@@ -112,7 +112,7 @@ def main(model: torch.nn.Module, loss: callable=torch.nn.functional.cross_entrop
     if training:
         # SGD optimizer
         # __steps_per_epoch = x.shape[0] // n_batch
-        # __rate = functools.partial(_mto.rate, lr_min=0.05, lr_max=0.1, lr_exp=decay, rampup=1, sustain=0, steps_per_epoch=__steps_per_epoch)
+        # __rate = functools.partial(_mto.learning_rate_waveform, lr_min=0.05, lr_max=0.1, lr_exp=decay, rampup=1, sustain=0, steps_per_epoch=__steps_per_epoch)
         # __optimizer = _mto.SGD(params=__model.parameters(recurse=True), rate=__rate)
         __optimizer = torch.optim.AdamW(model.parameters(recurse=True), lr=lr, weight_decay=decay, betas=(0.9, 0.99), eps=1e-8)
         _mto.train(model=model, loss=loss, optimizer=__optimizer, x=x, y=y, n_epoch=n_epoch, n_batch=n_batch)

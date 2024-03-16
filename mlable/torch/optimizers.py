@@ -6,7 +6,7 @@ import mlable.torch.data as _mtd
 
 # LEARNING RATE ###############################################################
 
-def rate(step: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int, steps_per_epoch: int=1024) -> float:
+def learning_rate_waveform(step: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int, steps_per_epoch: int=1024) -> float:
     __lr = lr_min
     __epoch = step // steps_per_epoch
     if __epoch < rampup:
@@ -21,7 +21,7 @@ def rate(step: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, su
 
 class SGD(torch.optim.Optimizer):
     def __init__(self, params: list, rate: callable, **kwargs) -> None:
-        __default_rate = functools.partial(rate, lr_min=0.00001, lr_max=0.0001, lr_exp=0.8, rampup=4, sustain=2, steps_per_epoch=1024)
+        __default_rate = functools.partial(learning_rate_waveform, lr_min=0.00001, lr_max=0.0001, lr_exp=0.8, rampup=4, sustain=2, steps_per_epoch=1024)
         super(SGD, self).__init__(params, {'rate': __default_rate}, **kwargs)
         self._parameters = list(params)
         self._rate = rate
