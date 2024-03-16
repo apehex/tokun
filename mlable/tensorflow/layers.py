@@ -176,42 +176,51 @@ class Embedding(tf.keras.layers.Layer):
         self,
         input_dim: int,
         output_dim: int,
-        add_position: bool=False,
         **kwargs
     ):
         super(Embedding, self).__init__(**kwargs)
-        self._add_position = add_position
         self._input_dim = input_dim
         self._output_dim = output_dim
-        self._time_dim = None
-        self._content_kernel = None
+        self._kernel = None
         self._position_kernel = None
 
     def build(self, input_shape: tuple):
-        # content
-        __content_kernel_init = _mti.SmallNormal()
-        self._content_kernel = self.add_weight("content-kernel", shape=[self._input_dim, self._output_dim], initializer=__content_kernel_init)
-        # position
-        self._time_dim = list(input_shape)[-1]
-        if self._add_position:
-            __position_kernel_init = _mti.SmallNormal()
-            self._position_kernel = self.add_weight("position-kernel", shape=[self._time_dim, self._output_dim], initializer=__position_kernel_init)
+        __kernel_init = _mti.SmallNormal()
+        # register the weights
+        self._kernel = self.add_weight("kernel", shape=[self._input_dim, self._output_dim], initializer=__kernel_init)
         # notify the model
         self.built = True
 
     def call(self, inputs: tf.Tensor, **kwargs):
         # content embedding
         __x = tf.one_hot(indices=inputs, depth=self._input_dim, dtype=tf.dtypes.float32)
-        __y = tf.matmul(__x, self._content_kernel)
-        # position embedding
-        if self._add_position:
-            __diag = tf.convert_to_tensor(range(self._time_dim), dtype=tf.dtypes.float32)
-            __diag = (__diag - tf.math.reduce_mean(__diag)) / tf.math.reduce_std(__diag) # normalize
-            __x_pos = tf.linalg.tensor_diag(__diag)
-            __y_pos = tf.matmul(__x_pos, self._position_kernel)
-            __y = __y + tf.reshape(tensor=__y_pos, shape=[1] + list(__y_pos.shape))
-        # overall embedding
-        return __y
+        return tf.matmul(__x, self._kernel)
+
+class PositionalEmbedding(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        input_axis: int=1, # axis of the sequence
+        output_axis: int=-1, # axis of the embedding
+        **kwargs
+    ):
+        super(PositionalEmbedding, self).__init__(**kwargs)
+        self._input_axis = input_axis
+        self._output_axis = output_axis
+        self._kernel = None
+
+    def build(self, input_shape: tuple):
+        # shape
+        __axes = [self._input_axis % len(input_shape), self._output_axis % len(input_shape)]
+        __shape = [(__d if __i in __axes else 1) for __i, __d in enumerate(list(input_shape))]
+        # init values
+        __kernel_init = _mti.SmallNormal()
+        # register the weights
+        self._kernel = self.add_weight("kernel", shape=__shape, initializer=__kernel_init)
+        # notify the model
+        self.built = True
+
+    def call(self, inputs: tf.Tensor, **kwargs):
+        return inputs + self._kernel # each index in the sequence axis has a different bias
 
 # RESIDUALS ###################################################################
 
