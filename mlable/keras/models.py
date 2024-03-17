@@ -19,20 +19,20 @@ class ResidualFeedForwardBlock(tf.keras.layers.Layer):
         # create the projection layer to match the input shape
         self._projection = tf.keras.layers.Dense(units=input_shape[-1], activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, kernel_constraint=None, bias_constraint=None, **kwargs)
         # no need to build the activation layer
-        self._normalization.build(input_shape=input_shape) # no weights
-        self._hidden.build(input_shape=input_shape) # (C, H)
-        self._projection.build(input_shape=list(input_shape)[:-1] + [self._hidden_dim]) # (H, C), called on (x * W_h) => shape (B, T, H)
+        self._normalization.build(input_shape) # no weights
+        self._hidden.build(input_shape) # (C, H)
+        self._projection.build(list(input_shape)[:-1] + [self._hidden_dim]) # (H, C), called on (x * W_h) => shape (B, T, H)
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, **kwargs):
+    def call(self, inputs: tf.Tensor):
         __dx = inputs # (B, T, C)
         # normalize the features
-        __dx = self._normalization(__dx, **kwargs) # (B, T, C)
+        __dx = self._normalization(__dx) # (B, T, C)
         # expand inside the hidden layer
-        __dx = self._hidden(__dx, **kwargs) # (B, T, C) * (C, H) = (B, T, H)
+        __dx = self._hidden(__dx) # (B, T, C) * (C, H) = (B, T, H)
         # projection: match the input shape
-        __dx = self._projection(__dx, **kwargs) # (B, T, H) * (H, C) = (B, T, C)
+        __dx = self._projection(__dx) # (B, T, H) * (H, C) = (B, T, C)
         # residual
         return inputs + __dx # (B, T, C)
 
@@ -53,17 +53,17 @@ class ResidualSelfAttentionBlock(tf.keras.layers.Layer):
 
     def build(self, input_shape: tuple, **kwargs) -> None:
         # build
-        self._normalization.build(input_shape=input_shape)
-        self._attention.build(input_shape=input_shape)
+        self._normalization.build(input_shape)
+        self._attention.build(input_shape, input_shape)
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
+    def call(self, inputs: tf.Tensor):
         __dx = inputs # (B, T, C)
         # normalize the features
-        __dx = self._normalization(__dx, **kwargs) # (B, T, C)
+        __dx = self._normalization(__dx) # (B, T, C)
         # self-attention
-        __dx = self._attention(key=__dx, query=__dx, value=__dx, return_attention_scores=False, training=training, use_causal_mask=True, **kwargs) # (B, T, H_d * H_c) = (B, T, C) use_causal_mask=True
+        __dx = self._attention(key=__dx, query=__dx, value=__dx, return_attention_scores=False, use_causal_mask=True) # (B, T, H_d * H_c) = (B, T, C) use_causal_mask=True
         # residual
         return inputs + __dx # (B, T, C)
 
@@ -84,16 +84,16 @@ class ResidualSelfAttentionDecoderBlock(tf.keras.layers.Layer):
         self._attention = ResidualSelfAttentionBlock(attention_head_dim=attention_head_dim, attention_head_count=attention_head_count, normalization_epsilon=normalization_epsilon, dropout=dropout)
 
     def build(self, input_shape: tuple, **kwargs) -> None:
-        self._feedforward.build(input_shape=input_shape)
-        self._attention.build(input_shape=input_shape)
+        self._feedforward.build(input_shape)
+        self._attention.build(input_shape)
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, training: bool=True, **kwargs):
+    def call(self, inputs: tf.Tensor):
         __dx = inputs # (B, T, C)
         # residual self-attention
-        __dx = self._attention(__dx, training=training, **kwargs) # (B, T, C)
+        __dx = self._attention(__dx) # (B, T, C)
         # residual FF
-        __dx = self._feedforward(__dx, **kwargs) # (B, T, C)
+        __dx = self._feedforward(__dx) # (B, T, C)
         # residual
         return __dx # (B, T, C)
