@@ -50,7 +50,7 @@ N_VOCABULARY_DIM = len(VOCABULARY)
 
 # MAPPINGS ####################################################################
 
-MAPPINGS = _mtn.mappings(vocabulary=VOCABULARY)
+MAPPINGS = _mtn.mappings(voc=VOCABULARY)
 
 _stoi = MAPPINGS['encode']
 _itos = MAPPINGS['decode']
