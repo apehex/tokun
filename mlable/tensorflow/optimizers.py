@@ -9,6 +9,18 @@ N_EPOCHS = 1
 
 R_TRAINING = 0.1
 
+# LEARNING RATE ###############################################################
+
+def learning_rate_hokusai(epoch: int, lr_min: float, lr_max: float, lr_exp: float, rampup: int, sustain: int) -> float:
+    __lr = lr_min
+    if epoch < rampup:
+        __lr = lr_min + (epoch * (lr_max - lr_min) / rampup)
+    elif epoch < rampup + sustain:
+        __lr = lr_max
+    else:
+        __lr = lr_min + (lr_max - lr_min) * lr_exp ** (epoch - rampup - sustain)
+    return __lr
+
 # SGD #########################################################################
 
 def step(model: tf.Module, loss: callable, x: tf.Tensor, y: tf.Tensor, rate: float=R_TRAINING) -> tuple:
