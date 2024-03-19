@@ -187,7 +187,7 @@ class Embedding(tf.keras.layers.Layer):
     def build(self, input_shape: tuple):
         __kernel_init = _mti.SmallNormal()
         # register the weights
-        self._kernel = self.add_weight("kernel", shape=[self._input_dim, self._output_dim], initializer=__kernel_init)
+        self._kernel = self.add_weight(name="kernel", shape=[self._input_dim, self._output_dim], initializer=__kernel_init)
         # notify the model
         self.built = True
 
@@ -215,12 +215,12 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         # init values
         __kernel_init = _mti.SmallNormal()
         # register the weights
-        self._kernel = self.add_weight("kernel", shape=__shape, initializer=__kernel_init)
+        self._kernel = self.add_weight(name="kernel", shape=__shape, initializer=__kernel_init)
         # notify the model
         self.built = True
 
-    def call(self, inputs: tf.Tensor, **kwargs):
-        return inputs + self._kernel # each index in the sequence axis has a different bias
+    def call(self, inputs: tf.Tensor):
+        return inputs + self._kernel # each index in the sequence axis has a dedicated bias (different from dense bias)
 
 # RESIDUALS ###################################################################
 
@@ -255,22 +255,29 @@ class Softmax(tf.keras.layers.Layer):
 class Merge(tf.keras.layers.Layer):
     def __init__(
         self,
-        axis: int,
-        n: int,
+        input_axis: int,
+        output_axis: int,
+        factor: int,
+        insert: bool=False,
         **kwargs
     ):
         super(Merge, self).__init__(**kwargs)
-        self._axis = axis
-        self._n = n
+        self._input_axis = input_axis
+        self._output_axis = output_axis
+        self._factor = factor
+        self._insert = insert
 
-    def call(self, inputs: tf.Tensor, **kwargs):
+    def call(self, inputs: tf.Tensor):
         __shape = list(inputs.shape)
-        __axis0 = self._axis % len(__shape)
-        __axis1 = (self._axis + 1) % len(__shape)
-        # merge n rows along the given axis
-        __shape[__axis0] = inputs.shape[__axis0] // self._n
-        __shape[__axis1] = inputs.shape[__axis1] * self._n
-        return tf.reshape(inputs, __shape) # tf.squeeze
+        __length = len(__shape) + int(self._insert)
+        __axis0 = self._input_axis % __length
+        __axis1 = self._output_axis % __length
+        # option to group data on a new axis
+        if self._insert: __shape.insert(__axis1, 1)
+        # move data from axis 0 to axis 1
+        __shape[__axis0] = __shape[__axis0] // self._factor
+        __shape[__axis1] = __shape[__axis1] * self._factor
+        return tf.reshape(tensor=inputs, shape=__shape) # tf.squeeze
 
 class Reshape(tf.keras.layers.Layer):
     def __init__(
