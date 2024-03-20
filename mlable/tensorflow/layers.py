@@ -277,7 +277,7 @@ class Merge(tf.keras.layers.Layer):
         # move data from axis 0 to axis 1
         __shape[__axis0] = __shape[__axis0] // self._factor
         __shape[__axis1] = __shape[__axis1] * self._factor
-        return tf.reshape(tensor=inputs, shape=__shape) # tf.squeeze
+        return tf.squeeze(tf.reshape(tensor=inputs, shape=__shape))
 
 class Reshape(tf.keras.layers.Layer):
     def __init__(
