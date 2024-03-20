@@ -21,7 +21,7 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 8
+N_EPOCHS = 2
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
@@ -33,7 +33,7 @@ R_MIN = 0.0001
 R_MAX = 0.001
 R_EXP = .8
 
-VERSION = 'autok-keras-125k'
+VERSION = 'autok-keras-660k'
 
 # DATA ########################################################################
 
@@ -51,11 +51,12 @@ X_TEST, Y_TEST = _mtd.dataset(x=__x_test, y=__x_test, depth=N_ENCODING_DIM) # id
 # MODEL #######################################################################
 
 class Encoder(tf.keras.models.Model):
-    def __init__(self, encoding_dim: int, embedding_dim: int, latent_dim: int, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, **kwargs) -> None:
         super(Encoder, self).__init__(**kwargs)
         self._encoder = tf.keras.Sequential([
+            _mtl.Merge(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
             tf.keras.layers.Embedding(input_dim=encoding_dim, output_dim=embedding_dim, embeddings_initializer='he_normal', name='embedding'), # (B, G) => (B, G, E)
-            _mtl.PositionalEmbedding(input_axis=1, output_axis=-1, name='position'),
+            _mtl.PositionalEmbedding(input_axis=1, output_axis=-1, name='position'), # (B, G, E) + (1, G, E)
             tf.keras.layers.Flatten(name='flatten'), # (B, G, E) => (B, G * E)
             tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head')]) # (B, G * E) => (B, L), here L = E
 
@@ -63,22 +64,23 @@ class Encoder(tf.keras.models.Model):
         return self._encoder(x)
 
 class Decoder(tf.keras.models.Model):
-    def __init__(self, group_dim: int, encoding_dim: int, embedding_dim: int, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, **kwargs) -> None:
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
-            tf.keras.layers.Dense(units=group_dim * embedding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'), # (B, L) => (B, G * E), here L = E
-            tf.keras.layers.Reshape(target_shape=(group_dim, embedding_dim), name='reshape'), # (B, G * E) => (B, G, E)
+            tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'), # (B, L) => (B, G * E), here L = E
+            tf.keras.layers.Reshape(target_shape=(token_dim, embedding_dim), name='reshape'), # (B, G * E) => (B, G, E)
             tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='feet'), # (B, G, E) => (B, G, U), here U = E
+            _mtl.Merge(input_axis=1, output_axis=0, factor=token_dim, insert=False, name='split'), # (B, G, E) => (B * G, E)
             tf.keras.layers.Softmax(axis=-1, name='softmax')])
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
 
 class AutoEncoder(tf.keras.models.Model):
-    def __init__(self, group_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, **kwargs) -> None:
         super(AutoEncoder, self).__init__(**kwargs)
-        self._encoder = Encoder(encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim)
-        self._decoder = Decoder(group_dim=group_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim)
+        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim)
+        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
@@ -87,7 +89,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 # (B, 4) => (B, 4, 256) => (B, 1024) => (B, 256)
 # (B, 256) => (B, 1024) => (B, 4, 256) => (B, 4, 256) => (B, 4, 256)
-MODEL = AutoEncoder(group_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM)
+MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM)
 
 # compile
 MODEL.compile(
@@ -123,9 +125,8 @@ TRAINING_HISTORY = MODEL.fit(
 
 # SAMPLE ######################################################################
 
-sample = functools.partial(_sam.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_ENCODING_DIM, length=N_SAMPLE)
+# sample = functools.partial(_sam.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_ENCODING_DIM, length=N_SAMPLE)
 
 # VIZ #########################################################################
 
-# plot model stats
-_sum.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
+# _sum.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
