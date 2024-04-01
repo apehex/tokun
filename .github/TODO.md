@@ -1,6 +1,6 @@
-## TODO
+# TODO
 
-### Common
+## Common
 
 - [x] replicate Keras modules in base Tensorflow
     - [x] initializers
@@ -15,7 +15,7 @@
     - [x] CNN
     - [x] SAT
 
-### GPT
+## GPT
 
 - [x] positional embedding:
     - [x] normalize? *no*
@@ -29,7 +29,7 @@
     - [x] self attention
     - [x] residual
 
-### Tokenizers
+## Tokenizers
 
 - [x] ngrams
 - [x] BPE
@@ -64,3 +64,44 @@
         - [ ] represented as a vector of length 256
     - [ ] keywords are single tokens
     - [ ] variables are special tokens ?
+
+## AutoK
+
+### Objectives
+
+- [ ] dense embeddings, rather than sparse "one-hot"
+- [ ] guiding without fixing: no frozen dictionary, context agnostic
+- [ ] tokenization independant of the input partitioning / shift
+- [ ] composite tokens have parent / child relation: "splitting" carries the information of "split" and "ing"
+
+### Dataviz
+
+- [ ] spatial repartition of tokens
+- [ ] embeddings of child <=> parent tokens
+- [ ] limit embedding size = when fidelity starts to drop = max compression
+
+### Curriculum
+
+- [ ] shift training data by 1, 2, ..., G - 1 ticks along the time / context axis
+- [ ] random perturbations on the inputs:
+    - [ ] letter capitalization
+    - [ ] byte shift
+    - [ ] byte replacement
+    - [ ] byte insertion
+    - [ ] reversing order in groups
+
+### Issues
+
+Trying to solve:
+
+- [ ] variable length encoding (UTF-8) that screws fixed size model shapes
+- [ ] part / global unrelated: knowledge about tokens doesn't transfer to their siblings
+- [ ] better support for eastern languages
+
+### Models
+
+- [ ] VAE
+- [ ] VAE + CNN
+- [ ] VAE + CNN + attention
+- [ ] VAE + hierarchical CNN
+- [ ] VAE + hierarchical CNN + attention*
