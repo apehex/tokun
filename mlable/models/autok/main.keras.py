@@ -5,6 +5,7 @@ import functools
 import os
 
 import tensorflow as tf
+import tensorflow_datasets as tfds
 
 import mlable.models.autok.data as _mmad
 import mlable.tensorflow.layers as _mtl
@@ -36,13 +37,15 @@ VERSION = 'autok-keras-660k'
 
 # DATA ########################################################################
 
-TEXT_TRAIN = open('.data/shakespeare/othello.md', 'r').read() # .splitlines()
-TEXT_TEST  = open('.data/shakespeare/hamlet.md', 'r').read() # .splitlines()
+DATA_TRAIN, DATA_TEST = tfds.load('mlqa/en', split=['test', 'validation'], shuffle_files=True, data_dir='~/.cache/tensorflow/')
+
+BATCH_TRAIN = iter(DATA_TRAIN.batch(512))
+BATCH_TEST = iter(DATA_TEST.batch(512))
 
 # SPLIT #######################################################################
 
-X_TRAIN = _mmad.tokenize(text=TEXT_TRAIN)
-X_TEST = _mmad.tokenize(text=TEXT_TEST)
+X_TRAIN = _mmad.tokenize(text=_mmad.preprocess(next(BATCH_TRAIN)['context']))
+X_TEST = _mmad.tokenize(text=_mmad.preprocess(next(BATCH_TEST)['context']))
 
 Y_TRAIN = tf.one_hot(indices=X_TRAIN, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # one-hot encoding of x as y, to compare with the output probabilities
 Y_TEST = tf.one_hot(indices=X_TEST, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # idem
