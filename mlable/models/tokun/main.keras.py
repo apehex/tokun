@@ -7,7 +7,8 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.models.autok.data as _mmad
+import mlable.models.tokun.datasets.mlqa as _mlqa
+import mlable.models.tokun.datasets.pipeline as _mmad
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
 import mlable.tensorflow.sampling as _sam
@@ -33,7 +34,7 @@ R_MIN = 0.0001
 R_MAX = 0.001
 R_EXP = .8
 
-VERSION = 'autok-keras-660k'
+VERSION = 'tokun-keras-660k'
 
 # DATA ########################################################################
 
@@ -44,8 +45,8 @@ BATCH_TEST = iter(DATA_TEST.batch(512))
 
 # SPLIT #######################################################################
 
-X_TRAIN = _mmad.tokenize(text=_mmad.preprocess(next(BATCH_TRAIN)['context']))
-X_TEST = _mmad.tokenize(text=_mmad.preprocess(next(BATCH_TEST)['context']))
+X_TRAIN = _mmad.tokenize(text=_mlqa.preprocess(next(BATCH_TRAIN)['context']))
+X_TEST = _mmad.tokenize(text=_mlqa.preprocess(next(BATCH_TEST)['context']))
 
 Y_TRAIN = tf.one_hot(indices=X_TRAIN, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # one-hot encoding of x as y, to compare with the output probabilities
 Y_TEST = tf.one_hot(indices=X_TEST, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # idem
