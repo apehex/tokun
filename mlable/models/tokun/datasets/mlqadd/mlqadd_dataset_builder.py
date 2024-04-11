@@ -1,7 +1,14 @@
 """Wrapper around the MLQA dataset."""
 
+import itertools
+
 import tensorflow as tf
 import tensorflow_datasets as tfds
+
+# GENERIC #####################################################################
+
+def _cycle(iterators: list) -> iter:
+    return itertools.chain(*zip(*iterators))
 
 # LOAD DATA ###################################################################
 
@@ -10,11 +17,13 @@ def _load(lang: str='en', **kwargs) -> iter:
     __shuffle_files = kwargs.get('shuffle_files', True)
     __data_dir = kwargs.get('data_dir', '~/.cache/tensorflow/')
     __split = kwargs.get('split', 'test')
-    __batch_size = kwargs.get('batch_size', 128)
     __dataset = tfds.load(name=__name, split=__split, shuffle_files=__shuffle_files, data_dir=__data_dir)
-    return iter(__dataset.batch(__batch_size))
+    return iter(__dataset.batch(1))
 
 # PREPROCESS ##################################################################
+
+def _merge(batch: dict) -> tf.Tensor:
+    return batch['title'] + b'\n' + batch['context'] + b'\n' + batch['question'] + b'\n' + batch['answers']['text']
 
 def _preprocess(batch: tf.Tensor) -> str:
     __flat = tf.reshape(tensor=batch, shape=(-1,))
@@ -35,8 +44,8 @@ class Builder(tfds.core.GeneratorBasedBuilder):
         self._train_id = -1
         self._test_id = -1
         # batch iterators, one per language
-        self._train_iterators = [_load(lang=__l, split='test', batch_size=batch_size // len(train_lang), **kwargs) for __l in train_lang]
-        self._test_iterators = [_load(lang=__l, split='validation', batch_size=batch_size // len(test_lang), **kwargs) for __l in test_lang]
+        self._train_iter = _cycle(iterators=[_load(lang=__l, split='test', **kwargs) for __l in train_lang])
+        self._test_iter = _cycle(iterators=[_load(lang=__l, split='validation', **kwargs) for __l in test_lang])
 
     def _info(self) -> tfds.core.DatasetInfo:
         """Returns the dataset metadata."""
@@ -54,8 +63,10 @@ class Builder(tfds.core.GeneratorBasedBuilder):
     def _generate_examples(self, train: bool=True) -> iter:
         """Produces long text samples with mixed languages."""
         if train:
-            self._train_id += 1
-            yield self._train_id, {'text': ''.join([_preprocess(batch=next(__i)['context']) for __i in self._train_iterators])}
+            for __b in self._train_iter:
+                self._train_id += 1
+                yield self._train_id, {'text': tf.reshape(tensor=_merge(batch=__b), shape=()).numpy()}
         else:
-            self._test_id += 1
-            yield self._test_id, {'text': ''.join([_preprocess(batch=next(__i)['context']) for __i in self._test_iterators])}
+            for __b in self._test_iter:
+                self._test_id += 1
+                yield self._test_id, {'text': tf.reshape(tensor=_merge(batch=__b), shape=()).numpy()}
