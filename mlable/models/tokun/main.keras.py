@@ -7,7 +7,7 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.models.tokun.datasets.mlqa as _mlqa
+import mlable.models.tokun.datasets.mlqadd as mlqadd
 import mlable.models.tokun.datasets.pipeline as _mmad
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
@@ -38,18 +38,7 @@ VERSION = 'tokun-keras-660k'
 
 # DATA ########################################################################
 
-DATA_TRAIN, DATA_TEST = tfds.load('mlqa/en', split=['test', 'validation'], shuffle_files=True, data_dir='~/.cache/tensorflow/')
-
-BATCH_TRAIN = iter(DATA_TRAIN.batch(512))
-BATCH_TEST = iter(DATA_TEST.batch(512))
-
-# SPLIT #######################################################################
-
-X_TRAIN = _mmad.tokenize(text=_mlqa.preprocess(next(BATCH_TRAIN)['context']))
-X_TEST = _mmad.tokenize(text=_mlqa.preprocess(next(BATCH_TEST)['context']))
-
-Y_TRAIN = tf.one_hot(indices=X_TRAIN, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # one-hot encoding of x as y, to compare with the output probabilities
-Y_TEST = tf.one_hot(indices=X_TEST, depth=N_ENCODING_DIM, dtype=tf.dtypes.float32) # idem
+DATA_TRAIN, DATA_TEST = tfds.load('mlqadd', split=['train', 'test'], as_supervised=True, shuffle_files=True, data_dir='~/.cache/tensorflow/', builder_kwargs={'train_lang': ['en'], 'test_lang': ['es']})
 
 # MODEL #######################################################################
 
@@ -59,8 +48,8 @@ class Encoder(tf.keras.models.Model):
         self._encoder = tf.keras.Sequential([
             # tf.keras.Input(shape=(), batch_size=batch_dim * token_dim, name='input'),
             # _mtl.Merge(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
-            tf.keras.Input(shape=(token_dim,), batch_size=batch_dim, name='input'),
-            tf.keras.layers.Embedding(input_dim=encoding_dim, output_dim=embedding_dim, embeddings_initializer='he_normal', name='embedding'), # (B, G) => (B, G, E)
+            tf.keras.Input(shape=(token_dim, encoding_dim), batch_size=batch_dim, name='input'), # (B, G, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embedding'), # (B, G, U) => (B, G, E)
             _mtl.PositionalEmbedding(input_axis=1, output_axis=-1, name='position'), # (B, G, E) + (1, G, E)
             tf.keras.layers.Flatten(name='flatten'), # (B, G, E) => (B, G * E)
             tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head')]) # (B, G * E) => (B, L), here L = E
@@ -119,12 +108,11 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 # TRAIN #######################################################################
 
 TRAINING_HISTORY = MODEL.fit(
-    x=X_TRAIN,
-    y=Y_TRAIN,
-    batch_size=N_BATCH * N_TOKEN_DIM,
+    x=DATA_TRAIN,
+    batch_size=N_BATCH,
     epochs=N_EPOCHS,
     validation_split=None,
-    validation_data=(X_TEST, Y_TEST),
+    validation_data=DATA_TEST,
     validation_freq=[1, N_EPOCHS],
     verbose=2,
     callbacks=[lr_callback, tb_callback])
