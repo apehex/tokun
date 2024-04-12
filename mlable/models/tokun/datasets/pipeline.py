@@ -17,9 +17,17 @@ def context(seq: iter, length: int) -> iter:
 
 # > ###########################################################################
 
-def tokenize(text: str) -> tf.Tensor:
+def _tokenize_scalar(text: str) -> tf.Tensor:
     __b = tf.convert_to_tensor(value=list(text.encode('utf-32')), dtype=tf.dtypes.int32) # uint8 is not allowed
     return tf.reshape(tensor=__b, shape=(-1, 4))
+
+def tokenize(data: tf.Tensor) -> tf.Tensor:
+    # Decode bytes from UTF-8
+    __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE')
+    # Decode byte strings to arrays of integers
+    __ints = tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=256)
+    # Convert to tensor and reshape
+    return tf.reshape(__ints, (-1, 4))
 
 # < ###########################################################################
 
@@ -28,4 +36,4 @@ def interpret(output: tf.Tensor) -> tf.Tensor:
 
 def detokenize(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
-    return bytes(__b).decode('utf-32')
+    return bytes(__b).decode('utf-32-be')
