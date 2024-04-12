@@ -27,6 +27,9 @@ def _load(lang: str='en', **kwargs) -> iter:
 def _merge(batch: dict) -> tf.Tensor:
     return batch['title'] + b'\n' + batch['context'] + b'\n' + batch['question'] + b'\n' + batch['answers']['text']
 
+def _unpack(tensor: tf.Tensor) -> bytes:
+    return tf.reshape(tensor=tensor, shape=()).numpy()
+
 def _preprocess(batch: tf.Tensor) -> str:
     __flat = tf.reshape(tensor=batch, shape=(-1,))
     __concat = b''.join(__flat.numpy().tolist())
@@ -53,11 +56,10 @@ class Builder(tfds.core.GeneratorBasedBuilder):
         """Returns the dataset metadata."""
         return self.dataset_info_from_configs(
             homepage='https://github.com/apehex/mlable/',
-            supervised_keys=('utf-32', 'utf-32'),
+            supervised_keys=('utf-8', 'utf-8'),
             disable_shuffling=False,
             features=tfds.features.FeaturesDict({
-                # 'bytes': tfds.features.Text(),
-                'utf-32': tfds.features.Tensor(shape=(4, 256), dtype=tf.dtypes.float32)}))
+                'utf-8': tfds.features.Text(),}))
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Generates the data splits."""
@@ -66,17 +68,10 @@ class Builder(tfds.core.GeneratorBasedBuilder):
     def _generate_examples(self, train: bool=True) -> iter:
         """Produces long text samples with mixed languages."""
         if train:
-            for __batch in self._train_iter: # single sample in batch
-                __utf8 = tf.reshape(tensor=_merge(batch=__batch), shape=()).numpy()
-                __utf32 = _mmad.tokenize(text=__utf8.decode('utf-8'))
-                for __i in range(__utf32.shape[0]):
-                    self._train_id += 1
-                    yield self._train_id, {'utf-32': tf.one_hot(indices=__utf32[__i], depth=256, dtype=tf.dtypes.float32).numpy()}
+            for __b in self._train_iter: # single sample in batch
+                self._train_id += 1
+                yield self._train_id, {'utf-8': _unpack(tensor=_merge(batch=__b))}
         else:
             for __b in self._test_iter: # single sample in batch
                 self._test_id += 1
-                __utf8 = tf.reshape(tensor=_merge(batch=__b), shape=()).numpy()
-                __utf32 = _mmad.tokenize(text=__utf8.decode('utf-8'))
-                for __i in range(__utf32.shape[0]):
-                    self._test_id += 1
-                    yield self._test_id, {'utf-32': tf.one_hot(indices=__utf32[__i], depth=256, dtype=tf.dtypes.float32).numpy()}
+                yield self._test_id, {'utf-8': _unpack(tensor=_merge(batch=__b))}
