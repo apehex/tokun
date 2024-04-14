@@ -37,3 +37,16 @@ def interpret(output: tf.Tensor) -> tf.Tensor:
 def detokenize(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
     return bytes(__b).decode('utf-32-be')
+
+# END-TO-END ##################################################################
+
+def preprocess(dataset: tf.data.Dataset, key: str='context') -> tf.data.Dataset:
+    # from UTF-8 bytes scalar to UTF-32-BE int tensor
+    __dataset = dataset.map(lambda x: tokenize(x[key]))
+    # one-hot encoding of UTF-32 bytes
+    __dataset = __dataset.map(lambda x: tf.one_hot(indices=x, depth=256, axis=-1))
+    # produce (input, target) tuples for supervised training, instead of a single tensor X
+    return __dataset.map(lambda x: (x,x))
+
+def postprocess(dataset: tf.data.Dataset) -> tf.data.Dataset:
+    return dataset

@@ -26,7 +26,7 @@ N_EPOCHS = 2
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
-N_BATCH = 64
+N_BATCH = 128
 
 N_SAMPLE = 256
 
@@ -39,11 +39,8 @@ VERSION = 'tokun-keras-660k'
 # DATA ########################################################################
 
 # DATA_TRAIN, DATA_TEST = tfds.load('mlqadd', split=['train', 'test'], as_supervised=True, shuffle_files=True, data_dir='~/.cache/tensorflow/', builder_kwargs={'train_lang': ['en'], 'test_lang': ['es']})
-DATA_TRAIN = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/')
-DATA_TEST = tfds.load('mlqa/es', split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/')
-
-DATA_TRAIN = DATA_TRAIN.map(lambda x: tf.one_hot(indices=_mmad.tokenize(x['context']), depth=N_ENCODING_DIM, axis=-1))
-DATA_TEST = DATA_TEST.map(lambda x: tf.one_hot(indices=_mmad.tokenize(x['context']), depth=N_ENCODING_DIM, axis=-1))
+DATA_TRAIN = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH)
+DATA_TEST = tfds.load('mlqa/es', split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH)
 
 # MODEL #######################################################################
 
@@ -111,6 +108,9 @@ tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 # PREPROCESS ##################################################################
+
+DATA_TRAIN = _mmad.preprocess(dataset=DATA_TRAIN, key='context')
+DATA_TEST = _mmad.preprocess(dataset=DATA_TEST, key='context')
 
 # TRAIN #######################################################################
 
