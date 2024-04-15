@@ -48,5 +48,8 @@ def preprocess(dataset: tf.data.Dataset, key: str='context') -> tf.data.Dataset:
     # produce (input, target) tuples for supervised training, instead of a single tensor X
     return __dataset.map(lambda x: (x,x))
 
-def postprocess(dataset: tf.data.Dataset) -> tf.data.Dataset:
-    return dataset
+def postprocess(output: tf.Tensor) -> tf.Tensor:
+    # from one-hot to UTF-32 bytes
+    __output = interpret(output=output)
+    # flatten the groups of 4 bytes
+    return detokenize(tokens=__output)

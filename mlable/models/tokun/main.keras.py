@@ -7,8 +7,7 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.models.tokun.datasets.mlqadd as mlqadd
-import mlable.models.tokun.datasets.pipeline as _mmad
+import mlable.models.tokun.pipeline as _mmtp
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
 import mlable.tensorflow.sampling as _sam
@@ -39,8 +38,8 @@ VERSION = 'tokun-keras-660k'
 # DATA ########################################################################
 
 # DATA_TRAIN, DATA_TEST = tfds.load('mlqadd', split=['train', 'test'], as_supervised=True, shuffle_files=True, data_dir='~/.cache/tensorflow/', builder_kwargs={'train_lang': ['en'], 'test_lang': ['es']})
-DATA_TRAIN = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH)
-DATA_TEST = tfds.load('mlqa/es', split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH)
+LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
+DATA = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
 # MODEL #######################################################################
 
@@ -109,17 +108,16 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA_TRAIN = _mmad.preprocess(dataset=DATA_TRAIN, key='context')
-DATA_TEST = _mmad.preprocess(dataset=DATA_TEST, key='context')
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context') for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 
 TRAINING_HISTORY = MODEL.fit(
-    x=DATA_TRAIN,
+    x=DATA['en'],
     batch_size=N_BATCH,
     epochs=N_EPOCHS,
     validation_split=None,
-    validation_data=DATA_TEST,
+    validation_data=DATA['zh'], # full of glyphs
     validation_freq=[1, N_EPOCHS],
     verbose=2,
     callbacks=[lr_callback, tb_callback])
