@@ -65,12 +65,12 @@
     - [ ] keywords are single tokens
     - [ ] variables are special tokens ?
 
-## AutoK
+## TokUn
 
 ### Objectives
 
-- [ ] dense embeddings, rather than sparse "one-hot"
-- [ ] guiding without fixing: no frozen dictionary, context agnostic
+- [x] dense embeddings, rather than sparse "one-hot"
+- [x] guiding without fixing: no frozen dictionary, context agnostic
 - [ ] tokenization independant of the input partitioning / shift
 - [ ] composite tokens have parent / child relation: "splitting" carries the information of "split" and "ing"
 
@@ -89,18 +89,19 @@
     - [ ] byte replacement
     - [ ] byte insertion
     - [ ] reversing order in groups
+    - [ ] change number format (while keeping the same value)
 
 ### Issues
 
 Trying to solve:
 
-- [ ] variable length encoding (UTF-8) that screws fixed size model shapes
+- [x] variable length encoding (UTF-8) that screws fixed size model shapes
 - [ ] part / global unrelated: knowledge about tokens doesn't transfer to their siblings
 - [ ] better support for eastern languages
 
 ### Models
 
-- [ ] VAE
+- [x] VAE
 - [ ] VAE + CNN
 - [ ] VAE + CNN + attention
 - [ ] VAE + hierarchical CNN
