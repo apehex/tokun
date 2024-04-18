@@ -252,7 +252,7 @@ class Softmax(tf.keras.layers.Layer):
 
 # RESHAPING ###################################################################
 
-class Merge(tf.keras.layers.Layer):
+class Divide(tf.keras.layers.Layer):
     def __init__(
         self,
         input_axis: int,
@@ -260,24 +260,54 @@ class Merge(tf.keras.layers.Layer):
         factor: int,
         insert: bool=False,
         **kwargs
-    ):
-        super(Merge, self).__init__(**kwargs)
+    ) -> None:
+        super(Divide, self).__init__(**kwargs)
         self._input_axis = input_axis
         self._output_axis = output_axis
         self._factor = factor
         self._insert = insert
 
-    def call(self, inputs: tf.Tensor):
-        __shape = list(inputs.shape)
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        __shape = [-1 if __d is None else __d for __d in list(inputs.shape)]
         __length = len(__shape) + int(self._insert)
         __axis0 = self._input_axis % __length
         __axis1 = self._output_axis % __length
         # option to group data on a new axis
         if self._insert: __shape.insert(__axis1, 1)
         # move data from axis 0 to axis 1
-        __shape[__axis0] = __shape[__axis0] // self._factor
-        __shape[__axis1] = __shape[__axis1] * self._factor
-        return tf.squeeze(tf.reshape(tensor=inputs, shape=__shape))
+        __shape[__axis0] = __shape[__axis0] // self._factor if __shape[__axis0] != -1 else -1
+        __shape[__axis1] = __shape[__axis1] * self._factor if __shape[__axis1] != -1 else -1
+        return tf.reshape(tensor=inputs, shape=__shape)
+
+class Merge(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        left_axis: int=-2,
+        right_axis: int=-1,
+        left: bool=True,
+        **kwargs
+    ) -> None:
+        super(Merge, self).__init__(**kwargs)
+        self._left_axis = left_axis
+        self._right_axis = right_axis
+        self._left = left
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        # current shape
+        __shape = [-1 if __d is None else __d for __d in list(inputs.shape)]
+        __length = len(__shape)
+        # target axes
+        __axis_l = self._left_axis % __length
+        __axis_r = self._right_axis % __length
+        # new axis
+        __dim = __shape[__axis_l] * __shape[__axis_r]
+        __axis_k = __axis_l if self._left else __axis_r # kept axis
+        __axis_d = __axis_r if self._left else __axis_l # deleted axis
+        # new shape
+        __shape[__axis_k] = __dim
+        __shape.pop(__axis_d)
+        # actually merge the two axes
+        return tf.reshape(tensor=inputs, shape=__shape)
 
 class Reshape(tf.keras.layers.Layer):
     def __init__(
