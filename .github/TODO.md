@@ -72,11 +72,12 @@
 - [x] dense embeddings, rather than sparse "one-hot"
 - [x] guiding without fixing: no frozen dictionary, context agnostic
 - [ ] tokenization independant of the input partitioning / shift
+- [ ] dense encoding != one-hot vectors on the vocabulary
 - [ ] composite tokens have parent / child relation: "splitting" carries the information of "split" and "ing"
 
 ### Dataviz
 
-- [ ] spatial repartition of tokens
+- [x] spatial repartition of tokens
 - [ ] embeddings of child <=> parent tokens
 - [ ] limit embedding size = when fidelity starts to drop = max compression
 

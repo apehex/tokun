@@ -7,6 +7,7 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import mlable.models.tokun.layers as _mmtl
 import mlable.models.tokun.pipeline as _mmtp
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
@@ -21,7 +22,7 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 2
+N_EPOCHS = 1
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
@@ -48,12 +49,10 @@ class Encoder(tf.keras.models.Model):
         super(Encoder, self).__init__(**kwargs)
         self._encoder = tf.keras.Sequential([
             # tf.keras.Input(shape=(), batch_size=batch_dim * token_dim, name='input'),
-            # _mtl.Merge(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
+            # _mtl.Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
             tf.keras.Input(shape=(token_dim, encoding_dim), batch_size=batch_dim, name='input'), # (B, G, U)
             tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embedding'), # (B, G, U) => (B, G, E)
-            _mtl.PositionalEmbedding(input_axis=1, output_axis=-1, name='position'), # (B, G, E) + (1, G, E)
-            tf.keras.layers.Flatten(name='flatten'), # (B, G, E) => (B, G * E)
-            tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head')]) # (B, G * E) => (B, L), here L = E
+            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, latent_dim=latent_dim)]) # (B, G, E) => (B, L), typically L = E
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -66,7 +65,7 @@ class Decoder(tf.keras.models.Model):
             tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'), # (B, L) => (B, G * E), here L = E
             tf.keras.layers.Reshape(target_shape=(token_dim, embedding_dim), name='reshape'), # (B, G * E) => (B, G, E)
             tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='feet'), # (B, G, E) => (B, G, U), here U = E
-            # _mtl.Merge(input_axis=1, output_axis=0, factor=token_dim, insert=False, name='split'), # (B, G, E) => (B * G, E)
+            # _mtl.Divide(input_axis=1, output_axis=0, factor=token_dim, insert=False, name='split'), # (B, G, E) => (B * G, E)
             tf.keras.layers.Softmax(axis=-1, name='softmax')])
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
@@ -108,7 +107,7 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context') for __l, __d in DATA.items()}
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64) for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 
