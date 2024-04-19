@@ -9,6 +9,7 @@ import tensorflow_datasets as tfds
 
 import mlable.models.tokun.layers as _mmtl
 import mlable.models.tokun.pipeline as _mmtp
+import mlable.tensorflow.io as _mti
 import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
 import mlable.tensorflow.sampling as _sam
@@ -22,7 +23,7 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 8
+N_EPOCHS = 4
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
@@ -116,10 +117,25 @@ TRAINING_HISTORY = MODEL.fit(
     verbose=2,
     callbacks=[lr_callback, tb_callback])
 
-# SAMPLE ######################################################################
+# SAMPLES #####################################################################
 
-# sample = functools.partial(_sam.sample, model=MODEL, context=N_CONTEXT_DIM, depth=N_ENCODING_DIM, length=N_SAMPLE)
+__x = next(iter(DATA['vi']))[0]
+__o = MODEL.predict(__x)
 
-# VIZ #########################################################################
+print(_mmtp.postprocess(__x)[:128])
+print(_mmtp.postprocess(__o)[:128])
 
-# _sum.save_model_histograms(model=MODEL, epoch=N_EPOCHS, summary=SUMMARY)
+# DATAVIZ #####################################################################
+
+def label(c: str) -> str:
+  return '({})'.format(','.join(str(__i) for __i in list(c.encode('utf-32-be'))))
+
+__vocabulary = ''.join(list(set(_mmtp.postprocess(__x))))
+
+__inputs = tf.one_hot(list(__vocabulary.encode('utf-32-be')), depth=256)
+__embeddings = MODEL._encoder.predict(__inputs)
+
+__metadata = [__c + ' ' + label(__c) for __c in __vocabulary]
+
+_mti.write(data=__metadata, path='./metadata.tsv', tsv=False)
+_mti.write(data=__embeddings, path='./embeddings.tsv', tsv=True)

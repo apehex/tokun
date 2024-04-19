@@ -24,7 +24,7 @@ def shape(layer_count: int, group_size: int, flatten: bool=False) -> list:
 
 def _tokenize_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: bool=False) -> tf.Tensor:
     __mod = group_size ** layer_count
-    __bytes = list(text.encode('utf-32'))
+    __bytes = list(text.encode('utf-32-be'))
     __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
     __padding = (-len(__bytes) % __mod) * [0]
     __tensor = tf.convert_to_tensor(value=__bytes + __padding, dtype=tf.dtypes.int32) # uint8 is not allowed
