@@ -303,7 +303,7 @@ class Merge(tf.keras.layers.Layer):
         __axis_l = self._left_axis % __rank
         __axis_r = self._right_axis % __rank
         # new axis
-        __dim = __shape[__axis_l] * __shape[__axis_r]
+        __dim = -1 if (__shape[__axis_l] == -1 or __shape[__axis_r] == -1) else __shape[__axis_l] * __shape[__axis_r]
         __axis_k = __axis_l if self._left else __axis_r # kept axis
         __axis_d = __axis_r if self._left else __axis_l # deleted axis
         # new shape

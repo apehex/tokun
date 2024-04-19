@@ -74,6 +74,7 @@
 - [ ] tokenization independant of the input partitioning / shift
 - [ ] dense encoding != one-hot vectors on the vocabulary
 - [ ] composite tokens have parent / child relation: "splitting" carries the information of "split" and "ing"
+- [ ] reduce token dimension: from several 100k to 256!
 
 ### Dataviz
 
@@ -86,11 +87,14 @@
 - [ ] shift training data by 1, 2, ..., G - 1 ticks along the time / context axis
 - [ ] random perturbations on the inputs:
     - [ ] letter capitalization
+    - [ ] abbreviations: "can't" <=> "cannot"
     - [ ] byte shift
     - [ ] byte replacement
     - [ ] byte insertion
     - [ ] reversing order in groups
     - [ ] change number format (while keeping the same value)
+    - [ ] equivalence 1 <=> 4 <=> 4 x 4:
+        - [ ] pad data with 0s to fill bigger tokens until they match their parts
 
 ### Issues
 
@@ -100,10 +104,19 @@ Trying to solve:
 - [ ] part / global unrelated: knowledge about tokens doesn't transfer to their siblings
 - [ ] better support for eastern languages
 
+### Blocks
+
+- [ ] tokenization:
+    - [ ] simplify: divide + position + merge = reshape + dense (position = dense bias on the merged vector)
+    - [ ] move data from axis 0 to axis -1 in the end: (B * G, E) => (B, G * E)
+- [ ] detokenization
+    - [ ] simplify: same as the tokenization block
+- [ ] head
+
 ### Models
 
 - [x] VAE
 - [ ] VAE + CNN
 - [ ] VAE + CNN + attention
 - [ ] VAE + hierarchical CNN
-- [ ] VAE + hierarchical CNN + attention*
+- [ ] VAE + hierarchical CNN + attention
