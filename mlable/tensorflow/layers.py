@@ -255,8 +255,8 @@ class Softmax(tf.keras.layers.Layer):
 class Divide(tf.keras.layers.Layer):
     def __init__(
         self,
-        input_axis: int,
-        output_axis: int,
+        input_axis: int, # relative to the NEW shape / rank
+        output_axis: int, # same
         factor: int,
         insert: bool=False,
         **kwargs
@@ -268,10 +268,13 @@ class Divide(tf.keras.layers.Layer):
         self._insert = insert
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        # infer the dimension of the symbolic axis
         __shape = [-1 if __d is None else __d for __d in list(inputs.shape)]
-        __length = len(__shape) + int(self._insert)
-        __axis0 = self._input_axis % __length
-        __axis1 = self._output_axis % __length
+        # rank, according to the new shape
+        __rank = len(__shape) + int(self._insert)
+        # axes, taken from the new shape
+        __axis0 = self._input_axis % __rank
+        __axis1 = self._output_axis % __rank
         # option to group data on a new axis
         if self._insert: __shape.insert(__axis1, 1)
         # move data from axis 0 to axis 1
@@ -293,12 +296,12 @@ class Merge(tf.keras.layers.Layer):
         self._left = left
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        # current shape
+        # infer the dimension of the symbolic axis
         __shape = [-1 if __d is None else __d for __d in list(inputs.shape)]
-        __length = len(__shape)
+        __rank = len(__shape)
         # target axes
-        __axis_l = self._left_axis % __length
-        __axis_r = self._right_axis % __length
+        __axis_l = self._left_axis % __rank
+        __axis_r = self._right_axis % __rank
         # new axis
         __dim = __shape[__axis_l] * __shape[__axis_r]
         __axis_k = __axis_l if self._left else __axis_r # kept axis
