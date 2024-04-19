@@ -34,7 +34,7 @@ R_MIN = 0.0001
 R_MAX = 0.001
 R_EXP = .8
 
-VERSION = 'tokun-keras-660k'
+VERSION = 'tokun-1-keras-660k'
 
 # DATA ########################################################################
 
@@ -51,8 +51,8 @@ class Encoder(tf.keras.models.Model):
             # tf.keras.Input(shape=(), batch_size=batch_dim * token_dim, name='input'),
             # _mtl.Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
             tf.keras.Input(shape=(token_dim, encoding_dim), batch_size=batch_dim, name='input'), # (B, G, U)
-            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embedding'), # (B, G, U) => (B, G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, latent_dim=latent_dim)]) # (B, G, E) => (B, L), typically L = E
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B, G, U) => (B, G, E)
+            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, latent_dim=latent_dim, name='tokenize-4')]) # (B, G, E) => (B, L), typically L = E
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -62,11 +62,8 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
             tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'),
-            tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='head'), # (B, L) => (B, G * E), here L = E
-            tf.keras.layers.Reshape(target_shape=(token_dim, embedding_dim), name='reshape'), # (B, G * E) => (B, G, E)
-            tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='feet'), # (B, G, E) => (B, G, U), here U = E
-            # _mtl.Divide(input_axis=1, output_axis=0, factor=token_dim, insert=False, name='split'), # (B, G, E) => (B * G, E)
-            tf.keras.layers.Softmax(axis=-1, name='softmax')])
+            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B, L) => (B, G, E)
+            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B, G, E) => (B, G, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
@@ -107,7 +104,7 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64) for __l, __d in DATA.items()}
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64, flatten=False) for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 

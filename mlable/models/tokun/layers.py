@@ -11,14 +11,45 @@ class TokenizeBlock(tf.keras.layers.Layer):
         right_axis: int=-1,
         latent_dim: int=256,
         **kwargs
-    ):
+    ) -> None:
         super(TokenizeBlock, self).__init__(**kwargs)
         # layers
-        self._embedding = _mtl.PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='positional-embeddings') # (..., G, E) + (1, G, E)
-        self._merge = _mtl.Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merged-embeddings') # (..., G, E) => (..., G * E)
-        self._dense = tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compressed-embeddings') # (..., G * E) => (..., L), typically L = E
+        self._embedding = _mtl.PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='position-embeddings') # (..., G, E) + (1, G, E)
+        self._merge = _mtl.Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merge-embeddings') # (..., G, E) => (..., G * E)
+        self._dense = tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compress-embeddings') # (..., G * E) => (..., L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(self._merge(self._embedding(inputs)))
 
 # DECODING BLOCKS #############################################################
+
+class DetokenizeBlock(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        token_dim: int=4,
+        embedding_dim: int=256,
+        **kwargs
+    ) -> None:
+        super(DetokenizeBlock, self).__init__(**kwargs)
+        # layers
+        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompress-embeddings') # (..., L) => (..., G * E), typically L = E
+        self._divide = _mtl.Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='divide-embeddings') # (..., G * E) => (..., G, E)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        return self._divide(self._dense(inputs))
+
+# HEAD ########################################################################
+
+class HeadBlock(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        encoding_dim: int=256,
+        **kwargs
+    ) -> None:
+        super(HeadBlock, self).__init__(**kwargs)
+        # layers
+        self._dense = tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='project-head') # (..., G, E) => (..., G, U), typically U = E
+        self._softmax = tf.keras.layers.Softmax(axis=-1, name='softmax') # (..., G, U)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        return self._softmax(self._dense(inputs))
