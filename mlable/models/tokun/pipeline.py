@@ -33,7 +33,7 @@ def _tokenize_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: 
 def tokenize(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
     # make sure each sample has a length multiple of G ** L = T, the token dim
     __mod = group_size ** layer_count
-    __dim = math.ceil(4 * sample_size / __mod) * __mod
+    __dim = math.ceil(4 * sample_size / __mod) * __mod # factor 4 because of the UTF-32 encoding
     # output shape
     __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
     # Decode bytes from UTF-8

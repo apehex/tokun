@@ -22,7 +22,7 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 1
+N_EPOCHS = 8
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
@@ -48,11 +48,9 @@ class Encoder(tf.keras.models.Model):
     def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
         super(Encoder, self).__init__(**kwargs)
         self._encoder = tf.keras.Sequential([
-            # tf.keras.Input(shape=(), batch_size=batch_dim * token_dim, name='input'),
-            # _mtl.Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group'), # (B * G,) => (B, G)
-            tf.keras.Input(shape=(token_dim, encoding_dim), batch_size=batch_dim, name='input'), # (B, G, U)
-            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B, G, U) => (B, G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, latent_dim=latent_dim, name='tokenize-4')]) # (B, G, E) => (B, L), typically L = E
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G, U) => (B * G, E)
+            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4')]) # (B * G, E) => (B, L), typically L = E
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -62,8 +60,8 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
             tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'),
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B, L) => (B, G, E)
-            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B, G, E) => (B, G, U)
+            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B, L) => (B * G, E)
+            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G, E) => (B * G, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
@@ -104,7 +102,7 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64, flatten=False) for __l, __d in DATA.items()}
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64, flatten=True) for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 
