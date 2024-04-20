@@ -119,7 +119,8 @@ TRAINING_HISTORY = MODEL.fit(
 
 # SAMPLES #####################################################################
 
-__x = next(iter(DATA['vi']))[0]
+__i = iter(DATA['de'])
+__x = next(__i)[0]
 __o = MODEL.predict(__x)
 
 print(_mmtp.postprocess(__x)[:128])
