@@ -50,7 +50,7 @@ def interpret(output: tf.Tensor) -> tf.Tensor:
 
 def detokenize(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
-    return bytes(__b).decode('utf-32-be')
+    return bytes(__b).decode(encoding='utf-32-be', errors='replace')
 
 # END-TO-END ##################################################################
 
