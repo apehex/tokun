@@ -1,3 +1,10 @@
+# METADATA ####################################################################
+
+def label(c: str) -> str:
+    return '({})'.format(','.join(str(__i) for __i in list(c.encode('utf-32-be'))))
+
+# SERIALIZE ###################################################################
+
 def write(data: any, path: str, tsv: bool=True) -> None:
     with open(path, 'w') as __f:
         for __row in data:

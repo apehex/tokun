@@ -23,8 +23,8 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 24
-N_EPOCHS_RAMPUP = 12
+N_EPOCHS = 32
+N_EPOCHS_RAMPUP = 16
 N_EPOCHS_SUSTAIN = 0
 
 N_BATCH = 128 # number of samples per batch
@@ -108,15 +108,15 @@ DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=2, group_s
 
 # TRAIN #######################################################################
 
-TRAINING_HISTORY = MODEL.fit(
-    x=DATA['en'],
-    batch_size=N_BATCH,
-    epochs=N_EPOCHS,
-    validation_split=None,
-    validation_data=DATA['zh'], # full of glyphs
-    validation_freq=[1, N_EPOCHS],
-    verbose=2,
-    callbacks=[lr_callback, tb_callback])
+# TRAINING_HISTORY = MODEL.fit(
+#     x=DATA['en'],
+#     batch_size=N_BATCH,
+#     epochs=N_EPOCHS,
+#     validation_split=None,
+#     validation_data=DATA['zh'], # full of glyphs
+#     validation_freq=[1, N_EPOCHS],
+#     verbose=2,
+#     callbacks=[lr_callback, tb_callback])
 
 # SAMPLES #####################################################################
 
@@ -129,14 +129,17 @@ print(_mmtp.postprocess(__o))
 
 # DATAVIZ #####################################################################
 
-__characters = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1)
-__tokens = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4)
+__characters = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
+__tokens = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4, repeats=False)
 
-__character_embeddings = MODEL._encoder._encoder.layers[0](MODEL._encoder._encoder.layers[1](__x))
-__token_embeddings = MODEL._encoder.predict(__x)
+__character_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__characters), layer_count=2, group_size=4, flatten=True), depth=256, axis=-1)
+__token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__tokens), layer_count=2, group_size=4, flatten=True), depth=256, axis=-1)
 
-_mti.write(data=__characters, path='./metadata.characters.tsv', tsv=False)
-_mti.write(data=__character_embeddings, path='./embeddings.characters.tsv', tsv=True)
+__character_embeddings = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__character_x))
+__token_embeddings = MODEL._encoder.predict(__token_x)
+
+_mti.write(data=[__c + _mti.label(__c) for __c in __characters], path='./metadata.characters.tsv', tsv=False)
+_mti.write(data=__character_embeddings.numpy(), path='./embeddings.characters.tsv', tsv=True)
 
 _mti.write(data=__tokens, path='./metadata.tokens.tsv', tsv=False)
 _mti.write(data=__token_embeddings, path='./embeddings.tokens.tsv', tsv=True)

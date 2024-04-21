@@ -5,8 +5,9 @@ import tensorflow as tf
 
 # GENERIC #####################################################################
 
-def chunk(seq: list, size: int) -> list:
-    return [seq[__i:__i+size] for __i in range(0, len(seq), size)]
+def chunk(seq: list, size: int, repeats: bool=True) -> list:
+    __chunks = (seq[__i:__i+size] for __i in range(0, len(seq), size))
+    return list(__chunks if repeats else set(__chunks))
 
 def merge(chunks: list) -> list:
     return list(itertools.chain.from_iterable(chunks))
