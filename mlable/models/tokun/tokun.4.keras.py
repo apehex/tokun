@@ -122,7 +122,7 @@ DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=2, group_s
 
 __i = iter(DATA['de']) # iterate over batches of samples
 __x = next(__i)[0][:2 * N_TOKEN_DIM * N_SAMPLE] # take two samples from the batch
-__o = MODEL.predict(__x)
+__o = MODEL(__x)
 
 print(_mmtp.postprocess(__x))
 print(_mmtp.postprocess(__o))
@@ -136,7 +136,7 @@ __character_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__charact
 __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__tokens), layer_count=2, group_size=4, flatten=True), depth=256, axis=-1)
 
 __character_embeddings = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__character_x))
-__token_embeddings = MODEL._encoder.predict(__token_x)
+__token_embeddings = MODEL._encoder(__token_x)
 
 _mti.write(data=[__c + _mti.label(__c) for __c in __characters], path='./metadata.characters.tsv', tsv=False)
 _mti.write(data=__character_embeddings.numpy(), path='./embeddings.characters.tsv', tsv=True)
