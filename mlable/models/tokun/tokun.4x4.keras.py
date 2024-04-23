@@ -122,32 +122,55 @@ DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=3, group_s
 
 # SAMPLES #####################################################################
 
-__i = iter(DATA['de']) # iterate over batches of samples
-__x = next(__i)[0][:4 * N_TOKEN_DIM * N_SAMPLE] # take a few samples from the batch
-__o = MODEL(__x)
+SAMPLES = {}
+TOKENS = {1: {}, 4: {}, 16: {}}
+EMBEDDINGS = {1: {}, 4: {}, 16: {}}
 
-print(_mmtp.postprocess(__x))
-print(_mmtp.postprocess(__o))
+for __l in DATA:
+    # compute predictions
+    __i = iter(DATA[__l]) # iterate over batches of samples
+    __x = next(__i)[0] # take input only
+    __o = MODEL(__x)
+    # sample predictions (inputs, outputs)
+    SAMPLES[__l] = (__x, __o)
+    # unique 1-tokens (characters)
+    TOKENS[1][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
+    # unique 4-tokens
+    TOKENS[4][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4, repeats=False)
+    # unique 4x4-tokens
+    TOKENS[16][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=16, repeats=False)
 
-# DATAVIZ #####################################################################
+TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
+TOKENS[4]['all'] = list(set(__t for _, __s in TOKENS[4].items() for __t in __s))
+TOKENS[16]['all'] = list(set(__t for _, __s in TOKENS[16].items() for __t in __s))
 
-__characters = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
-__4_tokens = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4, repeats=False)
-__4x4_tokens = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=16, repeats=False)
+# EMBEDDINGS ##################################################################
 
-__character_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__characters), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
-__4_token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__4_tokens), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
-__4x4_token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__4x4_tokens), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+for __l, __s in TOKENS[1].items():
+    # re-encode without token repeats
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    # embed
+    EMBEDDINGS[1][__l] = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x))[:len(__s)]
 
-__character_embeddings = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__character_x))
-__4_token_embeddings = MODEL._encoder._encoder.layers[2](MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__4_token_x)))
-__4x4_token_embeddings = MODEL._encoder(__4x4_token_x)
+for __l, __s in TOKENS[4].items():
+    # re-encode without token repeats
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    # embed
+    EMBEDDINGS[4][__l] = MODEL._encoder._encoder.layers[2](MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x)))[:len(__s)]
 
-_mti.write(data=[__c + _mti.label(__c) for __c in __characters], path='./metadata.characters.tsv', tsv=False)
-_mti.write(data=__character_embeddings.numpy(), path='./embeddings.characters.tsv', tsv=True)
+for __l, __s in TOKENS[16].items():
+    # re-encode without token repeats
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    # embed
+    EMBEDDINGS[16][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
-_mti.write(data=__4_tokens, path='./metadata.tokens.4.tsv', tsv=False)
-_mti.write(data=__4_token_embeddings, path='./embeddings.tokens.4.tsv', tsv=True)
+# SAVE ########################################################################
 
-_mti.write(data=__4x4_tokens, path='./metadata.tokens.4x4.tsv', tsv=False)
-_mti.write(data=__4x4_token_embeddings, path='./embeddings.tokens.4x4.tsv', tsv=True)
+_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
+_mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
+
+_mti.write(data=TOKENS[4]['all'], path='./metadata.4.tsv', tsv=False)
+_mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=True)
+
+_mti.write(data=TOKENS[16]['all'], path='./metadata.16.tsv', tsv=False)
+_mti.write(data=EMBEDDINGS[16]['all'].numpy(), path='./embeddings.16.tsv', tsv=True)
