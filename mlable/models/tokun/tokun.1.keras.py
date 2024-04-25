@@ -108,7 +108,7 @@ DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_s
 # TRAIN #######################################################################
 
 TRAINING_HISTORY = MODEL.fit(
-    x=DATA['en'],
+    x=DATA['en'].concatenate(DATA['zh']).concatenate(DATA['hi']).concatenate(DATA['es']),
     batch_size=N_BATCH,
     epochs=N_EPOCHS,
     validation_split=None,
@@ -119,24 +119,31 @@ TRAINING_HISTORY = MODEL.fit(
 
 # SAMPLES #####################################################################
 
-__i = iter(DATA['de'])
-__x = next(__i)[0]
-__o = MODEL.predict(__x)
+SAMPLES = {}
+TOKENS = {1: {}, 4: {}, 16: {}}
+EMBEDDINGS = {1: {}, 4: {}, 16: {}}
 
-print(_mmtp.postprocess(__x)[:128])
-print(_mmtp.postprocess(__o)[:128])
+for __l in DATA:
+    # compute predictions
+    __i = iter(DATA[__l]) # iterate over batches of samples
+    __x = next(__i)[0] # take input only
+    __o = MODEL(__x)
+    # sample predictions (inputs, outputs)
+    SAMPLES[__l] = (__x, __o)
+    # unique 1-tokens (characters)
+    TOKENS[1][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
 
-# DATAVIZ #####################################################################
+TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
 
-def label(c: str) -> str:
-  return '({})'.format(','.join(str(__i) for __i in list(c.encode('utf-32-be'))))
+# EMBEDDINGS ##################################################################
 
-__vocabulary = ''.join(list(set(_mmtp.postprocess(__x))))
+for __l, __s in TOKENS[1].items():
+    # re-encode without token repeats
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=1, group_size=4, flatten=True), depth=256, axis=-1)
+    # embed
+    EMBEDDINGS[1][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
-__inputs = tf.one_hot(list(__vocabulary.encode('utf-32-be')), depth=256)
-__embeddings = MODEL._encoder.predict(__inputs)
+# SAVE ########################################################################
 
-__metadata = [__c + ' ' + label(__c) for __c in __vocabulary]
-
-_mti.write(data=__metadata, path='./metadata.tsv', tsv=False)
-_mti.write(data=__embeddings, path='./embeddings.tsv', tsv=True)
+_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
+_mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
