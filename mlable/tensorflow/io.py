@@ -1,7 +1,7 @@
 # METADATA ####################################################################
 
 def label(c: str) -> str:
-    return '({})'.format(','.join(str(__i) for __i in list(c.encode('utf-32-be'))))
+    return '#{}'.format(c.encode('utf-32-be').hex())
 
 # SERIALIZE ###################################################################
 
