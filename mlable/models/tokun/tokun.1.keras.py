@@ -23,12 +23,11 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 4
+N_EPOCHS = 8
 N_EPOCHS_RAMPUP = 4
 N_EPOCHS_SUSTAIN = 0
 
 N_BATCH = 128
-
 N_SAMPLE = 256
 
 R_MIN = 0.0001
@@ -51,7 +50,8 @@ class Encoder(tf.keras.models.Model):
         self._encoder = tf.keras.Sequential([
             tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G, U)
             tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G, U) => (B * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4')]) # (B * G, E) => (B, L), typically L = E
+            _mtl.Reshape(target_shape=(-1, token_dim * embedding_dim), name='concat-4'), # (B * G, E) => (B, G * E)
+            tf.keras.layers.Dense(units=embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compress-4'),]) # (B, G * E) => (B, L)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -61,8 +61,10 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
             tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'),
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B, L) => (B * G, E)
-            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G, E) => (B * G, U)
+            tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompress-4'), # (B, L) => (B, G * E)
+            _mtl.Reshape(target_shape=(-1, embedding_dim), name='split-4'), # (B, G * E) => (B * G, E)
+            tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='project-head'), # (B * G, E) => (B * G, U)
+            tf.keras.layers.Softmax(axis=-1, name='softmax')]) # probabilities
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
