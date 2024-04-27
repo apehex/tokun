@@ -17,7 +17,7 @@ import mlable.tensorflow.summary as _sum
 
 # META ########################################################################
 
-N_CONTEXT_DIM = 16 # C
+N_DEPTH = 1 # D
 N_TOKEN_DIM = 4 # G
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
@@ -41,6 +41,9 @@ VERSION = 'tokun-1-keras-660k'
 # DATA_TRAIN, DATA_TEST = tfds.load('mlqadd', split=['train', 'test'], as_supervised=True, shuffle_files=True, data_dir='~/.cache/tensorflow/', builder_kwargs={'train_lang': ['en'], 'test_lang': ['es']})
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 DATA = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+
+# Single sample for manual testing
+TEST = """Reinforcement learning from human feedback (RLHF) (deutsch Bestärkendes Lernen durch menschliche Rückkopplung) steht für maschinelles Lernen, bei dem ein Software-Agent selbständig eine Strategie (Policy) erlernt, um erhaltene Belohnungen zu maximieren. Dabei wird dem Agenten nicht vorgezeigt, welche Aktion in welcher Situation die beste ist, sondern er erhält durch eine Bewertungseinheit zu bestimmten Zeitpunkten durch Rückkopplung (Feedback) aus der Umwelt eine reellwertige Belohnung, die auch negativ sein kann. Im Gegensatz zum klassischen bestärkenden Lernen bestimmt zusätzlich eine Bewertungseinheit eine weitere Belohnung nach Überprüfen von Resultaten des Software-Agents durch Personen, welche das sogenannte Alignment[1] mit menschlicher Denkweise, Erwartung und Wertvorstellung beurteilen.[2][3][4] Das Unternehmen Open AI hat diese zusätzliche, nachträgliche Feineinstellung mittels RLHF bei der Weiterentwicklung von ChatGPT Version 3.5 auf Version 4.0 eingeführt.[5]"""
 
 # MODEL #######################################################################
 
@@ -105,7 +108,7 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=1, group_size=N_TOKEN_DIM, sample_size=64, flatten=True) for __l, __d in DATA.items()}
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=64, flatten=True) for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 
@@ -141,7 +144,7 @@ TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
 
 for __l, __s in TOKENS[1].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=1, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[1][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
@@ -149,3 +152,14 @@ for __l, __s in TOKENS[1].items():
 
 _mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
+
+# TEST ########################################################################
+
+__x = tf.one_hot(indices=_tokenize_scalar(text=TEST, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__e = MODEL._encoder(__x)
+__p = MODEL(__x)
+__y = postprocess(__p)
+
+print(__sample)
+print(__y)
+print(sum(__l == __r for __l, __r in zip(__sample, __y)) / len(__sample))

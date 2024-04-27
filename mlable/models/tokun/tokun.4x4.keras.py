@@ -17,7 +17,7 @@ import mlable.tensorflow.summary as _sum
 
 # META ########################################################################
 
-N_CONTEXT_DIM = 16 # C
+N_DEPTH = 3 # D
 N_TOKEN_DIM = 4 # G
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
@@ -42,39 +42,38 @@ VERSION = 'tokun-1-keras-660k'
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 DATA = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
+# Single sample for manual testing
+TEST = """Reinforcement learning from human feedback (RLHF) (deutsch Bestärkendes Lernen durch menschliche Rückkopplung) steht für maschinelles Lernen, bei dem ein Software-Agent selbständig eine Strategie (Policy) erlernt, um erhaltene Belohnungen zu maximieren. Dabei wird dem Agenten nicht vorgezeigt, welche Aktion in welcher Situation die beste ist, sondern er erhält durch eine Bewertungseinheit zu bestimmten Zeitpunkten durch Rückkopplung (Feedback) aus der Umwelt eine reellwertige Belohnung, die auch negativ sein kann. Im Gegensatz zum klassischen bestärkenden Lernen bestimmt zusätzlich eine Bewertungseinheit eine weitere Belohnung nach Überprüfen von Resultaten des Software-Agents durch Personen, welche das sogenannte Alignment[1] mit menschlicher Denkweise, Erwartung und Wertvorstellung beurteilen.[2][3][4] Das Unternehmen Open AI hat diese zusätzliche, nachträgliche Feineinstellung mittels RLHF bei der Weiterentwicklung von ChatGPT Version 3.5 auf Version 4.0 eingeführt.[5]"""
+
 # MODEL #######################################################################
 
 class Encoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
+    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(Encoder, self).__init__(**kwargs)
         self._encoder = tf.keras.Sequential([
-            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G * G * G, U)
-            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G * G * G, U) => (B * G * G * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize-4'), # (B * G * G * G, E) => (B * G * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize-4x4'), # (B * G * G, E) => (B * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize-4x4x4'),]) # (B * G, E) => (B, E)
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)
+            + [_mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
 
 class Decoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
+    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(Decoder, self).__init__(**kwargs)
-        self._decoder = tf.keras.Sequential([
-            tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'), # (B, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize-4x4x4'), # (B, E) => (B * G, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize-4x4'), # (B * G, E) => (B * G * G, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize-4'), # (B * G * G, E) => (B * G * G * G, E)
-            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G * G * G, E) => (B * G * G * G, U)
+        self._decoder = tf.keras.Sequential(
+            [tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input')] # (B, E)
+            + [_mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize' + (depth - __i) * '-4') for __i in range(depth)] # (B * G ^ i, E) => (B * G ^ (i+1), E)
+            + [_mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G ^ D, E) => (B * G ^ D, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
 
 class AutoEncoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
+    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(AutoEncoder, self).__init__(**kwargs)
-        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
-        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
+        self._encoder = Encoder(depth=depth, token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
+        self._decoder = Decoder(depth=depth, token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
@@ -83,7 +82,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 # (B, 4) => (B, 4, 256) => (B, 1024) => (B, 256)
 # (B, 256) => (B, 1024) => (B, 4, 256) => (B, 4, 256) => (B, 4, 256)
-MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=False)
+MODEL = AutoEncoder(depth=N_DEPTH, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=False)
 
 # compile
 MODEL.compile(
@@ -106,7 +105,7 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=3, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in DATA.items()}
+DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in DATA.items()}
 
 # TRAIN #######################################################################
 
@@ -148,19 +147,19 @@ TOKENS[16]['all'] = list(set(__t for _, __s in TOKENS[16].items() for __t in __s
 
 for __l, __s in TOKENS[1].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[1][__l] = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x))[:len(__s)]
 
 for __l, __s in TOKENS[4].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[4][__l] = MODEL._encoder._encoder.layers[2](MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x)))[:len(__s)]
 
 for __l, __s in TOKENS[16].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=3, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[16][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
@@ -174,3 +173,14 @@ _mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=Tru
 
 _mti.write(data=TOKENS[16]['all'], path='./metadata.16.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[16]['all'].numpy(), path='./embeddings.16.tsv', tsv=True)
+
+# TEST ########################################################################
+
+__x = tf.one_hot(indices=_tokenize_scalar(text=TEST, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__e = MODEL._encoder(__x)
+__p = MODEL(__x)
+__y = postprocess(__p)
+
+print(__sample)
+print(__y)
+print(sum(__l == __r for __l, __r in zip(__sample, __y)) / len(__sample))
