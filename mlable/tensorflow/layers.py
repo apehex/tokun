@@ -329,9 +329,9 @@ class Reshape(tf.keras.layers.Layer):
         self,
         target_shape: tuple,
         **kwargs
-    ):
+    ) -> None:
         super(Reshape, self).__init__(**kwargs)
         self._shape = target_shape
 
-    def call(self, inputs: tf.Tensor, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         return tf.reshape(inputs, self._shape)

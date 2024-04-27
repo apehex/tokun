@@ -45,34 +45,34 @@ DATA = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle
 # MODEL #######################################################################
 
 class Encoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(Encoder, self).__init__(**kwargs)
         self._encoder = tf.keras.Sequential([
             tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G * G, U)
             tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G * G, U) => (B * G * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4'), # (B * G * G, E) => (B * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4-4'),]) # (B * G, E) => (B, E)
+            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize-4'), # (B * G * G, E) => (B * G, E)
+            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize-4-4'),]) # (B * G, E) => (B, E)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
 
 class Decoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
             tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'), # (B, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4-4'), # (B, E) => (B * G, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B * G, E) => (B * G * G, E)
+            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize-4-4'), # (B, E) => (B * G, E)
+            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, name='detokenize-4'), # (B * G, E) => (B * G * G, E)
             _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G * G, E) => (B * G * G, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
 
 class AutoEncoder(tf.keras.models.Model):
-    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
         super(AutoEncoder, self).__init__(**kwargs)
-        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)
-        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)
+        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
+        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
@@ -81,7 +81,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 # (B, 4) => (B, 4, 256) => (B, 1024) => (B, 256)
 # (B, 256) => (B, 1024) => (B, 4, 256) => (B, 4, 256) => (B, 4, 256)
-MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None)
+MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=False)
 
 # compile
 MODEL.compile(
@@ -114,7 +114,7 @@ DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=2, group_s
 #     epochs=N_EPOCHS,
 #     validation_split=None,
 #     validation_data=DATA['zh'], # full of glyphs
-#     validation_freq=[1, N_EPOCHS],
+#     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
 #     verbose=2,
 #     callbacks=[lr_callback, tb_callback])
 
