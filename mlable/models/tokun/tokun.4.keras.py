@@ -161,7 +161,7 @@ for __l, __s in TOKENS[4].items():
 _mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
 
-_mti.write(data=TOKENS[4]['all'], path='./metadata.4.tsv', tsv=False)
+_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[4]['all']], path='./metadata.4.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=True)
 
 # TEST ########################################################################

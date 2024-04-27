@@ -1,7 +1,7 @@
 # METADATA ####################################################################
 
-def label(c: str) -> str:
-    return '#{}'.format(c.encode('utf-32-be').hex())
+def label(token: str) -> str:
+    return '#{}'.format(token.encode('utf-32-be').hex())
 
 # SERIALIZE ###################################################################
 
