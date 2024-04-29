@@ -24,17 +24,17 @@ N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
 N_EPOCHS = 32
-N_EPOCHS_RAMPUP = 16
+N_EPOCHS_RAMPUP = 0
 N_EPOCHS_SUSTAIN = 0
 
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
-R_MIN = 0.0001
-R_MAX = 0.001
-R_EXP = .8
+R_MIN = 0.00001
+R_MAX = 0.0001
+R_EXP = .9
 
-VERSION = 'tokun-1-keras-660k'
+VERSION = 'tokun-4x4-keras-1M700K'
 
 # DATA ########################################################################
 
