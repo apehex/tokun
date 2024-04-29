@@ -30,8 +30,8 @@ N_EPOCHS_SUSTAIN = 0
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
-R_MIN = 0.0001
-R_MAX = 0.001
+R_MIN = 0.00001
+R_MAX = 0.0001
 R_EXP = .9
 
 VERSION = 'tokun-4-keras-1M200K'
@@ -81,7 +81,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 # (B, 4) => (B, 4, 256) => (B, 1024) => (B, 256)
 # (B, 256) => (B, 1024) => (B, 4, 256) => (B, 4, 256) => (B, 4, 256)
-MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=False)
+MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=False, normalization=True)
 
 # compile
 MODEL.compile(
@@ -156,10 +156,10 @@ for __l, __s in TOKENS[4].items():
 
 # SAVE ########################################################################
 
-_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
+_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
 
-_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[4]['all']], path='./metadata.4.tsv', tsv=False)
+_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[4]['all']], path='./metadata.4.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=True)
 
 # TEST ########################################################################

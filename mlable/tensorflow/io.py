@@ -1,7 +1,10 @@
 # METADATA ####################################################################
 
+def _label(c: str) -> str:
+    return '#{}'.format(c.encode('utf-32-be').hex())
+
 def label(token: str) -> str:
-    return '#{}'.format(token.encode('utf-32-be').hex())
+    return ' '.join(_label(__c) for __c in token)
 
 # SERIALIZE ###################################################################
 

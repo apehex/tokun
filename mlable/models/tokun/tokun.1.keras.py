@@ -116,7 +116,7 @@ TRAINING_HISTORY = MODEL.fit(
     epochs=N_EPOCHS,
     validation_split=None,
     validation_data=TEST['zh'], # full of glyphs
-    validation_freq=[1, N_EPOCHS],
+    validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
     verbose=2,
     callbacks=[lr_callback, tb_callback])
 
@@ -148,7 +148,7 @@ for __l, __s in TOKENS[1].items():
 
 # SAVE ########################################################################
 
-_mti.write(data=[__c + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
+_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
 _mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
 
 # TEST ########################################################################
