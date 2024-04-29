@@ -5,6 +5,9 @@ import tensorflow as tf
 
 # GENERIC #####################################################################
 
+def compare(left: str, right: str) -> float:
+    return sum(__l == __r for __l, __r in zip(left, right)) / max(1, len(left))
+
 def chunk(seq: list, size: int, repeats: bool=True) -> list:
     __chunks = (seq[__i:__i+size] for __i in range(0, len(seq), size))
     return list(__chunks if repeats else set(__chunks))

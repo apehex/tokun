@@ -183,4 +183,4 @@ __y = _mmtp.postprocess(__p)
 
 print(__s)
 print(__y)
-print(sum(__l == __r for __l, __r in zip(__s, __y)) / len(__s))
+print(_mmtp.compare(__s, __y))
