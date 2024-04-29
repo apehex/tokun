@@ -38,12 +38,9 @@ VERSION = 'tokun-1-keras-660k'
 
 # DATA ########################################################################
 
-# DATA_TRAIN, DATA_TEST = tfds.load('mlqadd', split=['train', 'test'], as_supervised=True, shuffle_files=True, data_dir='~/.cache/tensorflow/', builder_kwargs={'train_lang': ['en'], 'test_lang': ['es']})
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-DATA = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
-
-# Single sample for manual testing
-TEST = """Reinforcement learning from human feedback (RLHF) (deutsch Bestärkendes Lernen durch menschliche Rückkopplung) steht für maschinelles Lernen, bei dem ein Software-Agent selbständig eine Strategie (Policy) erlernt, um erhaltene Belohnungen zu maximieren. Dabei wird dem Agenten nicht vorgezeigt, welche Aktion in welcher Situation die beste ist, sondern er erhält durch eine Bewertungseinheit zu bestimmten Zeitpunkten durch Rückkopplung (Feedback) aus der Umwelt eine reellwertige Belohnung, die auch negativ sein kann. Im Gegensatz zum klassischen bestärkenden Lernen bestimmt zusätzlich eine Bewertungseinheit eine weitere Belohnung nach Überprüfen von Resultaten des Software-Agents durch Personen, welche das sogenannte Alignment[1] mit menschlicher Denkweise, Erwartung und Wertvorstellung beurteilen.[2][3][4] Das Unternehmen Open AI hat diese zusätzliche, nachträgliche Feineinstellung mittels RLHF bei der Weiterentwicklung von ChatGPT Version 3.5 auf Version 4.0 eingeführt.[5]"""
+TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
 # MODEL #######################################################################
 
@@ -105,16 +102,17 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-DATA = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in DATA.items()}
+TRAIN = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TRAIN.items()}
+TEST = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TEST.items()}
 
 # TRAIN #######################################################################
 
 # TRAINING_HISTORY = MODEL.fit(
-#     x=DATA['en'],
+#     x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
 #     batch_size=N_BATCH,
 #     epochs=N_EPOCHS,
 #     validation_split=None,
-#     validation_data=DATA['zh'], # full of glyphs
+#     validation_data=TEST['zh'], # full of glyphs
 #     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
 #     verbose=2,
 #     callbacks=[lr_callback, tb_callback])
@@ -125,9 +123,9 @@ SAMPLES = {}
 TOKENS = {1: {}, 4: {}, 16: {}}
 EMBEDDINGS = {1: {}, 4: {}, 16: {}}
 
-for __l in DATA:
+for __l in TEST:
     # compute predictions
-    __i = iter(DATA[__l]) # iterate over batches of samples
+    __i = iter(TEST[__l]) # iterate over batches of samples
     __x = next(__i)[0] # take input only
     __o = MODEL(__x)
     # sample predictions (inputs, outputs)
@@ -176,11 +174,13 @@ _mti.write(data=EMBEDDINGS[16]['all'].numpy(), path='./embeddings.16.tsv', tsv=T
 
 # TEST ########################################################################
 
-__x = tf.one_hot(indices=_tokenize_scalar(text=TEST, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [_mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
+
+__x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
-__y = postprocess(__p)
+__y = _mmtp.postprocess(__p)
 
-print(__sample)
+print(__s)
 print(__y)
-print(sum(__l == __r for __l, __r in zip(__sample, __y)) / len(__sample))
+print(sum(__l == __r for __l, __r in zip(__s, __y)) / len(__s))
