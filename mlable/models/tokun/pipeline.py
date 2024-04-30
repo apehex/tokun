@@ -1,3 +1,4 @@
+import functools
 import itertools
 import math
 
@@ -23,6 +24,16 @@ def context(seq: iter, length: int) -> iter:
 
 def shape(layer_count: int, group_size: int, flatten: bool=False) -> list:
     return [-1] + (1 - int(flatten)) * layer_count * [group_size]
+
+# AUGMENT #####################################################################
+
+def _offset(ticks: int=1, layer: int=1, unit: int=4) -> int:
+    return math.ceil(ticks * (unit ** (layer - 1)))
+
+def offset(data: tf.Tensor, ticks: int=1, layer: int=1, unit: int=4) -> tf.Tensor:
+    __length = _offset(ticks=ticks, layer=layer, unit=unit)
+    __pad = tf.convert_to_tensor([__length * b'\x00'])
+    return __pad + data
 
 # > ###########################################################################
 
@@ -58,13 +69,17 @@ def detokenize(tokens: tf.Tensor) -> str:
 
 # END-TO-END ##################################################################
 
-def preprocess(dataset: tf.data.Dataset, key: str='context', layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.data.Dataset:
+def preprocess(dataset: tf.data.Dataset, key: str='context', layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False, tupled: bool=False) -> tf.data.Dataset:
     # from UTF-8 bytes scalar to UTF-32-BE int tensor
-    __dataset = dataset.map(lambda x: tokenize(data=x[key], layer_count=layer_count, group_size=group_size, sample_size=sample_size, flatten=flatten))
+    __partial = lambda x: tokenize(data=x[key], layer_count=layer_count, group_size=group_size, sample_size=sample_size, flatten=flatten)
+    __tokenize = (lambda x: __partial(x), __partial(x)) if tupled else __partial
+    __dataset = dataset.map(__tokenize)
     # one-hot encoding of UTF-32 bytes
-    __dataset = __dataset.map(lambda x: tf.one_hot(indices=x, depth=256, axis=-1))
+    __partial = lambda x: tf.one_hot(indices=x, depth=256, axis=-1)
+    __onehot = (lambda x: __partial(x), __partial(x)) if tupled else __partial
+    __dataset = __dataset.map(__onehot)
     # produce (input, target) tuples for supervised training, instead of a single tensor X
-    return __dataset.map(lambda x: (x,x))
+    return __dataset if tupled else __dataset.map(lambda x: (x,x))
 
 def postprocess(output: tf.Tensor) -> tf.Tensor:
     # from one-hot to UTF-32 bytes
