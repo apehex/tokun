@@ -105,20 +105,20 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 # PREPROCESS ##################################################################
 
-TRAIN = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=64, flatten=True) for __l, __d in TRAIN.items()}
-TEST = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=64, flatten=True) for __l, __d in TEST.items()}
+TRAIN = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TRAIN.items()}
+TEST = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TEST.items()}
 
 # TRAIN #######################################################################
 
-TRAINING_HISTORY = MODEL.fit(
-    x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
-    batch_size=N_BATCH,
-    epochs=N_EPOCHS,
-    validation_split=None,
-    validation_data=TEST['zh'], # full of glyphs
-    validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
-    verbose=2,
-    callbacks=[lr_callback, tb_callback])
+# TRAINING_HISTORY = MODEL.fit(
+#     x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
+#     batch_size=N_BATCH,
+#     epochs=N_EPOCHS,
+#     validation_split=None,
+#     validation_data=TEST['zh'], # full of glyphs
+#     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
+#     verbose=2,
+#     callbacks=[lr_callback, tb_callback])
 
 # SAMPLES #####################################################################
 
