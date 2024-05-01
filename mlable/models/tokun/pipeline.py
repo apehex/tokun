@@ -69,6 +69,17 @@ def detokenize(tokens: tf.Tensor) -> str:
 
 # END-TO-END ##################################################################
 
+def process(dataset: tf.data.Dataset, pipeline: list, replace: bool=True, feature: str=None) -> tf.data.Dataset:
+    # fetch the target feature in the dataset
+    __dataset = dataset.map(lambda x: x[feature]) if feature else dataset
+    # specify how to combine each operation result with the original dataset
+    __replace = len(list(pipeline)) * [replace] if isinstance(replace, bool) else replace
+    # apply the operation successively  
+    for __fn, __repl in zip(pipeline, __replace):
+        __new = __dataset.map(__fn)
+        __dataset = __new if __repl else __dataset.concatenate(__new)
+    return __dataset
+
 def preprocess(dataset: tf.data.Dataset, key: str='context', layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False, tupled: bool=False) -> tf.data.Dataset:
     # from UTF-8 bytes scalar to UTF-32-BE int tensor
     __partial = lambda x: tokenize(data=x[key], layer_count=layer_count, group_size=group_size, sample_size=sample_size, flatten=flatten)
