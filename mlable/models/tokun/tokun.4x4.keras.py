@@ -51,8 +51,11 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 
 # B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
-    # offset by 1 character => (B, 1) bytes
-    *[(functools.partial(_mmtp.offset, ticks=__i, layer=1, unit=N_TOKEN_DIM), False) for __i in range(1, 16)],
+    # offset by 1 to 15 character => (B, 1) bytes
+    (functools.partial(_mmtp.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # double the dataset volume: (all samples with offset 0) + (offset 1)
+    (functools.partial(_mmtp.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0 and 1) + (offsets 2 and 3)
+    (functools.partial(_mmtp.offset, ticks=4, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3) + (offsets 4, 5, 6, 7)
+    (functools.partial(_mmtp.offset, ticks=8, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3, 4, 5, 6, 7) + (offsets 8, 9, 10, 11, 12, 13, 14, 15)
     # tokenize => (B * T * S,) int
     (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
