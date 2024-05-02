@@ -36,11 +36,32 @@ R_EXP = .9
 
 VERSION = 'tokun-1-keras-660k'
 
+# LOG #########################################################################
+
+LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+SUMMARY = tf.summary.create_file_writer(LOGPATH)
+
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+
+# PREPROCESS ##################################################################
+
+# B = 128, T = 4, S = 128, E = 256
+PIPELINE = [
+    # tokenize => (B * T * S,) int
+    (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    # one-hot encoding => (B * T * S, E) int (bool)
+    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
+    # replace sample inputs with (inputs, target) for supervised learning
+    ((lambda x: (x, x)), True)]
+
+OPERATIONS, REPLACE = zip(*PIPELINE)
+
+TRAIN = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
+TEST = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
 
 # MODEL #######################################################################
 
@@ -80,8 +101,6 @@ class AutoEncoder(tf.keras.models.Model):
 
 # INIT ########################################################################
 
-# (B, 4) => (B, 4, 256) => (B, 1024) => (B, 256)
-# (B, 256) => (B, 1024) => (B, 4, 256) => (B, 4, 256) => (B, 4, 256)
 MODEL = AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None)
 
 # compile
@@ -89,26 +108,6 @@ MODEL.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=R_MAX),
     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
     metrics=['accuracy'])
-
-# LOG #########################################################################
-
-LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-SUMMARY = tf.summary.create_file_writer(LOGPATH)
-
-# PREPROCESS ##################################################################
-
-PIPELINE = [
-    # tokenize
-    (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
-    # one-hot encoding
-    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
-    # replace sample inputs with (inputs, target) for supervised learning
-    ((lambda x: (x, x)), True)]
-
-OPERATIONS, REPLACE = zip(*PIPELINE)
-
-TRAIN = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
-TEST = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
 
 # TRAIN #######################################################################
 

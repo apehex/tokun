@@ -80,18 +80,6 @@ def process(dataset: tf.data.Dataset, pipeline: list, replace: bool=True, featur
         __dataset = __new if __repl else __dataset.concatenate(__new)
     return __dataset
 
-def preprocess(dataset: tf.data.Dataset, key: str='context', layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False, tupled: bool=False) -> tf.data.Dataset:
-    # from UTF-8 bytes scalar to UTF-32-BE int tensor
-    __partial = lambda x: tokenize(data=x[key], layer_count=layer_count, group_size=group_size, sample_size=sample_size, flatten=flatten)
-    __tokenize = (lambda x: __partial(x), __partial(x)) if tupled else __partial
-    __dataset = dataset.map(__tokenize)
-    # one-hot encoding of UTF-32 bytes
-    __partial = lambda x: tf.one_hot(indices=x, depth=256, axis=-1)
-    __onehot = (lambda x: __partial(x), __partial(x)) if tupled else __partial
-    __dataset = __dataset.map(__onehot)
-    # produce (input, target) tuples for supervised training, instead of a single tensor X
-    return __dataset if tupled else __dataset.map(lambda x: (x,x))
-
 def postprocess(output: tf.Tensor) -> tf.Tensor:
     # from one-hot to UTF-32 bytes
     __output = interpret(output=output)

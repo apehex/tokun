@@ -36,11 +36,34 @@ R_EXP = .9
 
 VERSION = 'tokun-4-keras-1M200K'
 
+# LOG #########################################################################
+
+LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+SUMMARY = tf.summary.create_file_writer(LOGPATH)
+
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+
+# PREPROCESS ##################################################################
+
+# B = 128, T = 4, S = 128, E = 256
+PIPELINE = [
+    # offset by 1 character => (B, 1) bytes
+    *[(functools.partial(_mmtp.offset, ticks=__i, layer=1, unit=N_TOKEN_DIM), False) for __i in range(1, 4)],
+    # tokenize => (B * T * S,) int
+    (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    # one-hot encoding => (B * T * S, E) int (bool)
+    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
+    # replace sample inputs with (inputs, target) for supervised learning
+    ((lambda x: (x, x)), True)]
+
+OPERATIONS, REPLACE = zip(*PIPELINE)
+
+TRAIN = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
+TEST = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
 
 # MODEL #######################################################################
 
@@ -89,25 +112,10 @@ MODEL.compile(
     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
     metrics=['accuracy'])
 
-# SAVE ########################################################################
-
-# log path
-LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-SUMMARY = tf.summary.create_file_writer(LOGPATH)
-
-# called during training
-tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
-
-# LEARNING RATE ###############################################################
-
-lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
-
-# PREPROCESS ##################################################################
-
-TRAIN = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TRAIN.items()}
-TEST = {__l: _mmtp.preprocess(dataset=__d, key='context', layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True) for __l, __d in TEST.items()}
-
 # TRAIN #######################################################################
+
+tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
+lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 # TRAINING_HISTORY = MODEL.fit(
 #     x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
