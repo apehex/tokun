@@ -23,7 +23,7 @@ N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 32
+N_EPOCHS = 8
 N_EPOCHS_RAMPUP = 0
 N_EPOCHS_SUSTAIN = 0
 
@@ -32,7 +32,7 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 
 R_MIN = 0.00001
 R_MAX = 0.0001
-R_EXP = .9
+R_EXP = .8
 
 VERSION = 'tokun-4-keras-1M200K'
 
