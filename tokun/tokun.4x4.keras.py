@@ -7,13 +7,11 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.models.tokun.layers as _mmtl
-import mlable.models.tokun.pipeline as _mmtp
 import mlable.tensorflow.io as _mti
-import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
-import mlable.tensorflow.sampling as _sam
-import mlable.tensorflow.summary as _sum
+
+import tokun.layers
+import tokun.pipeline
 
 # META ########################################################################
 
@@ -52,12 +50,12 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 # B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
-    (functools.partial(_mmtp.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # double the dataset volume: (all samples with offset 0) + (offset 1)
-    (functools.partial(_mmtp.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0 and 1) + (offsets 2 and 3)
-    (functools.partial(_mmtp.offset, ticks=4, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3) + (offsets 4, 5, 6, 7)
-    (functools.partial(_mmtp.offset, ticks=8, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3, 4, 5, 6, 7) + (offsets 8, 9, 10, 11, 12, 13, 14, 15)
+    (functools.partial(tokun.pipeline.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # double the dataset volume: (all samples with offset 0) + (offset 1)
+    (functools.partial(tokun.pipeline.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0 and 1) + (offsets 2 and 3)
+    (functools.partial(tokun.pipeline.offset, ticks=4, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3) + (offsets 4, 5, 6, 7)
+    (functools.partial(tokun.pipeline.offset, ticks=8, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3, 4, 5, 6, 7) + (offsets 8, 9, 10, 11, 12, 13, 14, 15)
     # tokenize => (B * T * S,) int
-    (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (inputs, target) for supervised learning
@@ -65,8 +63,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-TRAIN = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
-TEST = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
+TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
+TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
 
 # MODEL #######################################################################
 
@@ -76,7 +74,7 @@ class Encoder(tf.keras.models.Model):
         self._encoder = tf.keras.Sequential([
             tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)
             tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)
-            + [_mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
+            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -86,8 +84,8 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential(
             [tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input')] # (B, E)
-            + [_mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize' + (depth - __i) * '-4') for __i in range(depth)] # (B * G ^ i, E) => (B * G ^ (i+1), E)
-            + [_mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G ^ D, E) => (B * G ^ D, U)
+            + [tokun.layers.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize' + (depth - __i) * '-4') for __i in range(depth)] # (B * G ^ i, E) => (B * G ^ (i+1), E)
+            + [tokun.layers.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G ^ D, E) => (B * G ^ D, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
@@ -140,11 +138,11 @@ for __l in TEST:
     # sample predictions (inputs, outputs)
     SAMPLES[__l] = (__x, __o)
     # unique 1-tokens (characters)
-    TOKENS[1][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
+    TOKENS[1][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=1, repeats=False)
     # unique 4-tokens
-    TOKENS[4][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4, repeats=False)
+    TOKENS[4][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=4, repeats=False)
     # unique 4x4-tokens
-    TOKENS[16][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=16, repeats=False)
+    TOKENS[16][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=16, repeats=False)
 
 TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
 TOKENS[4]['all'] = list(set(__t for _, __s in TOKENS[4].items() for __t in __s))
@@ -154,19 +152,19 @@ TOKENS[16]['all'] = list(set(__t for _, __s in TOKENS[16].items() for __t in __s
 
 for __l, __s in TOKENS[1].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[1][__l] = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x))[:len(__s)]
 
 for __l, __s in TOKENS[4].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[4][__l] = MODEL._encoder._encoder.layers[2](MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x)))[:len(__s)]
 
 for __l, __s in TOKENS[16].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[16][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
@@ -183,13 +181,13 @@ _mti.write(data=EMBEDDINGS[16]['all'].numpy(), path='./embeddings.16.tsv', tsv=T
 
 # TEST ########################################################################
 
-__s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [_mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
+__s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
 
-__x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
-__y = _mmtp.postprocess(__p)
+__y = tokun.pipeline.postprocess(__p)
 
 print(__s)
 print(__y)
-print(_mmtp.compare(__s, __y))
+print(tokun.pipeline.compare(__s, __y))

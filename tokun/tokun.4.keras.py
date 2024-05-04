@@ -7,13 +7,11 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.models.tokun.layers as _mmtl
-import mlable.models.tokun.pipeline as _mmtp
 import mlable.tensorflow.io as _mti
-import mlable.tensorflow.layers as _mtl
 import mlable.tensorflow.optimizers as _mto
-import mlable.tensorflow.sampling as _sam
-import mlable.tensorflow.summary as _sum
+
+import tokun.layers
+import tokun.pipeline
 
 # META ########################################################################
 
@@ -52,10 +50,10 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 # B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
     # offset by 1 to 3 character => (B, 1) bytes
-    (functools.partial(_mmtp.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # doubles the dataset volume: (all samples with offset 0) + (offset 1)
-    (functools.partial(_mmtp.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # doubles again: (offsets 0 and 1) + (offsets 2 and 3)
+    (functools.partial(tokun.pipeline.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # doubles the dataset volume: (all samples with offset 0) + (offset 1)
+    (functools.partial(tokun.pipeline.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # doubles again: (offsets 0 and 1) + (offsets 2 and 3)
     # tokenize => (B * T * S,) int
-    (functools.partial(_mmtp.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (inputs, target) for supervised learning
@@ -63,8 +61,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-TRAIN = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
-TEST = {__l: _mmtp.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
+TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
+TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
 
 # MODEL #######################################################################
 
@@ -74,8 +72,8 @@ class Encoder(tf.keras.models.Model):
         self._encoder = tf.keras.Sequential([
             tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G * G, U)
             tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G * G, U) => (B * G * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize-4'), # (B * G * G, E) => (B * G, E)
-            _mmtl.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize-4-4'),]) # (B * G, E) => (B, E)
+            tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize-4'), # (B * G * G, E) => (B * G, E)
+            tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize-4-4'),]) # (B * G, E) => (B, E)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -85,9 +83,9 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         self._decoder = tf.keras.Sequential([
             tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'), # (B, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize-4-4'), # (B, E) => (B * G, E)
-            _mmtl.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize-4'), # (B * G, E) => (B * G * G, E)
-            _mmtl.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G * G, E) => (B * G * G, U)
+            tokun.layers.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize-4-4'), # (B, E) => (B * G, E)
+            tokun.layers.DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize-4'), # (B * G, E) => (B * G * G, E)
+            tokun.layers.HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G * G, E) => (B * G * G, U)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
@@ -142,9 +140,9 @@ for __l in TEST:
     # sample predictions (inputs, outputs)
     SAMPLES[__l] = (__x, __o)
     # unique 1-tokens (characters)
-    TOKENS[1][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=1, repeats=False)
+    TOKENS[1][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=1, repeats=False)
     # unique 4-tokens
-    TOKENS[4][__l] = _mmtp.chunk(seq=_mmtp.postprocess(__x), size=4, repeats=False)
+    TOKENS[4][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=4, repeats=False)
 
 TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
 TOKENS[4]['all'] = list(set(__t for _, __s in TOKENS[4].items() for __t in __s))
@@ -153,13 +151,13 @@ TOKENS[4]['all'] = list(set(__t for _, __s in TOKENS[4].items() for __t in __s))
 
 for __l, __s in TOKENS[1].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[1][__l] = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x))[:len(__s)]
 
 for __l, __s in TOKENS[4].items():
     # re-encode without token repeats
-    __token_x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
     # embed
     EMBEDDINGS[4][__l] = MODEL._encoder(__token_x)[:len(__s)]
 
@@ -175,11 +173,11 @@ _mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=Tru
 
 __s = """Reinforcement learning from human feedback (RLHF) (deutsch Bestärkendes Lernen durch menschliche Rückkopplung) steht für maschinelles Lernen, bei dem ein Software-Agent selbständig eine Strategie (Policy) erlernt, um erhaltene Belohnungen zu maximieren. Dabei wird dem Agenten nicht vorgezeigt, welche Aktion in welcher Situation die beste ist, sondern er erhält durch eine Bewertungseinheit zu bestimmten Zeitpunkten durch Rückkopplung (Feedback) aus der Umwelt eine reellwertige Belohnung, die auch negativ sein kann. Im Gegensatz zum klassischen bestärkenden Lernen bestimmt zusätzlich eine Bewertungseinheit eine weitere Belohnung nach Überprüfen von Resultaten des Software-Agents durch Personen, welche das sogenannte Alignment[1] mit menschlicher Denkweise, Erwartung und Wertvorstellung beurteilen.[2][3][4] Das Unternehmen Open AI hat diese zusätzliche, nachträgliche Feineinstellung mittels RLHF bei der Weiterentwicklung von ChatGPT Version 3.5 auf Version 4.0 eingeführt.[5]"""
 
-__x = tf.one_hot(indices=_mmtp._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
-__y = _mmtp.postprocess(__p)
+__y = tokun.pipeline.postprocess(__p)
 
 print(__s)
 print(__y)
-print(_mmtp.compare(__s, __y))
+print(tokun.pipeline.compare(__s, __y))
