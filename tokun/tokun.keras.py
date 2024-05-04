@@ -2,6 +2,7 @@
 
 import datetime
 import functools
+import math
 import os
 
 import tensorflow as tf
@@ -14,6 +15,9 @@ import tokun.layers
 import tokun.pipeline
 
 # META ########################################################################
+
+ATTENTION = True
+NORMALIZATION = True
 
 N_DEPTH = 3 # D
 N_TOKEN_DIM = 4 # G
@@ -32,9 +36,9 @@ R_MIN = 0.00001
 R_MAX = 0.0001
 R_EXP = .8
 
-VERSION = 'tokun-4x4-keras-1M700K'
-
 # LOG #########################################################################
+
+VERSION = 'tokun-' + str(N_TOKEN_DIM ** (N_DEPTH - 1)) + '-keras' + ATTENTION * '-attention' + NORMALIZATION * '-normalization'
 
 LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 SUMMARY = tf.summary.create_file_writer(LOGPATH)
@@ -50,10 +54,7 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 # B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
-    (functools.partial(tokun.pipeline.offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # double the dataset volume: (all samples with offset 0) + (offset 1)
-    (functools.partial(tokun.pipeline.offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0 and 1) + (offsets 2 and 3)
-    (functools.partial(tokun.pipeline.offset, ticks=4, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3) + (offsets 4, 5, 6, 7)
-    (functools.partial(tokun.pipeline.offset, ticks=8, layer=1, unit=N_TOKEN_DIM), False), # (offsets 0, 1, 2, 3, 4, 5, 6, 7) + (offsets 8, 9, 10, 11, 12, 13, 14, 15)
+    *[(functools.partial(tokun.pipeline.offset, ticks=2 ** __i, layer=1, unit=N_TOKEN_DIM), False) for __i in range(2 * (N_DEPTH - 1))], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # tokenize => (B * T * S,) int
     (functools.partial(tokun.pipeline.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
@@ -101,7 +102,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 # INIT ########################################################################
 
-MODEL = AutoEncoder(depth=N_DEPTH, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=True, normalization=True)
+MODEL = AutoEncoder(depth=N_DEPTH, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION)
 
 # compile
 MODEL.compile(
@@ -127,63 +128,51 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 # SAMPLES #####################################################################
 
 SAMPLES = {}
-TOKENS = {1: {}, 4: {}, 16: {}}
-EMBEDDINGS = {1: {}, 4: {}, 16: {}}
+TOKENS = {(N_TOKEN_DIM ** __i): {} for __i in range(N_DEPTH)}
+EMBEDDINGS = {(N_TOKEN_DIM ** __i): {} for __i in range(N_DEPTH)}
 
-for __l in TEST:
+for __lang in TEST:
     # compute predictions
-    __i = iter(TEST[__l]) # iterate over batches of samples
-    __x = next(__i)[0] # take input only
-    __o = MODEL(__x)
+    __batch = iter(TEST[__lang]) # iterate over batches of samples
+    __input = next(__batch)[0] # take input only
+    __output = MODEL(__input)
     # sample predictions (inputs, outputs)
-    SAMPLES[__l] = (__x, __o)
-    # unique 1-tokens (characters)
-    TOKENS[1][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=1, repeats=False)
-    # unique 4-tokens
-    TOKENS[4][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=4, repeats=False)
-    # unique 4x4-tokens
-    TOKENS[16][__l] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__x), size=16, repeats=False)
+    SAMPLES[__lang] = (__input, __output)
+    # unique (G ^ i)-tokens
+    for __size in TOKENS:
+        TOKENS[__size][__lang] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__input), size=__size, repeats=False)
 
-TOKENS[1]['all'] = list(set(__t for _, __s in TOKENS[1].items() for __t in __s))
-TOKENS[4]['all'] = list(set(__t for _, __s in TOKENS[4].items() for __t in __s))
-TOKENS[16]['all'] = list(set(__t for _, __s in TOKENS[16].items() for __t in __s))
+# unique tokens, for all languages
+for __size in TOKENS:
+    TOKENS[__size]['all'] = list(set(__t for _, __s in TOKENS[__size].items() for __t in __s))
 
 # EMBEDDINGS ##################################################################
 
-for __l, __s in TOKENS[1].items():
-    # re-encode without token repeats
-    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
-    # embed
-    EMBEDDINGS[1][__l] = MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x))[:len(__s)]
-
-for __l, __s in TOKENS[4].items():
-    # re-encode without token repeats
-    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
-    # embed
-    EMBEDDINGS[4][__l] = MODEL._encoder._encoder.layers[2](MODEL._encoder._encoder.layers[1](MODEL._encoder._encoder.layers[0](__token_x)))[:len(__s)]
-
-for __l, __s in TOKENS[16].items():
-    # re-encode without token repeats
-    __token_x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__s), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
-    # embed
-    EMBEDDINGS[16][__l] = MODEL._encoder(__token_x)[:len(__s)]
+for __size in TOKENS:
+    for __lang, __tokens in TOKENS[__size].items():
+        # embedding depth / nesting
+        __depth = int(math.log(__size, N_TOKEN_DIM))
+        # re-encode without token repeats
+        __input = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__tokens), layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+        # UTF-32 embedding
+        __embedding = MODEL._encoder._encoder.layers[0](__input)
+        # iterative CNN tokenization
+        for __i in range(__depth + 1):
+            __embedding = MODEL._encoder._encoder.layers[__i + 1](__embedding)
+        # remove the (tokenized) padding
+        EMBEDDINGS[__size][__lang] = __embedding[:len(__tokens)]
 
 # SAVE ########################################################################
 
-_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[1]['all']], path='./metadata.1.tsv', tsv=False)
-_mti.write(data=EMBEDDINGS[1]['all'].numpy(), path='./embeddings.1.tsv', tsv=True)
-
-_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[4]['all']], path='./metadata.4.tsv', tsv=False)
-_mti.write(data=EMBEDDINGS[4]['all'].numpy(), path='./embeddings.4.tsv', tsv=True)
-
-_mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[16]['all']], path='./metadata.16.tsv', tsv=False)
-_mti.write(data=EMBEDDINGS[16]['all'].numpy(), path='./embeddings.16.tsv', tsv=True)
+for __size in TOKENS:
+    _mti.write(data=[__c + ' ' + _mti.label(__c) for __c in TOKENS[__size]['all']], path='./metadata.' + str(__size) + '.tsv', tsv=False)
+    _mti.write(data=EMBEDDINGS[__size]['all'].numpy(), path='./embeddings.' + str(__size) + '.tsv', tsv=True)
 
 # TEST ########################################################################
 
 __s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
 
-__x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = tokun.pipeline.postprocess(__p)
