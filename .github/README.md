@@ -67,24 +67,24 @@ This project was inspired by a video from Andrej Karpathy, ["Let's build the GPT
 
 Licensed under the [aGPLv3](LICENSE.md).
 
-[article-file-tokun-1]: articles/tokun.1.md
-[article-file-tokun-4]: articles/tokun.4.md
-[article-file-tokun-16]: articles/tokun.16.md
-[article-medium-tokun-1]: articles/tokun.1.md
-[article-medium-tokun-4]: articles/tokun.4.md
-[article-medium-tokun-16]: articles/tokun.16.md
-[article-notion-tokun-1]: articles/tokun.1.md
-[article-notion-tokun-4]: articles/tokun.4.md
-[article-notion-tokun-16]: articles/tokun.16.md
+[article-file-tokun-1]: ../articles/tokun.1.md
+[article-file-tokun-4]: ../articles/tokun.4.md
+[article-file-tokun-16]: ../articles/tokun.16.md
+[article-medium-tokun-1]: ../articles/tokun.1.md
+[article-medium-tokun-4]: ../articles/tokun.4.md
+[article-medium-tokun-16]: ../articles/tokun.16.md
+[article-notion-tokun-1]: ../articles/tokun.1.md
+[article-notion-tokun-4]: ../articles/tokun.4.md
+[article-notion-tokun-16]: ../articles/tokun.16.md
 
-[notebook-file-tokun-1]: notebooks/tokun.1.ipynb
-[notebook-file-tokun-4]: notebooks/tokun.4.ipynb
-[notebook-file-tokun-16]: notebooks/tokun.16.ipynb
-[notebook-hf-tokun-1]: notebooks/tokun.1.ipynb
-[notebook-hf-tokun-4]: notebooks/tokun.4.ipynb
-[notebook-hf-tokun-16]: notebooks/tokun.16.ipynb
-[notebook-kaggle-tokun-1]: notebooks/tokun.1.ipynb
-[notebook-kaggle-tokun-4]: notebooks/tokun.4.ipynb
-[notebook-kaggle-tokun-16]: notebooks/tokun.16.ipynb
+[notebook-file-tokun-1]: ../notebooks/tokun.1.ipynb
+[notebook-file-tokun-4]: ../notebooks/tokun.4.ipynb
+[notebook-file-tokun-16]: ../notebooks/tokun.16.ipynb
+[notebook-hf-tokun-1]: ../notebooks/tokun.1.ipynb
+[notebook-hf-tokun-4]: ../notebooks/tokun.4.ipynb
+[notebook-hf-tokun-16]: ../notebooks/tokun.16.ipynb
+[notebook-kaggle-tokun-1]: ../notebooks/tokun.1.ipynb
+[notebook-kaggle-tokun-4]: ../notebooks/tokun.4.ipynb
+[notebook-kaggle-tokun-16]: ../notebooks/tokun.16.ipynb
 
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
