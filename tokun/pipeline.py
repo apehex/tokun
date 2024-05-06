@@ -37,7 +37,7 @@ def offset(data: tf.Tensor, ticks: int=1, layer: int=1, unit: int=4) -> tf.Tenso
 
 # > ###########################################################################
 
-def _tokenize_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: bool=False) -> tf.Tensor:
+def _encode_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: bool=False) -> tf.Tensor:
     __mod = group_size ** layer_count
     __bytes = list(text.encode('utf-32-be'))
     __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
@@ -45,7 +45,7 @@ def _tokenize_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: 
     __tensor = tf.convert_to_tensor(value=__bytes + __padding, dtype=tf.dtypes.int32) # uint8 is not allowed
     return tf.reshape(tensor=__tensor, shape=__shape)
 
-def tokenize(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
+def encode(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
     # make sure each sample has a length multiple of G ** L = T, the token dim
     __mod = group_size ** layer_count
     __dim = math.ceil(4 * sample_size / __mod) * __mod # factor 4 because of the UTF-32 encoding
@@ -63,7 +63,7 @@ def tokenize(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size
 def interpret(output: tf.Tensor) -> tf.Tensor:
     return tf.argmax(input=output, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
 
-def detokenize(tokens: tf.Tensor) -> str:
+def decode(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
     return bytes(__b).decode(encoding='utf-32-be', errors='replace')
 
@@ -84,4 +84,4 @@ def postprocess(output: tf.Tensor) -> tf.Tensor:
     # from one-hot to UTF-32 bytes
     __output = interpret(output=output)
     # flatten the groups of 4 bytes
-    return detokenize(tokens=__output)
+    return decode(tokens=__output)
