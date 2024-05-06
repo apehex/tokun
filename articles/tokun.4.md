@@ -1,5 +1,7 @@
 # Tokun-4
 
+> `tokun`
+
 ## Model
 
 ### Input & Output
@@ -121,6 +123,8 @@ class TokenizeBlock(tf.keras.layers.Layer):
 
 ### Detokenization Block
 
+The `_embedding` layer is actually redundant, but I have a strong urge to make `DetokenizeBlock` the symmetric of `TokenizeBlock`...
+
 ```python
 class DetokenizeBlock(tf.keras.layers.Layer):
     def __init__(
@@ -133,8 +137,9 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         # layers
         self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompress-embeddings') # (B, L) => (B, G * E), typically L = E
         self._divide = _mtl.Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='divide-embeddings') # (B, G * E) => (B, G, E)
+        self._embedding = _mtl.PositionalEmbedding(input_axis=-2, output_axis=-1, name='position-embeddings') # (B, G, E) + (1, G, E)
         self._merge = _mtl.Merge(left_axis=0, right_axis=1, left=True) # (B, G, E) => (B * G, E)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._merge(self._divide(self._dense(inputs)))
+        return self._merge(self._embedding(self._divide(self._dense(inputs))))
 ```
