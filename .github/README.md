@@ -73,7 +73,7 @@ Licensed under the [aGPLv3](LICENSE.md).
 [article-medium-tokun-1]: ../articles/tokun.1.md
 [article-medium-tokun-4]: ../articles/tokun.4.md
 [article-medium-tokun-16]: ../articles/tokun.16.md
-[article-notion-tokun-1]: ../articles/tokun.1.md
+[article-notion-tokun-1]: https://apehex.notion.site/Tokun-1-e03c438a39fe49fcb2ce303eb63b2e73
 [article-notion-tokun-4]: ../articles/tokun.4.md
 [article-notion-tokun-16]: ../articles/tokun.16.md
 
