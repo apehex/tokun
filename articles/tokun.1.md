@@ -124,7 +124,7 @@ This means that the 4 UTF-32 bytes get merged into a single vector, the embeddin
 The latent dimension of the resulting vector `E` is set to 256:
 the layer performs a compression of the input space by a factor of 4.
 
-![](.images/block-encoder.png style="width: 50%; margin: auto;")
+<img src=".images/block-encoder.png" width="50%"/>
 
 #### Decoder
 
