@@ -56,8 +56,8 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=2 ** __i, layer=1, unit=N_TOKEN_DIM), False) for __i in range(2 * (N_DEPTH - 1))], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # tokenize => (B * T * S,) int
-    (functools.partial(tokun.pipeline.tokenize, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    # encode => (B * T * S,) int
+    (functools.partial(tokun.pipeline.encode, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (inputs, target) for supervised learning
@@ -121,7 +121,7 @@ for __size in TOKENS:
         # embedding depth / nesting
         __depth = int(math.log(__size, N_TOKEN_DIM))
         # re-encode without token repeats
-        __input = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=''.join(__tokens), layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+        __input = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=''.join(__tokens), layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
@@ -140,7 +140,7 @@ for __size in TOKENS:
 
 __s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
 
-__x = tf.one_hot(indices=tokun.pipeline._tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+__x = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=__s, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = tokun.pipeline.postprocess(__p)

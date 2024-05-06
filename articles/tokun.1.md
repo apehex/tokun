@@ -260,7 +260,7 @@ To better evaluate the capacity to generalize, the model is evaluated on Korean 
 ```python
 __s = """위키백과, 우리 모두의 백과사전.\nt-분포 확률적 임베딩(t-SNE)은 데이터의 차원 축소에 사용되는 기계 학습 알고리즘 중 하나로, 2002년 샘 로이스Sam Rowise와 제프리 힌튼에 의해 개발되었다.[1] t-SNE는 비선형 차원 축소 기법으로, 고차원 데이터를 특히 2, 3차원 등으로 줄여 가시화하는데에 유용하게 사용된다. 구체적으로 t-SNE는 비슷한 데이터는 근접한 2, 3차원의 지점으로, 다른 데이터는 멀리 떨어진 지점으로 맵핑한다.\n\nt-SNE 알고리즘은 두 단계에 걸쳐서 진행된다. 첫번째로, 각 데이터 쌍에 대해서 결합분포를 만든다. 이 분포는 비슷한 데이터는 선택될 확률이 매우 높지만 다른 데이터끼리는 선택될 확률이 매우 낮도록 설계된다.\n\nt-SNE는 컴퓨터 보안,[2] 음악 분석,[3] 암 연구,[4] 생물정보학,[5] 생체신호처리[6] 등 너른 분야에서 데이터의 시각화를 위해 사용된다.인공 신경망의 상위 계층을 표현하는데 쓰이기도 한다.[7]"""
 
-__x = tf.one_hot(indices=_tokenize_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__x = tf.one_hot(indices=_encode_scalar(text=__s, layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = postprocess(__p)
