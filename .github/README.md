@@ -18,9 +18,13 @@ But these vectors keep meaningful information on their constituting parts.
 
 ## Usage
 
-### External Tokenization
+### Tokenization
 
-### Internal Tokenization
+#### External
+
+#### Internal
+
+### Fine-Tuning
 
 ## Resources
 
@@ -35,17 +39,17 @@ ATTENTION = True # whether the blocks include an attention layer
 NORMALIZATION = True # whether the blocks include a normalization layer
 
 N_DEPTH = 3 # D, the number of successive token groupings
-N_TOKEN_DIM = 4 # G, the size of a single token unit, also the factor of compression
+N_TOKEN_DIM = 4 # G, the size of a single token group, also the factor of compression
 N_ENCODING_DIM = 256 # U, then dimension of a single byte as a one-hot vector
-N_EMBEDDING_DIM = N_ENCODING_DIM # E, the dimension of each unit 
+N_EMBEDDING_DIM = N_ENCODING_DIM # E, the dimension of each group
 N_LATENT_DIM = N_EMBEDDING_DIM # L, the dimension of the resulting embedding
 ```
 
 ### Notebooks
 
-- `tokun-1`: [File][notebook-file-tokun-1] / [Colab][notebook-colab-tokun-1] / [Kaggle][notebook-kaggle-tokun-1] / [HuggingFace][notebook-hf-tokun-1]
-- `tokun-4`: [File][notebook-file-tokun-4] / [Colab][notebook-colab-tokun-4] / [Kaggle][notebook-kaggle-tokun-4] / [HuggingFace][notebook-hf-tokun-4]
-- `tokun-16`: [File][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16] / [Kaggle][notebook-kaggle-tokun-16] / [HuggingFace][notebook-hf-tokun-16]
+- `tokun-1`: [File][notebook-file-tokun-1] / [Kaggle][notebook-kaggle-tokun-1] / [HuggingFace][notebook-hf-tokun-1]
+- `tokun-4`: [File][notebook-file-tokun-4] / [Kaggle][notebook-kaggle-tokun-4] / [HuggingFace][notebook-hf-tokun-4]
+- `tokun-16`: [File][notebook-file-tokun-16] / [Kaggle][notebook-kaggle-tokun-16] / [HuggingFace][notebook-hf-tokun-16]
 
 ### Articles
 
@@ -76,9 +80,6 @@ Licensed under the [aGPLv3](LICENSE.md).
 [notebook-file-tokun-1]: notebooks/tokun.1.ipynb
 [notebook-file-tokun-4]: notebooks/tokun.4.ipynb
 [notebook-file-tokun-16]: notebooks/tokun.16.ipynb
-[notebook-colab-tokun-1]: notebooks/tokun.1.ipynb
-[notebook-colab-tokun-4]: notebooks/tokun.4.ipynb
-[notebook-colab-tokun-16]: notebooks/tokun.16.ipynb
 [notebook-hf-tokun-1]: notebooks/tokun.1.ipynb
 [notebook-hf-tokun-4]: notebooks/tokun.4.ipynb
 [notebook-hf-tokun-16]: notebooks/tokun.16.ipynb

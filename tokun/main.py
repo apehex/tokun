@@ -83,15 +83,15 @@ MODEL.compile(
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
 lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
-# TRAINING_HISTORY = MODEL.fit(
-#     x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
-#     batch_size=N_BATCH,
-#     epochs=N_EPOCHS,
-#     validation_split=None,
-#     validation_data=TEST['zh'], # full of glyphs
-#     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
-#     verbose=2,
-#     callbacks=[lr_callback, tb_callback])
+TRAINING_HISTORY = MODEL.fit(
+    x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
+    batch_size=N_BATCH,
+    epochs=N_EPOCHS,
+    validation_split=None,
+    validation_data=TEST['zh'], # full of glyphs
+    validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
+    verbose=2,
+    callbacks=[lr_callback, tb_callback])
 
 # SAMPLES #####################################################################
 
