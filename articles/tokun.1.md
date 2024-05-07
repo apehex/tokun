@@ -43,22 +43,22 @@ In particular, he listed some issues with current (public) tokenizers:
 2. [ ] they generalize poorly across languages
 3. [ ] they result in input vectors with dimensions of several 100k
 4. [ ] tokens are a priori unrelated to each other:
-    4.1. [ ] `"hello"` has no relation to `"h"` or the ASCII code `104`
-    4.2. [ ] capitalization: `"New-York"` and `"new York"`
-    4.3. [ ] typos: `"helllo"` and `"hello"`
-    4.4. [ ] repetitions: `"    "` and `"\t"`
-    4.5. [ ] inflections:
+    - [ ] `"hello"` has no relation to `"h"` or the ASCII code `104`
+    - [ ] capitalization: `"New-York"` and `"new York"`
+    - [ ] typos: `"helllo"` and `"hello"`
+    - [ ] repetitions: `"    "` and `"\t"`
+    - [ ] inflections:
         - conjugation: `"is"` and `"be"`
         - plural: `"languages"` and `"language"`
         - gender: `"franc"` and `"franche"`
         - cases: genetive, nominative, etc
 5. [ ] words are tokenized differently depending on their surrounding elements:
-    5.1. [ ] `"\thello world"` is split into `["\th", "ello", " world"]` by [GPT-4][tiktokenizer-gpt-4]
-    5.2. [ ] while `"hello world"` results in `["hello", " world"]`
+    - [ ] `"\thello world"` is split into `["\th", "ello", " world"]` by [GPT-4][tiktokenizer-gpt-4]
+    - [ ] while `"hello world"` results in `["hello", " world"]`
 6. [ ] tokenizers have trouble with numbers:
-    6.1. [ ] fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
-    6.2. [ ] base: `"0x10"` and `"16"`
-    6.3. [ ] format: `"1.6e-1"` and `"0.16"`
+    - [ ] fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
+    - [ ] base: `"0x10"` and `"16"`
+    - [ ] format: `"1.6e-1"` and `"0.16"`
 
 The model `tokun-1` presented here will tackle the first 3 points.
 The final model `tokun-4x4` addresses most of these shortcomings.
