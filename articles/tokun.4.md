@@ -6,20 +6,21 @@
 
 Other articles in the serie:
 
-- [`tokun-1`][github-article-tokun-1]
-- [`tokun-16`][github-article-tokun-16]
+- [`tokun-1`][article-github-tokun-1]
+- [`tokun-16`][article-github-tokun-16]
 
 All the variants of the model are already available on:
 
-- [Github][github-tokun]
-- [Hugging Face][huggingface-tokun]
-- [Kaggle][kaggle-tokun]
+- [Github][tokun-github]
+- [Hugging Face][tokun-huggingface]
+- [Kaggle][tokun-kaggle]
 
 You will also find notebooks on:
 
-- [Github][github-notebook]
-- [Hugging Face][huggingface-notebook]
-- [Kaggle][kaggle-notebook]
+- [Github][notebook-github]
+- [Google Colab][notebook-colab]
+- [Hugging Face][notebook-huggingface]
+- [Kaggle][notebook-kaggle]
 
 ## Summary
 
@@ -175,16 +176,17 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         return self._merge(self._embedding(self._divide(self._dense(inputs))))
 ```
 
+[github-mlqa]: https://github.com/facebookresearch/MLQA
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
-[github-article-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
-[github-article-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
-[github-mlqa]: https://github.com/facebookresearch/MLQA
-[github-notebook]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
-[github-tokun]: https://github.com/apehex/tokun
+[article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
+[article-github-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
 
-[huggingface-notebook]: https://github.com/apehex/tokun
-[huggingface-tokun]: https://github.com/apehex/tokun
+[notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
+[notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
+[notebook-huggingface]: https://github.com/apehex/tokun
+[notebook-kaggle]: https://github.com/apehex/tokun
 
-[kaggle-notebook]: https://github.com/apehex/tokun
-[kaggle-tokun]: https://github.com/apehex/tokun
+[tokun-github]: https://github.com/apehex/tokun
+[tokun-huggingface]: https://github.com/apehex/tokun
+[tokun-kaggle]: https://github.com/apehex/tokun
