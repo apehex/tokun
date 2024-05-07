@@ -14,10 +14,24 @@ But these vectors keep meaningful information on their constituting parts.
 This article is the first part of a serie, starting from single character tokenization.
 It will follow the improvements of the model, building increasingly meaningful and dense tokens.
 
-Still, all the variants of the model are already available:
+## Resources
 
-- on [Github][github-tokun]
-- on [Hugging Face][huggingface-tokun]
+Other articles in the serie:
+
+- [`tokun-4`][github-article-tokun-4]
+- [`tokun-16`][github-article-tokun-16]
+
+All the variants of the model are already available on:
+
+- [Github][github-tokun]
+- [Hugging Face][huggingface-tokun]
+- [Kaggle][kaggle-tokun]
+
+You will also find notebooks on:
+
+- [Github][github-notebook]
+- [Hugging Face][huggingface-notebook]
+- [Kaggle][kaggle-notebook]
 
 ## Limitations Of Current Tokenizers
 
@@ -25,27 +39,28 @@ This project was inspired by a recent (2024) video from Andrej Karpathy, ["Let's
 
 In particular, he listed some issues with current (public) tokenizers:
 
-- tokenizers are built and operate outside of the NN models
-- they generalize poorly across languages
-- they result in input vectors with dimensions of several 100k
-- tokens are a priori unrelated to each other:
-    - `"hello"` has no relation to `"h"` or the ASCII code `104`
-    - capitalization: `"New-York"` and `"new York"`
-    - typos: `"helllo"` and `"hello"`
-    - repetitions: `"    "` and `"\t"`
-    - inflections:
+1. [ ] tokenizers are built and operate outside of the NN models
+2. [ ] they generalize poorly across languages
+3. [ ] they result in input vectors with dimensions of several 100k
+4. [ ] tokens are a priori unrelated to each other:
+    4.1. [ ] `"hello"` has no relation to `"h"` or the ASCII code `104`
+    4.2. [ ] capitalization: `"New-York"` and `"new York"`
+    4.3. [ ] typos: `"helllo"` and `"hello"`
+    4.4. [ ] repetitions: `"    "` and `"\t"`
+    4.5. [ ] inflections:
         - conjugation: `"is"` and `"be"`
         - plural: `"languages"` and `"language"`
         - gender: `"franc"` and `"franche"`
         - cases: genetive, nominative, etc
-- words are tokenized differently depending on their surrounding elements:
-    - `"\thello world"` is split into `["\th", "ello", " world"]` by [GPT-4][tiktokenizer-gpt-4]
-    - while `"hello world"` results in `["hello", " world"]`
-- tokenizers have trouble with numbers:
-    - fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
-    - base: `"0x10"` and `"16"`
-    - format: `"1.6e-1"` and `"0.16"`
+5. [ ] words are tokenized differently depending on their surrounding elements:
+    5.1. [ ] `"\thello world"` is split into `["\th", "ello", " world"]` by [GPT-4][tiktokenizer-gpt-4]
+    5.2. [ ] while `"hello world"` results in `["hello", " world"]`
+6. [ ] tokenizers have trouble with numbers:
+    6.1. [ ] fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
+    6.2. [ ] base: `"0x10"` and `"16"`
+    6.3. [ ] format: `"1.6e-1"` and `"0.16"`
 
+The model `tokun-1` presented here will tackle the first 3 points.
 The final model `tokun-4x4` addresses most of these shortcomings.
 
 The serie is heavily focused on western languages, due to personal knowledge.
@@ -376,15 +391,18 @@ class AutoEncoder(tf.keras.models.Model):
 ```
 
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
-[github-mlqa]: https://github.com/facebookresearch/MLQA
-[github-tokun]: https://github.com/apehex/tokun
-[huggingface-tokun]: https://github.com/apehex/tokun
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
 [unicode-table]: https://symbl.cc/en/unicode-table/
-[wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
-[wiki-vae]: https://en.wikipedia.org/wiki/Variational_autoencoder
-[wiki-tsne]: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
+
+[github-article-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
+[github-article-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
+[github-mlqa]: https://github.com/facebookresearch/MLQA
+[github-notebook]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
+[github-tokun]: https://github.com/apehex/tokun
+
+[huggingface-notebook]: https://github.com/apehex/tokun
+[huggingface-tokun]: https://github.com/apehex/tokun
 
 [image-block-encoder]: .images/block-encoder.png
 [image-graph-accuracy]: .images/1/graph.accuracy.png
@@ -396,3 +414,10 @@ class AutoEncoder(tf.keras.models.Model):
 [image-tsne-ascii]: .images/1/tsne.ascii.png
 [image-tsne-vietnamese]: .images/1/tsne.vietnamese.png
 [image-tsne-cjk-4e]: .images/1/tsne.cjk.4e.png
+
+[kaggle-notebook]: https://github.com/apehex/tokun
+[kaggle-tokun]: https://github.com/apehex/tokun
+
+[wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
+[wiki-vae]: https://en.wikipedia.org/wiki/Variational_autoencoder
+[wiki-tsne]: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding

@@ -2,6 +2,37 @@
 
 > `tokun`
 
+## Resources
+
+Other articles in the serie:
+
+- [`tokun-1`][github-article-tokun-1]
+- [`tokun-16`][github-article-tokun-16]
+
+All the variants of the model are already available on:
+
+- [Github][github-tokun]
+- [Hugging Face][huggingface-tokun]
+- [Kaggle][kaggle-tokun]
+
+You will also find notebooks on:
+
+- [Github][github-notebook]
+- [Hugging Face][huggingface-notebook]
+- [Kaggle][kaggle-notebook]
+
+## Summary
+
+The previous model `tokun-1` gave us character level tokens / embeddings that:
+
+1. [x] is an actual neural network
+2. [x] generalizes across all languages
+3. [x] produces embeddings of dimension 256
+
+So:
+
+Pushing forward:
+
 ## Model
 
 ### Input & Output
@@ -143,3 +174,17 @@ class DetokenizeBlock(tf.keras.layers.Layer):
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._merge(self._embedding(self._divide(self._dense(inputs))))
 ```
+
+[youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
+
+[github-article-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
+[github-article-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
+[github-mlqa]: https://github.com/facebookresearch/MLQA
+[github-notebook]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
+[github-tokun]: https://github.com/apehex/tokun
+
+[huggingface-notebook]: https://github.com/apehex/tokun
+[huggingface-tokun]: https://github.com/apehex/tokun
+
+[kaggle-notebook]: https://github.com/apehex/tokun
+[kaggle-tokun]: https://github.com/apehex/tokun
