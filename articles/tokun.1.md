@@ -40,10 +40,11 @@ This project was inspired by a recent (2024) video from Andrej Karpathy, ["Let's
 
 In particular, he listed some issues with current (public) tokenizers:
 
-1. [ ] tokenizers are built and operate outside of the NN models
-2. [ ] they generalize poorly across languages
-3. [ ] they result in input vectors with dimensions of several 100k
-4. [ ] tokens are a priori unrelated to each other:
+- [ ] tokenizers are built and operate outside of the NN models
+- [ ] they generalize poorly across languages
+- [ ] they result in input vectors with dimensions of several 100k
+- [ ] they require the definition of additional "special tokens"
+- [ ] tokens are a priori unrelated to each other:
     - [ ] `"hello"` has no relation to `"h"` or the ASCII code `104`
     - [ ] capitalization: `"New-York"` and `"new York"`
     - [ ] typos: `"helllo"` and `"hello"`
@@ -53,15 +54,15 @@ In particular, he listed some issues with current (public) tokenizers:
         - plural: `"languages"` and `"language"`
         - gender: `"franc"` and `"franche"`
         - cases: genetive, nominative, etc
-5. [ ] words are tokenized differently depending on their surrounding elements:
+- [ ] words are tokenized differently depending on their surrounding elements:
     - [ ] `"\thello world"` is split into `["\th", "ello", " world"]` by [GPT-4][tiktokenizer-gpt-4]
     - [ ] while `"hello world"` results in `["hello", " world"]`
-6. [ ] tokenizers have trouble with numbers:
+- [ ] tokenizers have trouble with numbers:
     - [ ] fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
     - [ ] base: `"0x10"` and `"16"`
     - [ ] format: `"1.6e-1"` and `"0.16"`
 
-The model `tokun-1` presented here will tackle the first 3 points.
+The model `tokun-1` presented here will tackle the first 4 points.
 The final model `tokun-4x4` addresses most of these shortcomings.
 
 The serie is heavily focused on western languages, due to personal knowledge.
@@ -258,13 +259,42 @@ there are relatively few compared to other alphabets, like CJK, so the model did
 
 It put more emphasis on the "Latin Extended" characters because of their diversity and representation in Vietnamese samples.
 
-### Generalization Power
+## Features
 
-#### New Samples
+### Special Tokens
+
+Unicode comes with [special characters out-of-the-box][unicode-table]:
+
+![][image-unicode-table]
+
+Many of these special characters are obsolete and can be repurposed as special tokens.
+
+For instance `0x0002` and `0x0003` stand for "start" and "end of text" in unicode, they are similar to `<|im_start|>` `<|im_end|>` used in GPT-4.
+
+### Input Compression
+
+As explained in the [encoder section](#encoder):
+
+- the input tensor has a shape `(B * G, U)`
+- the embedding tensor has a shape `(B, L)`
+
+With:
+
+- `B` is the batch dimension or the number of characters processed
+- `G` is the group dimension, 4, which is also the number of bytes per unicode codepoint
+- `U` is the encoding dimension, 256 = `E` = `L`
+
+In short, this first model **compresses the UTF-32 input by a factor 4**.
+
+`B` is related but different from a potential attention context.
+
+### Generalization
+
+#### To New Samples
 
 As illustrated in the section [metrics](#metrics), the model maintains 100% accuracy on new samples.
 
-#### New Characters And Languages
+#### To New Characters (And Languages)
 
 The "context" feature in the MLQA dataset has no occurence of the newline `"\n"` character.
 Yet, the encoder-decoder is able to reconstruct the newline from the embedding.
@@ -409,6 +439,7 @@ class AutoEncoder(tf.keras.models.Model):
 [image-graph-accuracy]: .images/1/graph.accuracy.png
 [image-graph-loss]: .images/1/graph.loss.png
 [image-sample-german]: .images/1/sample.german.png
+[image-unicode-table]: .images/unicode-table.special-tokens.png
 
 [image-tsne-4c]: .images/1/tsne.4c.png
 [image-tsne-arabic]: .images/1/tsne.arabic.png
