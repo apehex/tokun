@@ -141,7 +141,7 @@ This means that the 4 UTF-32 bytes get merged into a single vector, the embeddin
 The latent dimension of the resulting vector `E` is set to 256:
 the layer performs a compression of the input space by a factor of 4.
 
-<img src=".images/block-encoder.png" width="50%"/>
+<img src=".images/1/encoder-layer.png" width="50%"/>
 
 #### Decoder
 
@@ -154,7 +154,7 @@ The decoder performs the reverse operations:
 
 The head applies a softmax on the last axis to compute the probability of each byte.
 
-#### Outputs
+### Outputs
 
 The softmax probabilities can be easily post-processed with `argmax` to predict the actual byte values:
 
