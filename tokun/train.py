@@ -12,6 +12,7 @@ import mlable.tensorflow.io as _mti
 import mlable.tensorflow.optimizers as _mto
 
 import tokun.layers
+import tokun.meta
 import tokun.model
 import tokun.pipeline
 
@@ -33,16 +34,15 @@ N_EPOCHS_SUSTAIN = 0
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
-R_MIN = 0.00001
-R_MAX = 0.0001
-R_EXP = .8
+R_MIN, R_MAX, R_EXP = tokun.meta.rates(normalization=NORMALIZATION)
 
 # LOG #########################################################################
 
-VERSION = 'tokun-' + str(N_TOKEN_DIM ** (N_DEPTH - 1)) + '-keras' + ATTENTION * '-attention' + NORMALIZATION * '-normalization'
+VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION, framework='')
+DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-LOGPATH = os.path.join('.logs/', VERSION, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-SUMMARY = tf.summary.create_file_writer(LOGPATH)
+PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
+PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')
 
 # DATA ########################################################################
 
@@ -80,10 +80,10 @@ MODEL.compile(
 
 # TRAIN #######################################################################
 
-tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOGPATH)
+tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
 lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
-TRAINING_HISTORY = MODEL.fit(
+HISTORY = MODEL.fit(
     x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
     batch_size=N_BATCH,
     epochs=N_EPOCHS,
@@ -92,3 +92,7 @@ TRAINING_HISTORY = MODEL.fit(
     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
     verbose=2,
     callbacks=[lr_callback, tb_callback])
+
+# SAVE ########################################################################
+
+MODEL.save(PATH_MODEL, save_format='keras')
