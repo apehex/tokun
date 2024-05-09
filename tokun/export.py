@@ -9,9 +9,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import mlable.tensorflow.io as _mti
-import mlable.tensorflow.optimizers as _mto
 
-import tokun.layers
 import tokun.meta
 import tokun.model
 import tokun.pipeline
