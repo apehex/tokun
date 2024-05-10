@@ -9,22 +9,7 @@ import tensorflow as tf
 def compare(left: str, right: str) -> float:
     return sum(__l == __r for __l, __r in zip(left, right)) / max(1, len(left))
 
-def chunk(seq: list, size: int, repeats: bool=True) -> list:
-    __chunks = (seq[__i:__i+size] for __i in range(0, len(seq), size))
-    return list(__chunks if repeats else set(__chunks))
-
-def merge(chunks: list) -> list:
-    return list(itertools.chain.from_iterable(chunks))
-
-def shape(groups: list, flatten: bool=False) -> list:
-    return [-1] + (1 - int(flatten)) * groups
-
-# AUGMENT #####################################################################
-
-def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
-    return tf.convert_to_tensor([ticks * b'\x00']) + data
-
-# > ###########################################################################
+# ENCODE ######################################################################
 
 def _encode_scalar(text: str, token_size: int) -> tf.Tensor:
     # encode the string
@@ -48,6 +33,18 @@ def encode(data: any, token_size: int, sample_size: int=64) -> tf.Tensor:
     else:
         return _encode_tensor(data=data, token_size=token_size, sample_size=sample_size)
 
+# RESHAPE #####################################################################
+
+def chunk(seq: list, size: int, repeats: bool=True) -> list:
+    __chunks = (seq[__i:__i+size] for __i in range(0, len(seq), size))
+    return list(__chunks if repeats else set(__chunks))
+
+def merge(chunks: list) -> list:
+    return list(itertools.chain.from_iterable(chunks))
+
+def shape(groups: list, flatten: bool=False) -> list:
+    return [-1] + (1 - int(flatten)) * groups
+
 def reshape(data: tf.Tensor, groups: list, flatten: bool=True) -> tf.Tensor:
     # total length of the token
     __token_size = math.prod(groups)
@@ -56,7 +53,12 @@ def reshape(data: tf.Tensor, groups: list, flatten: bool=True) -> tf.Tensor:
     # partition or flatten the data
     return tf.reshape(tensor=data, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
 
-# < ###########################################################################
+# AUGMENT #####################################################################
+
+def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
+    return tf.convert_to_tensor([ticks * b'\x00']) + data
+
+# DECODE ######################################################################
 
 def interpret(output: tf.Tensor) -> tf.Tensor:
     return tf.argmax(input=output, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
@@ -78,6 +80,8 @@ def process(dataset: tf.data.Dataset, pipeline: list, replace: bool=True, featur
         __dataset = __new if __repl else __dataset.concatenate(__new)
     return __dataset
 
+# > ###########################################################################
+
 def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:
     # total length of the token
     __token_size = math.prod(groups)
@@ -86,9 +90,11 @@ def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:
     # partition or flatten
     __bytes = reshape(data=__bytes, groups=groups, flatten=flatten)
     # one-hot
-    tf.one_hot(indices=__bytes, depth=256, axis=-1)
+    return tf.one_hot(indices=__bytes, depth=256, axis=-1)
 
-def postprocess(output: tf.Tensor) -> tf.Tensor:
+# < ###########################################################################
+
+def postprocess(output: tf.Tensor) -> str:
     # from one-hot to UTF-32 bytes
     __output = interpret(output=output)
     # flatten the groups of 4 bytes
