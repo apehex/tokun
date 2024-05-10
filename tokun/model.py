@@ -1,9 +1,11 @@
+import keras
 import tensorflow as tf
 
 import tokun.layers
 
 # ENCODER #####################################################################
 
+@keras.saving.register_keras_serializable(package='models')
 class Encoder(tf.keras.models.Model):
     def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
         super(Encoder, self).__init__(**kwargs)
@@ -37,6 +39,7 @@ class Encoder(tf.keras.models.Model):
 
 # DECODER #####################################################################
 
+@keras.saving.register_keras_serializable(package='models')
 class Decoder(tf.keras.models.Model):
     def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
         super(Decoder, self).__init__(**kwargs)
@@ -70,6 +73,7 @@ class Decoder(tf.keras.models.Model):
 
 # VAE #########################################################################
 
+@keras.saving.register_keras_serializable(package='models')
 class AutoEncoder(tf.keras.models.Model):
     def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
         super(AutoEncoder, self).__init__(**kwargs)
