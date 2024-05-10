@@ -15,6 +15,26 @@ class Encoder(tf.keras.models.Model):
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
 
+    def get_config(self) -> dict:
+        __parent_config = super(Encoder, self).get_config()
+        __input_shape = list(self._encoder.inputs[0].shape)
+        __embedding_config = self._encoder.layers[0].get_config()
+        __tokenizer_config = self._encoder.layers[1].get_config()
+        __child_config = {
+            'depth': max(0, len(self._encoder.layers) - 1),
+            'batch_dim': __input_shape[0],
+            'encoding_dim': __input_shape[-1],
+            'embedding_dim': __embedding_config['units'],
+            'token_dim': __tokenizer_config['token_dim'],
+            'latent_dim': __tokenizer_config['latent_dim'],
+            'attention': __tokenizer_config['attention'],
+            'normalization': __tokenizer_config['normalization'],}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+
 # DECODER #####################################################################
 
 class Decoder(tf.keras.models.Model):
@@ -28,6 +48,26 @@ class Decoder(tf.keras.models.Model):
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
 
+    def get_config(self) -> dict:
+        __parent_config = super(Decoder, self).get_config()
+        __input_shape = list(self._decoder.inputs[0].shape)
+        __detokenizer_config = self._decoder.layers[0].get_config()
+        __head_config = self._decoder.layers[-1].get_config()
+        __child_config = {
+            'depth': max(0, len(self._decoder.layers) - 1),
+            'batch_dim': __input_shape[0],
+            'latent_dim': __input_shape[-1],
+            'encoding_dim': __head_config['encoding_dim'],
+            'token_dim': __detokenizer_config['token_dim'],
+            'embedding_dim': __detokenizer_config['embedding_dim'],
+            'attention': __detokenizer_config['attention'],
+            'normalization': __detokenizer_config['normalization'],}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+
 # VAE #########################################################################
 
 class AutoEncoder(tf.keras.models.Model):
@@ -38,3 +78,12 @@ class AutoEncoder(tf.keras.models.Model):
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
+
+    def get_config(self) -> dict:
+        __parent_config = super(AutoEncoder, self).get_config()
+        __encoder_config = self._encoder.get_config()
+        return {**__encoder_config, **__parent_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
