@@ -2,6 +2,7 @@
 
 import datetime
 import functools
+import itertools
 import math
 import os
 
@@ -27,7 +28,7 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 # DERIVED #####################################################################
 
 TOKEN_LENGTH = math.prod(N_TOKEN_DIM) # in bytes
-OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))] # in characters
+OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_LENGTH // 4, 2)))] # in characters
 
 # LOG #########################################################################
 
@@ -48,7 +49,7 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
     (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
@@ -68,8 +69,8 @@ MODEL = keras.models.load_model(PATH_MODEL)
 # SAMPLES #####################################################################
 
 SAMPLES = {}
-TOKENS = {(N_TOKEN_DIM ** __i): {} for __i in range(N_DEPTH)}
-EMBEDDINGS = {(N_TOKEN_DIM ** __i): {} for __i in range(N_DEPTH)}
+TOKENS = {__i // 4: {} for __i in itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)}
+EMBEDDINGS = {__i // 4: {} for __i in itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)}
 
 for __lang in TEST:
     # compute predictions
@@ -92,10 +93,8 @@ for __size in TOKENS:
 
 # EMBEDDINGS ##################################################################
 
-for __size in TOKENS:
+for __depth, __size in enumerate(TOKENS.keys()):
     for __lang, __tokens in TOKENS[__size].items():
-        # embedding depth / nesting
-        __depth = int(math.log(__size, N_TOKEN_DIM))
         # re-encode without token repeats
         __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True)
         # UTF-32 embedding
