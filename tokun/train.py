@@ -36,7 +36,7 @@ R_MIN, R_MAX, R_EXP = tokun.meta.rates(normalization=NORMALIZATION)
 # DERIVED #####################################################################
 
 TOKEN_LENGTH = math.prod(N_TOKEN_DIM) # in bytes
-OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))] # in characters
+OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_LENGTH // 4, 2)))] # in characters
 
 # LOG #########################################################################
 
@@ -58,7 +58,7 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
     (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)

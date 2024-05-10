@@ -24,7 +24,7 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 
 # DERIVED #####################################################################
 
-TOKEN_LENGTH = math.prod(N_TOKEN_DIM) // 4
+TOKEN_LENGTH = math.prod(N_TOKEN_DIM)
 
 # LOG #########################################################################
 
