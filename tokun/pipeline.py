@@ -16,14 +16,8 @@ def chunk(seq: list, size: int, repeats: bool=True) -> list:
 def merge(chunks: list) -> list:
     return list(itertools.chain.from_iterable(chunks))
 
-def context(seq: iter, length: int) -> iter:
-    __context = length * [0]
-    for __c in text:
-        yield __context
-        __context = __context[1:] + __c
-
-def shape(layer_count: int, group_size: int, flatten: bool=False) -> list:
-    return [-1] + (1 - int(flatten)) * layer_count * [group_size]
+def shape(groups: list, flatten: bool=False) -> list:
+    return [-1] + (1 - int(flatten)) * groups
 
 # AUGMENT #####################################################################
 
@@ -32,25 +26,32 @@ def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
 
 # > ###########################################################################
 
-def _encode_scalar(text: str, layer_count: int=1, group_size: int=4, flatten: bool=False) -> tf.Tensor:
-    __mod = group_size ** layer_count
+def _encode_scalar(text: str, groups: list, flatten: bool=False) -> tf.Tensor:
+    # total length of the token
+    __mod = math.prod(groups)
+    # encode the string
     __bytes = list(text.encode('utf-32-be'))
-    __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
+    # group by token unit
+    __shape = shape(groups=groups, flatten=flatten)
+    # pad until the encodeed text has length multiple of the token length
     __padding = (-len(__bytes) % __mod) * [0]
+    # cast to tensor
     __tensor = tf.convert_to_tensor(value=__bytes + __padding, dtype=tf.dtypes.int32) # uint8 is not allowed
+    # partition or flatten the data
     return tf.reshape(tensor=__tensor, shape=__shape)
 
-def encode(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
-    # make sure each sample has a length multiple of G ** L = T, the token dim
-    __mod = group_size ** layer_count
-    __dim = math.ceil(4 * sample_size / __mod) * __mod # factor 4 because of the UTF-32 encoding
-    # output shape
-    __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
+def encode(data: tf.Tensor, groups: list, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
+    # total length of the token
+    __mod = math.prod(groups)
+    # factor 4 because of the UTF-32 encoding
+    __dim = math.ceil(4 * sample_size / __mod) * __mod
+    # group by token unit
+    __shape = shape(groups=groups, flatten=flatten)
     # Decode bytes from UTF-8
     __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
     # Decode byte strings to arrays of integers
     __ints = tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
-    # group the characters into tokens
+    # partition of flatten the data
     return tf.reshape(tensor=__ints, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
 
 # < ###########################################################################

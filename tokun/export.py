@@ -19,20 +19,19 @@ import tokun.pipeline
 ATTENTION = True
 NORMALIZATION = True
 
-N_DEPTH = 3 # D
-N_TOKEN_DIM = 4 # G
+N_TOKEN_DIM = [4, 4, 4] # G, for each block
 
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
 # DERIVED #####################################################################
 
-TOKEN_LENGTH = N_TOKEN_DIM ** (N_DEPTH - 1)
-OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))]
+TOKEN_LENGTH = math.prod(N_TOKEN_DIM) # in bytes
+OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))] # in characters
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = '20240509-211600'
 
 PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')
@@ -50,7 +49,7 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B * T * S,) int
-    (functools.partial(tokun.pipeline.encode, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.encode, groups=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (inputs, target) for supervised learning
@@ -84,7 +83,7 @@ for __lang in TEST:
 # unique (G ^ i)-tokens
 for __lang, __sample in SAMPLES.items():
     for __size in TOKENS:
-        TOKENS[__size][__lang] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__sample[0]), size=__size, repeats=False)
+        TOKENS[__size][__lang] = tokun.pipeline.chunk(sequence=tokun.pipeline.postprocess(__sample[0]), size=__size, repeats=False)
 
 # unique tokens, for all languages
 for __size in TOKENS:
@@ -97,7 +96,7 @@ for __size in TOKENS:
         # embedding depth / nesting
         __depth = int(math.log(__size, N_TOKEN_DIM))
         # re-encode without token repeats
-        __input = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=''.join(__tokens), layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+        __input = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
