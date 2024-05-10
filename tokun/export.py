@@ -27,7 +27,7 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION, framework='')
+VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = '20240509-211600'
 
 PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')

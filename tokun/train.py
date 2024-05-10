@@ -36,7 +36,7 @@ R_MIN, R_MAX, R_EXP = tokun.meta.rates(normalization=NORMALIZATION)
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION, framework='')
+VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
