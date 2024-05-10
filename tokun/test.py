@@ -17,15 +17,18 @@ import tokun.pipeline
 ATTENTION = True
 NORMALIZATION = True
 
-N_DEPTH = 3 # D
-N_TOKEN_DIM = 4 # G
+N_TOKEN_DIM = [4, 4, 4] # G, for each block
 
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
+# DERIVED #####################################################################
+
+TOKEN_LENGTH = math.prod(N_TOKEN_DIM) // 4
+
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = '20240509-211600'
 
 PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')
@@ -38,7 +41,7 @@ MODEL = keras.models.load_model(PATH_MODEL)
 
 __s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
 
-__x = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=__s, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+__x = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=__s, groups=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = tokun.pipeline.postprocess(__p)
@@ -53,16 +56,16 @@ __sample  = """The t-SNE algorithm comprises two main stages. First, t-SNE const
 
 # compute
 __s = ''.join(__i * chr(0) + __sample for __i in range(4))
-__t = chunk(seq=__s, size=4, repeats=False)
-__x = tf.one_hot(indices=_encode_scalar(text=''.join(__t), layer_count=N_DEPTH, group_size=4, flatten=True), depth=256, axis=-1)
+__t = tokun.pipeline.chunk(sequence=__s, size=4, repeats=False)
+__x = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=''.join(__t), groups=N_TOKEN_DIM, flatten=True), depth=256, axis=-1)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
-__y = postprocess(__p)
+__y = tokun.pipeline.postprocess(__p)
 
 # print
 print('# INPUT ################################################################\n\n' + ''.join(__t))
 print('\n# OUTPUT ###############################################################\n\n' + __y)
-print('\n# SCORE ################################################################\n\n' + str(compare(''.join(__t), __y)))
+print('\n# SCORE ################################################################\n\n' + str(tokun.pipeline.compare(''.join(__t), __y)))
 print('\n# SHAPES ###############################################################\n')
 print(len(__t))
 print(__x.shape)

@@ -35,12 +35,12 @@ R_MIN, R_MAX, R_EXP = tokun.meta.rates(normalization=NORMALIZATION)
 
 # DERIVED #####################################################################
 
-TOKEN_LENGTH = math.prod(N_TOKEN_DIM) // 4
-OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH, 2))]
+TOKEN_LENGTH = math.prod(N_TOKEN_DIM) # in bytes
+OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))] # in characters
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
@@ -59,7 +59,7 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B * T * S,) int
-    (functools.partial(tokun.pipeline.encode, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    (functools.partial(tokun.pipeline.encode, groups=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (inputs, target) for supervised learning
@@ -72,7 +72,7 @@ TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPE
 
 # INIT ########################################################################
 
-MODEL = tokun.model.AutoEncoder(depth=N_DEPTH, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION)
+MODEL = tokun.model.AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION)
 
 # compile
 MODEL.compile(
