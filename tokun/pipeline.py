@@ -27,13 +27,8 @@ def shape(layer_count: int, group_size: int, flatten: bool=False) -> list:
 
 # AUGMENT #####################################################################
 
-def _offset(ticks: int=1, layer: int=1, unit: int=4) -> int:
-    return math.ceil(ticks * (unit ** (layer - 1)))
-
-def offset(data: tf.Tensor, ticks: int=1, layer: int=1, unit: int=4) -> tf.Tensor:
-    __length = _offset(ticks=ticks, layer=layer, unit=unit)
-    __pad = tf.convert_to_tensor([__length * b'\x00'])
-    return __pad + data
+def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
+    return tf.convert_to_tensor([ticks * b'\x00']) + data
 
 # > ###########################################################################
 

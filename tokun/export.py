@@ -25,6 +25,11 @@ N_TOKEN_DIM = 4 # G
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
+# DERIVED #####################################################################
+
+TOKEN_LENGTH = N_TOKEN_DIM ** (N_DEPTH - 1)
+OFFSET_TICKS = [2 ** __i for __i in range(math.log(TOKEN_LENGTH // 4, 2))]
+
 # LOG #########################################################################
 
 VERSION = tokun.meta.version(depth=N_DEPTH, unit=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
@@ -43,7 +48,7 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 # B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=2 ** __i, layer=1, unit=N_TOKEN_DIM), False) for __i in range(2 * (N_DEPTH - 1))], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B * T * S,) int
     (functools.partial(tokun.pipeline.encode, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
     # one-hot encoding => (B * T * S, E) int (bool)
