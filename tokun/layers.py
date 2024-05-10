@@ -30,6 +30,21 @@ class TokenizeBlock(tf.keras.layers.Layer):
         __t = self._attention([__t, __t, __t], return_attention_scores=False, use_causal_mask=False) if self._attention else __t
         return self._dense(self._merge(__t))
 
+    def get_config(self) -> dict:
+        __parent_config = super(TokenizeBlock, self).get_config()
+        __child_config = {
+            'left_axis': self._merge._left_axis,
+            'right_axis': self._merge._right_axis,
+            'token_dim': self._divide._factor,
+            'latent_dim': self._dense.units,
+            'attention': bool(self._attention),
+            'normalization': bool(self._normalization)}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+
 # DECODING BLOCKS #############################################################
 
 class DetokenizeBlock(tf.keras.layers.Layer):
@@ -56,6 +71,19 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         __t = self._merge(__t)
         return self._normalization(__t) if self._normalization else __t
 
+    def get_config(self) -> dict:
+        __parent_config = super(DetokenizeBlock, self).get_config()
+        __child_config = {
+            'token_dim': self._dense.units // self._divide._factor,
+            'embedding_dim': self._divide._factor,
+            'attention': bool(self._attention),
+            'normalization': bool(self._normalization)}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+
 # HEAD ########################################################################
 
 class HeadBlock(tf.keras.layers.Layer):
@@ -71,3 +99,12 @@ class HeadBlock(tf.keras.layers.Layer):
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._softmax(self._dense(inputs))
+
+    def get_config(self) -> dict:
+        __parent_config = super(HeadBlock, self).get_config()
+        __child_config = {'encoding_dim': self._dense.units,}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
