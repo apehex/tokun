@@ -40,7 +40,7 @@ def _encode_scalar(text: str, groups: list, flatten: bool=False) -> tf.Tensor:
     # partition or flatten the data
     return tf.reshape(tensor=__tensor, shape=__shape)
 
-def encode(data: tf.Tensor, groups: list, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
+def _encode_tensor(data: tf.Tensor, groups: list, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
     # total length of the token
     __mod = math.prod(groups)
     # factor 4 because of the UTF-32 encoding
@@ -53,6 +53,12 @@ def encode(data: tf.Tensor, groups: list, sample_size: int=64, flatten: bool=Fal
     __ints = tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
     # partition of flatten the data
     return tf.reshape(tensor=__ints, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
+
+def encode(data: any, groups: list, sample_size: int=64, flatten: bool=True) -> tf.Tensor:
+    if isinstance(data, str):
+        return _encode_scalar(text=data, groups=groups, flatten=flatten)
+    else:
+        return _encode_tensor(data=data, groups=groups, sample_size=sample_size, flatten=flatten)
 
 # < ###########################################################################
 
