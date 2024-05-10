@@ -54,15 +54,16 @@ TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, s
 
 # PREPROCESS ##################################################################
 
-# B = 128, T = 4, S = 128, E = 256
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # encode => (B * T * S,) int
-    (functools.partial(tokun.pipeline.encode, groups=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
-    # one-hot encoding => (B * T * S, E) int (bool)
+    # encode => (B, G * S,) int
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE, flatten=True), True),
+    # reshape => (B * G * S,) int
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
+    # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
-    # replace sample inputs with (inputs, target) for supervised learning
+    # replace sample inputs with (input, target) for supervised learning
     ((lambda x: (x, x)), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
