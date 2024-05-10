@@ -1,9 +1,11 @@
+import keras
 import tensorflow as tf
 
 import mlable.tensorflow.layers as _mtl
 
 # ENCODING BLOCKS #############################################################
 
+@keras.saving.register_keras_serializable(package='blocks')
 class TokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
@@ -47,6 +49,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
 
 # DECODING BLOCKS #############################################################
 
+@keras.saving.register_keras_serializable(package='blocks')
 class DetokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
@@ -86,6 +89,7 @@ class DetokenizeBlock(tf.keras.layers.Layer):
 
 # HEAD ########################################################################
 
+@keras.saving.register_keras_serializable(package='blocks')
 class HeadBlock(tf.keras.layers.Layer):
     def __init__(
         self,
