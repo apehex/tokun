@@ -78,6 +78,16 @@ def process(dataset: tf.data.Dataset, pipeline: list, replace: bool=True, featur
         __dataset = __new if __repl else __dataset.concatenate(__new)
     return __dataset
 
+def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:
+    # total length of the token
+    __token_size = math.prod(groups)
+    # list of bytes
+    __bytes = encode(data=text, token_size=__token_size)
+    # partition or flatten
+    __bytes = reshape(data=__bytes, groups=groups, flatten=flatten)
+    # one-hot
+    tf.one_hot(indices=__bytes, depth=256, axis=-1)
+
 def postprocess(output: tf.Tensor) -> tf.Tensor:
     # from one-hot to UTF-32 bytes
     __output = interpret(output=output)

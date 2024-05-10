@@ -41,7 +41,7 @@ MODEL = keras.models.load_model(PATH_MODEL)
 
 __s = """class Encoder(tf.keras.models.Model):\n    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:\n        super(Encoder, self).__init__(**kwargs)\n        self._encoder = tf.keras.Sequential([\n            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)\n            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)\n            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._encoder(x)\n"""
 
-__x = tf.one_hot(indices=tokun.pipeline.encode(text=__s, groups=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+__x = tokun.pipeline.preprocess(text=__s, groups=N_TOKEN_DIM, flatten=True)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = tokun.pipeline.postprocess(__p)
@@ -57,7 +57,7 @@ __sample  = """The t-SNE algorithm comprises two main stages. First, t-SNE const
 # compute
 __s = ''.join(__i * chr(0) + __sample for __i in range(4))
 __t = tokun.pipeline.chunk(sequence=__s, size=4, repeats=False)
-__x = tf.one_hot(indices=tokun.pipeline.encode(text=''.join(__t), groups=N_TOKEN_DIM, flatten=True), depth=256, axis=-1)
+__x = tokun.pipeline.preprocess(text=''.join(__t), groups=N_TOKEN_DIM, flatten=True)
 __e = MODEL._encoder(__x)
 __p = MODEL(__x)
 __y = tokun.pipeline.postprocess(__p)
