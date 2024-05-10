@@ -96,7 +96,7 @@ for __size in TOKENS:
         # embedding depth / nesting
         __depth = int(math.log(__size, N_TOKEN_DIM))
         # re-encode without token repeats
-        __input = tf.one_hot(indices=tokun.pipeline._encode_scalar(text=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
+        __input = tf.one_hot(indices=tokun.pipeline.encode(data=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True), depth=N_ENCODING_DIM, axis=-1)
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
