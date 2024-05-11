@@ -84,6 +84,7 @@ MODEL.compile(
 # TRAIN #######################################################################
 
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
+cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_MODEL, monitor='val_accuracy', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
 lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 HISTORY = MODEL.fit(
@@ -94,8 +95,8 @@ HISTORY = MODEL.fit(
     validation_data=TEST['zh'], # full of glyphs
     validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
     verbose=2,
-    callbacks=[lr_callback, tb_callback])
+    callbacks=[lr_callback, cp_callback, tb_callback])
 
 # SAVE ########################################################################
 
-MODEL.save(PATH_MODEL, save_format='keras')
+# MODEL.save(PATH_MODEL, save_format='keras')
