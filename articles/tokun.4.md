@@ -1,6 +1,16 @@
 # Tokun-4
 
-> `tokun`
+> `tokun` to can tokens
+
+Current tokenizers have notorious issues that are bringing all the LLMs down.
+
+The model presented in the [previous article][article-github-tokun-1] made the case for using UTF-32-BE as text encoding.
+`tokun-1` is able to perform a lossless compression of UTF-32-BE into a dense equivalent to UTF-8.
+
+The process can be iterated to merge the characters into embeddings 4 by 4.
+
+For reference, OpenAI stated that the [GPT-4 tokenizer has a length of 4 characters on average][openai-tokenizer] and on English.
+So `tokun-4` has comparable sequence compression capabilities, while producing shorter and more meaningful embedding vectors.
 
 ## Resources
 
@@ -24,41 +34,332 @@ You will also find notebooks on:
 
 ## Summary
 
-The previous model `tokun-1` gave us character level tokens / embeddings that:
+The VAE model `tokun-1` could be used as a tokenizer that:
 
-1. [x] is an actual neural network
-2. [x] generalizes across all languages
-3. [x] produces embeddings of dimension 256
+- [x] is an actual neural network
+- [x] generalize across all languages
+- [x] produces embeddings of dimension 256
+- [x] comes with built-in special tokens
 
-So:
+The goal is to maintain these properties in `tokun-4` while solving some of the remaining issues:
 
-Pushing forward:
+- [ ] tokens are unrelated to each other
+- [ ] token are unrelated to their own parts
+- [ ] words are tokenized differently depending on their surrounding elements
 
 ## Model
 
-### Input & Output
+The overall model is still a VAE with convolution layers.
+
+Since it is very similar to the first iteration, only the macroscopic structure and the variations will be described.
+
+### Inputs
+
+The training and inference inputs have different specifics but result in similar tensors.
+
+Before the preprocessing pipeline, the inputs have the shape `(B, S)`. With:
+
+- `B` the batch dimension
+- `S` the fixed sample dimension:
+    - in number of unicode characters
+    - with 0 padding on the right
+
+After preprocessing, the input is reshaped into `(B * S * 4, 256)`:
+
+- it is a flat sequence of bytes
+- where each byte has dimension 256 because of the one-hot encoding
+- the factor 4 comes from the UTF-32-BE encoding of each unicode character
+
+During inference, the input tensor has just `(S * 4, 256)` elements.
+
+From the point of view of the model, the dimension of the first axis will be written `B' * G * G`.
+This is because the batch dimension `B * S * 4` will be compressed twice by a factor `G`, the unit token dimension.
 
 ### Architecture
 
+Both encoder and decoder use the same layers as `tokun-1`.
+They are just stacked twice.
+
+#### Hyper Parameters
+
+- `D = 2`, the number of tokenization blocks
+- `G = 4`, the token unit dimension or group dimension
+- `U = 256`, the encoding dimension from UTF-32-BE
+- `E = 256`, the embedding dimension
+- `L = 256`, the latent dimension
+
+The depth of the model `D` was one for `tokun-1`, and now 2 for `tokun-4`.
+
+A priori the dimensions of the last axes could be different.
+As we'll see in [the results](#results), these choices seem to fit best.
+
 #### Encoder
+
+The previous model merged the input bytes 4 by 4 into embeddings.
+These embeddings can also be merged 4 by 4:
+
+<img src=".images/4/encoder-blocks.png" width="75%"/>
+
+And the succession of layers that perform the merging can be packaged into a block layer, `TokenizeBlock`:
+
+1. the `Divide` layer splits the batch axis: `(B * G, E)` => `(B, G, E)`
+2. the `PositionalEmbedding` layer distinguishes each of the `G` token units with a specific bias
+3. the `Merge` layer groups all the embeddings on the last dimension: `(B * G, E)` => `(B, G * E)`
+4. the `Dense` layer finally compresses the dimension `G * E` into `E`
+
+The custom `Divide` and `Merge` layers offer the advantage to work on *relative* shapes:
+they modify a subset of the axes and don't make assumptions on the overall shape of the tensors.
+
+The order of the layers 2 and 3 could actually be switched, and the positional embedding removed.
+Still, this configuration is a setup for later improvements of the blocks, in `tokun-4x4`.
 
 #### Decoder
 
+Again, the decoding model performs the reverse operations.
+The process is packaged in `DetokenizeBlock`:
+
+1. the `Dense` layer expands the latent embedding: `(B, E)` => `(B, G * E)`
+2. the `Divide` layer splits the last axis: `(B, G * E)` => `(B, G, E)`
+3. the `PositionalEmbedding` layer adds markers to each token unit
+4. the `Merge` layer flattens the tensor: `(B, G, E)` => `(B * G, E)`
+
+Here too, the position embedding is redundant, as the first layer it is already applied by the first layer.
+It is kept to satisfy my kink for symmetry mostly.
+
+#### Head
+
+The head is unchanged, it applies a softmax on the last axis to compute the probability of each byte.
+
+### Outputs
+
+The outputs have the same shape as the inputs.
+
+They are filled with probabilities instead of just zeros and ones.
+
 ## Training
+
+The training was done on the [MLQA][github-mlqa] dataset again.
+All seven languages were used in both training and validation.
+
+Since the data is chunked by units of 4 characters, the embeddings now depend on the position of the splits.
+Typically the 2 following samples would have unrelated tokens:
+
+```
+    __length = _offset(ticks=ticks, layer=layer, unit=unit)
+```
+
+```
+\t__length = _offset(ticks=ticks, layer=layer, unit=unit)
+```
+
+To ensure that the model learns all the splitting variations, the training data is augmented:
+each sample is replicated with its characters shifted by 1, 2 and 3 ticks. 
+
+Now the data pipeline is:
+
+```python
+PIPELINE = [
+    # offset by 1 to 3 character => (B, 1) bytes
+    (functools.partial(offset, ticks=1, layer=1, unit=N_TOKEN_DIM), False), # double the dataset volume: (all samples with offset 0) + (offset 1)
+    (functools.partial(offset, ticks=2, layer=1, unit=N_TOKEN_DIM), False), # double again: (offsets 0 and 1) + (offsets 2 and 3)
+    # encode => (B * G * S,) int
+    (functools.partial(encode, layer_count=N_DEPTH, group_size=N_TOKEN_DIM, sample_size=N_SAMPLE, flatten=True), True),
+    # one-hot encoding => (B * G * S, E) int (bool)
+    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
+    # replace sample inputs with (inputs, target) for supervised learning
+    ((lambda x: (x, x)), True)]
+```
+
+The operations above are applied to the datasets one after another.
 
 ## Results
 
+For this model to be relevant, it has to be perfectly accurate so that embeddings can be reversed into their matching sequence of characters.
+
 ### Metrics
 
-### Samples
+After 24 epochs on the augmented dataset the model reaches 100% accuracy on both training and validation data.
 
-### Generalization Power
+The process was done 8 epochs at a time to adjust the learning rate.
+Here's the evolution on the first 8:
 
-#### New Samples
+![][image-graph-accuracy-4x4]
 
-#### New Characters
+### Embeddings
 
-#### New Languages
+The latent space is very structured:
+
+![][image-tsne-latent-space]
+
+
+Each embedding stands for 4 characters:
+
+```python
+__x = preprocess('toku', groups=[4, 4], flatten=True)
+__e = MODEL._encoder(__x)
+print(postprocess(MODEL._decoder(__e)))
+# toku
+```
+
+### Robustness
+
+Once again, the embeddings are **very robust to noise** even when it doesn't respect the underlying structure:
+
+```python
+__std = tf.math.reduce_std(EMBEDDINGS[4]['en'], axis=0)
+__noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+
+__x = preprocess('toku', groups=[16], flatten=True)
+__e = MODEL._encoder(__x)
+
+print(postprocess(MODEL._decoder(__e))) # original embedding
+# toku
+print(postprocess(MODEL._decoder(__e + __std))) # noise with same structure as an embedding
+# toku
+print(postprocess(MODEL._decoder(__e + __noise))) # random noise
+# toku
+print(postprocess(MODEL._decoder(__e + 2 * __noise))) # random noise with more amplitude
+# toÁu
+```
+
+### Configurations
+
+As expected from the model architecture, the positional embedding did not improve the performances.
+
+Also, several CNN configurations can achieve the embedding of 4 characters / 16 bytes:
+
+1. 2 successive layers that merge 4 tensor rows at a time, labeled `4x4`
+2. a single layers that merges 16 rows / bytes, labeled `16`
+3. anything in-between
+
+Here's how the 2 extreme options compare, after training them on 8 epochs:
+
+| 4x4                           | 16                           |
+| ----------------------------- | ---------------------------- |
+| ![][image-graph-accuracy-4x4] | ![][image-graph-accuracy-16] |
+
+The 16 variant performs better, but it has roughly twice as many weights.
+Indeed, most weights come from the dense kernels of the blocks:
+
+- the `4x4` model:
+    - has 2 blocks in the encoder and 2 in the decoder
+    - each with a kernel of `4 * 256 * 256 = 262144`
+    - for a total of more or less 1M elements
+- the `16` version:
+    - has 1 block in the encoder and 1 in the decoder
+    - each with a kernel of `16 * 256 * 256 = 1048576`
+    - which amounts to roughly 2M elements
+
+While the `16` version takes less epochs to train, it is also wasteful.
+In the end, the `4x4` architecture reaches the same performance.
+
+## Features
+
+### 
+
+### Compression
+
+The input tensor has shape `(B * G * G, E)` and the embedding is `(B, E)`:
+the model performs a compression by factor 16 compared to the UTF-32 bytes, or 4 wrt unicode strings.
+
+```python
+# __x.shape
+# __e.shape
+```
+
+### International
+
+The model fully supports the languages it was trained on.
+Meaning it can encode (tokenize) and decode (detokenize) without errors:
+
+![][image-sample-vietnamese]
+
+Of course, the dataset could be extended to include code, maths, and other languages.
+
+### Generalization
+
+`tokun-4` manages new words and characters, for example it can tokenize its own code flawlessly:
+
+```
+# INPUT ################################################################
+
+class Encoder(tf.keras.models.Model):
+    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
+        super(Encoder, self).__init__(**kwargs)
+        self._encoder = tf.keras.Sequential([
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)
+            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._encoder(x)
+
+# OUTPUT ###############################################################
+
+class Encoder(tf.keras.models.Model):
+    def __init__(self, depth: int, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, **kwargs) -> None:
+        super(Encoder, self).__init__(**kwargs)
+        self._encoder = tf.keras.Sequential([
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)
+            + [tokun.layers.TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, attention=attention, name='tokenize' + (__i + 1) * '-4') for __i in range(depth)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._encoder(x)
+����
+
+# SCORE ################################################################
+
+1.0
+```
+
+The 4 "?" at the end of the decoded output are just padding.
+
+It has trouble handling new regions of the unicode space:
+
+```python
+```
+
+### Relation Between Token And Parts
+
+We saw that [adding random noise to the embedding](#robustness) of "toku" produced "toÁu".
+
+In other words the embeddings of these 2 "tokens" are close in the latent space.
+It matches our expectations since both samples differ by a single letter.
+
+This also shows that the embeddings hold information on each of their constituting characters.
+
+### Similarity Between Tokens
+
+While having different characters, some tokens can still be related.
+
+This is expecially apparent with punctuation:
+
+| Space                       | Comma                       |
+| --------------------------- | --------------------------- |
+| ![][image-tsne-token-space] | ![][image-tsne-token-comma] |
+
+And numbers:
+
+![][image-tsne-token-number]
+
+Even though i can't decipher the Arabic, Chinese and Hindi tokens, the model seems to associate samples that have punctuation:
+
+![][image-tsne-token-chinese-space]
+
+### Invariance To Split
+
+While the representation of data is compressed, the actual text information is preserved during "tokenization".
+
+Another model would learn to interpret these embeddings without seeing all the variants
+
+The model has been trained on all the possible shifts of the samples.
+Whether a space is at the start, middle or end doesn't impact the decoding.
+
+## Next
+
+- model improvements (attention, normalization, param tweaks)
+- curriculum
 
 ## Implementation Details
 
@@ -130,6 +431,36 @@ class Merge(tf.keras.layers.Layer):
         return tf.reshape(tensor=inputs, shape=__shape)
 ```
 
+### Embedding Layer
+
+```python
+class PositionalEmbedding(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        input_axis: int=1, # axis of the sequence
+        output_axis: int=-1, # axis of the embedding
+        **kwargs
+    ):
+        super(PositionalEmbedding, self).__init__(**kwargs)
+        self._input_axis = input_axis
+        self._output_axis = output_axis
+        self._kernel = None
+
+    def build(self, input_shape: tuple):
+        # shape
+        __axes = [self._input_axis % len(input_shape), self._output_axis % len(input_shape)]
+        __shape = [(__d if __i in __axes else 1) for __i, __d in enumerate(list(input_shape))]
+        # init values
+        __kernel_init = tf.keras.initializers.GlorotNormal()
+        # register the weights
+        self._kernel = self.add_weight(name="kernel", shape=__shape, initializer=__kernel_init)
+        # notify the model
+        self.built = True
+
+    def call(self, inputs: tf.Tensor):
+        return inputs + self._kernel # each index in the sequence axis has a dedicated bias
+```
+
 ### Tokenization Block
 
 ```python
@@ -177,10 +508,20 @@ class DetokenizeBlock(tf.keras.layers.Layer):
 ```
 
 [github-mlqa]: https://github.com/facebookresearch/MLQA
+[openai-tokenizer]: https://platform.openai.com/tokenizer
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
 [article-github-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
+
+[image-graph-accuracy-16]: .images/4/graph.accuracy.16.png
+[image-graph-accuracy-4x4]: .images/4/graph.accuracy.4x4.png
+[image-sample-vietnamese]: .images/4/sample.vietnamese.png
+[image-tsne-latent-space]: .images/4/tsne.latent-space.png
+[image-tsne-token-chinese-space]: .images/4/tsne.token.chinese.space.png
+[image-tsne-token-comma]: .images/4/tsne.token.comma.png
+[image-tsne-token-number]: .images/4/tsne.token.number.png
+[image-tsne-token-space]: .images/4/tsne.token.space.png
 
 [notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
 [notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
