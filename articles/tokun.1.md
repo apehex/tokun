@@ -261,6 +261,27 @@ there are relatively few compared to other alphabets, like CJK, so the model did
 
 It put more emphasis on the "Latin Extended" characters because of their diversity and representation in Vietnamese samples.
 
+### Robustness
+
+The embeddings are **very robust to noise** even when it doesn't respect the underlying structure:
+
+```python
+__std = tf.math.reduce_std(EMBEDDINGS[1]['en'], axis=0)
+__noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+
+__x = preprocess('toku', groups=[4], flatten=True)
+__e = MODEL._encoder(__x)
+
+print(postprocess(MODEL._decoder(__e))) # original embedding
+# toku
+print(postprocess(MODEL._decoder(__e + __std))) # noise with same structure as an embedding
+# toku
+print(postprocess(MODEL._decoder(__e + __noise))) # random noise
+# toku
+print(postprocess(MODEL._decoder(__e + 4 * __noise))) # random noise with more amplitude
+# tokn
+```
+
 ## Features
 
 ### Special Tokens
