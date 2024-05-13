@@ -255,16 +255,25 @@ In the end, the `4x4` architecture reaches the same performance.
 
 ## Features
 
-### 
+### Extension
+
+`tokun-4` keeps all the features of the previous model `tokun-1`:
+
+- it is obviously still a NN tokenizer
+- it has special tokens because UTF-32-BE has special characters
+- it produces vector embeddings of dimension 256
+- it has 100% encode-decode accuracy on its training languages
 
 ### Compression
 
-The input tensor has shape `(B * G * G, E)` and the embedding is `(B, E)`:
+The input tensor has shape `(B' * G * G, E)` and the embedding is `(B, E)`:
 the model performs a compression by factor 16 compared to the UTF-32 bytes, or 4 wrt unicode strings.
 
 ```python
-# __x.shape
-# __e.shape
+__x.shape # (B' * G * G, E) = (128 * 4 * 256 * 4 * 4, 256)
+# (131072, 256)
+__e.shape # (B', E) = (B * 4 * S) = (128 * 4 * 256)
+# (8192, 256)
 ```
 
 ### International
@@ -315,9 +324,22 @@ class Encoder(tf.keras.models.Model):
 
 The 4 "?" at the end of the decoded output are just padding.
 
-It has trouble handling new regions of the unicode space:
+It has trouble handling new regions of the unicode space like Korean:
 
-```python
+```
+# INPUT ################################################################
+
+위키백과, 우리 모두의 백과사전.
+t-분포 확률적 임베딩(t-SNE)은 데이터의 차원 축소에 사용되는 기계 학습 알고리즘 중 하나로, 2002년 샘 로이스Sam Rowise와 제프리 힌튼에 의해 개발되었다.[1] t-SNE는 비선형 차원 축소 기법으로, 고차원 데이터를 특히 2, 3차원 등으로 줄여 가시화하는데에 유용하게 사용된다. 구체적으로 t-SNE는 비슷한 데이터는 근접한 2, 3차원의 지점으로, 다른 데이터는 멀리 떨어진 지점으로 맵핑한다.
+
+# OUTPUT ###############################################################
+
+鰄烒由싼, 鮰리 梨奐畘 由싼사鸄.
+t-঄壬 畕浠鸁 鲄鲠娩(t-SNE)｀ 数이阰畘 차원 岕梌狐 憬鮩夘涔 栰싄 镙습 詌고리즘 萑 じ媘筜, 2002屄 痘 ｜이겤Sam Rowise筀 鸜锄리 傌妼꧐ 쁘해 娜娜夘峈￤.[1] t-SNE涔 ♄栠甕 차闐 岕梌 細鲕＼｜, 고차원 数이阰浼 妹傈 2, 3차원 篱甼｜ 萄壬 踀시罔镘羔豰峐 유ᢩ镘ƌ 사ᢩ夜篤. 구骴ā＼｜ t-SNE妔 畄获ぜ 数이鐰妔 狼耑镜 2, 3섨원鱘 지耐甼筜, 淤･ 数이鐰涔 奀리 媨導懄 지渐＼｜ 淵镑彜￤.
+
+# SCORE ################################################################
+
+0.5158730158730159
 ```
 
 ### Relation Between Token And Parts
@@ -350,20 +372,27 @@ Even though i can't decipher the Arabic, Chinese and Hindi tokens, the model see
 ### Invariance To Split
 
 While the representation of data is compressed, the actual text information is preserved during "tokenization".
-
-Another model would learn to interpret these embeddings without seeing all the variants
-
-The model has been trained on all the possible shifts of the samples.
-Whether a space is at the start, middle or end doesn't impact the decoding.
+So the *overall* information held in the embedding tensor doesn't change when shifted.
 
 ## Next
 
-- model improvements (attention, normalization, param tweaks)
-- curriculum
+In summary, `tokun-4`:
+
+- divides the input sequence length by a factor 4, similar to common tokenizers like `cl100k`
+- compresses the input encoding to a dimension 256, thousands of times smaller than current tokenizers
+- handles many languages at once, code included
+- holds the character level information in its vectors, unlocking many limits
+
+Pushing the model to higher rates of compression is getting harder.
+We saw that naively increasing the number of neurons improved the performance, so there is hope.
+
+`tokun-16` will refine the model architecture and follow a training curriculum to better handle numbers.
 
 ## Implementation Details
 
 ### Divide Layer
+
+This first layer cuts an "input" axis and moves the chunks into a new "output" axis:
 
 ```python
 class Divide(tf.keras.layers.Layer):
@@ -397,7 +426,11 @@ class Divide(tf.keras.layers.Layer):
         return tf.reshape(tensor=inputs, shape=__shape)
 ```
 
+This allows to go from `(B * G * G, E)` to `(B * G, G, E)` during encoding for example.
+
 ### Merge Layer
+
+This second layer merges 2 axes into a single one:
 
 ```python
 class Merge(tf.keras.layers.Layer):
@@ -431,7 +464,11 @@ class Merge(tf.keras.layers.Layer):
         return tf.reshape(tensor=inputs, shape=__shape)
 ```
 
+It turns the tensor `(B * G, G, E)` into `(B * G, G * E)` during encoding for example.
+
 ### Embedding Layer
+
+To distinguish the embedding of each element in the token unit, the following layer gives them a disting bias:
 
 ```python
 class PositionalEmbedding(tf.keras.layers.Layer):
@@ -463,6 +500,8 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 
 ### Tokenization Block
 
+All the above are pieced together in the `TokenizeBlock`:
+
 ```python
 class TokenizeBlock(tf.keras.layers.Layer):
     def __init__(
@@ -484,9 +523,11 @@ class TokenizeBlock(tf.keras.layers.Layer):
         return self._dense(self._merge(self._embedding(self._divide(inputs))))
 ```
 
+It compresses data with shape `(B * G * G, E)` into `(B * G, E)` and then another instance iterates to finally get to `(B, E)`.
+
 ### Detokenization Block
 
-The `_embedding` layer is actually redundant, but I have a strong urge to make `DetokenizeBlock` the symmetric of `TokenizeBlock`...
+And the `DetokenizeBlock` is used in the decoder to reverse the process:
 
 ```python
 class DetokenizeBlock(tf.keras.layers.Layer):
@@ -505,6 +546,53 @@ class DetokenizeBlock(tf.keras.layers.Layer):
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._merge(self._embedding(self._divide(self._dense(inputs))))
+```
+
+The `_embedding` layer is actually redundant, but I have a strong urge to make `DetokenizeBlock` the symmetric of `TokenizeBlock`...
+
+### Autoencoder Model
+
+All in all, the autoencoder is just:
+
+```python
+# ENCODER #####################################################################
+
+class Encoder(tf.keras.models.Model):
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+        super(Encoder, self).__init__(**kwargs)
+        self._encoder = tf.keras.Sequential([
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G * G, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'), # (B * G * G, U) => (B * G * G, E)
+            TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4'), # (B * G * G, E) => (B * G, E)
+            TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=token_dim, latent_dim=latent_dim, name='tokenize-4-4'),]) # (B * G, E) => (B, E)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._encoder(x)
+
+# DECODER #####################################################################
+
+class Decoder(tf.keras.models.Model):
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+        super(Decoder, self).__init__(**kwargs)
+        self._decoder = tf.keras.Sequential([
+            tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input'), # (B, E)
+            DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4-4'), # (B, E) => (B * G, E)
+            DetokenizeBlock(token_dim=token_dim, embedding_dim=embedding_dim, name='detokenize-4'), # (B * G, E) => (B * G * G, E)
+            HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G, E) => (B * G, U)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._decoder(x)
+
+# VAE #########################################################################
+
+class AutoEncoder(tf.keras.models.Model):
+    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
+        super(AutoEncoder, self).__init__(**kwargs)
+        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)
+        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._decoder(self._encoder(x))
 ```
 
 [github-mlqa]: https://github.com/facebookresearch/MLQA
