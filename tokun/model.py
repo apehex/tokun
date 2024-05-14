@@ -1,3 +1,5 @@
+"""Piece together the actual VAE CNN model for tokun."""
+
 import keras
 import tensorflow as tf
 

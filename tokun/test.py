@@ -1,4 +1,4 @@
-"""Tensorflow port of the tutorial by Andrej Karpathy: https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/"""
+"""Apply the model to various samples."""
 
 import datetime
 import functools
@@ -36,6 +36,8 @@ PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')
 # LOAD ########################################################################
 
 MODEL = keras.models.load_model(PATH_MODEL)
+
+# SAMPLES ########################################################################
 
 # TEST ########################################################################
 

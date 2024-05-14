@@ -1,4 +1,4 @@
-"""Tensorflow port of the tutorial by Andrej Karpathy: https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/"""
+"""Train tokun from scratch or from a checkpoint."""
 
 import datetime
 import functools
