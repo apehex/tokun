@@ -27,8 +27,8 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 
 # DERIVED #####################################################################
 
-TOKEN_LENGTH = math.prod(N_TOKEN_DIM) # in bytes
-OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_LENGTH // 4, 2)))] # in characters
+TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
+OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2)))] # in characters
 
 # LOG #########################################################################
 
@@ -49,7 +49,7 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_LENGTH, sample_size=N_SAMPLE), True),
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
     (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
@@ -69,8 +69,8 @@ MODEL = keras.models.load_model(PATH_MODEL)
 # SAMPLES #####################################################################
 
 SAMPLES = {}
-TOKENS = {__i // 4: {} for __i in itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)}
-EMBEDDINGS = {__i // 4: {} for __i in itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)}
+TOKENS = {__i: {} for __i in TOKEN_SIZES} # in bytes
+EMBEDDINGS = {__i: {} for __i in TOKEN_SIZES} # in bytes
 
 for __lang in TEST:
     # compute predictions
@@ -85,7 +85,7 @@ for __lang in TEST:
 # unique (G ^ i)-tokens
 for __lang, __sample in SAMPLES.items():
     for __size in TOKENS:
-        TOKENS[__size][__lang] = tokun.pipeline.chunk(sequence=tokun.pipeline.postprocess(__sample[0]), size=__size, repeats=False)
+        TOKENS[__size][__lang] = tokun.pipeline.chunk(sequence=tokun.pipeline.postprocess(__sample[0]), size=__size // 4, repeats=False)
 
 # unique tokens, for all languages
 for __size in TOKENS:
@@ -93,7 +93,7 @@ for __size in TOKENS:
 
 # EMBEDDINGS ##################################################################
 
-for __depth, __size in enumerate(TOKENS.keys()):
+for __depth, __size in enumerate(TOKEN_SIZES):
     for __lang, __tokens in TOKENS[__size].items():
         # re-encode without token repeats
         __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True)
