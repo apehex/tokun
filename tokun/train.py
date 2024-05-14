@@ -37,7 +37,7 @@ N_EPOCHS_SUSTAIN = 0
 N_BATCH = 128 # number of samples per batch
 N_SAMPLE = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
 
-R_MIN, R_MAX, R_EXP = tokun.meta.rates(normalization=NORMALIZATION)
+R_MIN, R_MAX, R_EXP = tokun.meta.rates(pretrained=IMPORT, normalization=NORMALIZATION, base=0.001)
 
 # DERIVED #####################################################################
 
