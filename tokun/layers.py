@@ -1,3 +1,5 @@
+"""Encoding and decoding blocks of tokun."""
+
 import keras
 import tensorflow as tf
 

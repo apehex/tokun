@@ -1,4 +1,4 @@
-"""Tensorflow port of the tutorial by Andrej Karpathy: https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/"""
+"""Compute tokens and embeddings on MLQA."""
 
 import datetime
 import functools
