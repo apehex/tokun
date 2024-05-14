@@ -53,3 +53,14 @@ __x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=
 print(__s)
 print(__y)
 print(tokun.pipeline.compare(__s, __y))
+
+# ROBUSTNESS ##################################################################
+
+__std = tf.math.reduce_std(__e, axis=0)
+__noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+
+__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', groups=N_TOKEN_DIM, flatten=True)
+
+print(tokun.pipeline.postprocess(MODEL._decoder(__e)))
+print(tokun.pipeline.postprocess(MODEL._decoder(__e + 1.6 * __std)))
+print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __noise)))
