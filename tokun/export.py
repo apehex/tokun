@@ -30,12 +30,12 @@ N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE inte
 TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
 OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2)))] # in characters
 
-# LOG #########################################################################
+# IMPORT ######################################################################
 
 VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-DATETIME = '20240509-211600'
+NAME = '0.99996'
 
-PATH_MODEL = os.path.join('models/', *VERSION, DATETIME + '.keras')
+PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(NAME))
 
 # DATA ########################################################################
 
@@ -64,7 +64,7 @@ TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPE
 
 # LOAD ########################################################################
 
-MODEL = keras.models.load_model(PATH_MODEL)
+MODEL = keras.models.load_model(PATH_IMPORT)
 
 # SAMPLES #####################################################################
 
