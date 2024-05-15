@@ -19,21 +19,16 @@ NORMALIZATION = True
 
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
 
-N_BATCH = 128 # number of samples per batch
-N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
-
 # DERIVED #####################################################################
 
 TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
 
-# LOG #########################################################################
+# IMPORT ######################################################################
 
 VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-DATETIME = '20240509-211600'
+LABEL = '0.99996'
 
-PATH_IMPORT = os.path.join('models/', *VERSION, DATETIME + '.keras')
-
-# LOAD ########################################################################
+PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
 MODEL = keras.models.load_model(PATH_IMPORT)
 
