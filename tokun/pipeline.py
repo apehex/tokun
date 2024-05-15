@@ -101,11 +101,16 @@ def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:
 
 # < ###########################################################################
 
+def unpad(text: str) -> str:
+    return text.strip('\x00')
+
 def postprocess(output: tf.Tensor) -> str:
     # from one-hot to UTF-32 bytes
     __output = interpret(output=output)
     # flatten the groups of 4 bytes
-    return decode(tokens=__output)
+    __output = decode(tokens=__output)
+    # remove the padding
+    return unpad(text=__output)
 
 # SAMPLING ####################################################################
 
