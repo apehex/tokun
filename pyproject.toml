@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "tokun"
-version = "0.3.4"
+version = "0.3.5"
 description = "NN model specialized in text tokenization."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
 
 [tool.poetry.dependencies]
-mlable = ">=0.1.3"
+mlable = ">0.1.3"
 python = ">=3.10, <3.12"
 tensorflow = ">=2.14"
 tensorflow-datasets = ">=4.9"

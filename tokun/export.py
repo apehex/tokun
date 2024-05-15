@@ -33,9 +33,11 @@ OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2))
 # IMPORT ######################################################################
 
 VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-NAME = '0.99996'
+LABEL = '0.99996'
 
-PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(NAME))
+PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
+
+MODEL = keras.models.load_model(PATH_IMPORT)
 
 # DATA ########################################################################
 
@@ -61,10 +63,6 @@ OPERATIONS, REPLACE = zip(*PIPELINE)
 
 TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
 TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
-
-# LOAD ########################################################################
-
-MODEL = keras.models.load_model(PATH_IMPORT)
 
 # SAMPLES #####################################################################
 
