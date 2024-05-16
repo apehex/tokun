@@ -24,10 +24,40 @@ This process has several stages: encoding, tokenization and embedding.
 
 For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`): 
 
-|TOKEN | "Une"         | " unité"  | " lexi"    | "cale"     | " ou"   | " token" | " lexical" | " ou"   | " plus"  | " simplement" | " token" | " est"  | " un"  | " couple" | " composé" | " d"    | "'un"  | " nom"  | " et"   | " d"    | "'une"  | " valeur" | " option" | "nelle" | "("    | "e"    | ".g"   | "."   | " "   | "135"  | "677"  | ")."  |
-| ---- | ------------- | --------- | ---------- | ---------- | ------- | -------- | ---------- | ------- | -------- | ------------- | -------- | ------- | ------ | --------- | ---------- | ------- | ------ | ------- | ------- | ------- | ------- | --------- | --------- | ------- | ------ | ------ | ------ | ----- | ----- | ------ | ------ | ----- |
-| ID   | 28821         | 181741    | 37772      | 135677     | 2031    | 6602     | 173846     | 2031    | 2932     | 45065         | 6602     | 893     | 537    | 7167      | 98898      | 272     | 9788   | 8080    | 859     | 272     | 13337   | 41664     | 5317      | 30805   | 350    | 68     | 1940   | 13    | 220   | 14953  | 45835  | 741   |
-
+| Token         | ID        |
+| ------------- | --------- |
+| "Une"         | 28821     |
+| " unité"      | 181741    |
+| " lexi"       | 37772     |
+| "cale"        | 135677    |
+| " ou"         | 2031      |
+| " token"      | 6602      |
+| " lexical"    | 173846    |
+| " ou"         | 2031      |
+| " plus"       | 2932      |
+| " simplement" | 45065     |
+| " token"      | 6602      |
+| " est"        | 893       |
+| " un"         | 537       |
+| " couple"     | 7167      |
+| " composé"    | 98898     |
+| " d"          | 272       |
+| "'un"         | 9788      |
+| " nom"        | 8080      |
+| " et"         | 859       |
+| " d"          | 272       |
+| "'une"        | 13337     |
+| " valeur"     | 41664     |
+| " option"     | 5317      |
+| "nelle"       | 30805     |
+| " ("          | 350       |
+| "e"           | 68        |
+| ".g"          | 1940      |
+| "."           | 13        |
+| " "           | 220       |
+| "135"         | 14953     |
+| "677"         | 45835     |
+| ")."          | 741       |
 
 The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
 Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
