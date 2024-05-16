@@ -134,7 +134,7 @@ Still the concepts were tested on asian and middle-eastern languages.
 
 Instead of building vocabularies outside of LLMs, the idea is to train a NN to produce its own embeddings.
 
-The model will learn to compress and decompress at the same time, *from the raw Unicode bytes*.
+The model will learn to compress and decompress text at the same time, *from the raw Unicode bytes*.
 
 Compared to current techniques, both axes will be reduced by several orders:
 eventually, the example prompt would be represented as a `(9, 256)` tensor.
