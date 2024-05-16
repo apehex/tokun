@@ -3,49 +3,111 @@
 > `to-kun` took tokens to t-can
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
-For example I could not get ChatGPT to produce a decent catch-phrase (so you're stuck with mine!).
+For example I could not get ChatGPT-3.5 to produce a decent catch-phrase (so you're stuck with mine!).
 
 `tokun` is a NN model specialized in text tokenization.
-It produces 256-embedding vectors with a 1:1 match to 64 UTF-32 bytes.
-
-IE each `tokun` embedding can be thought of as a token of length 16.
-But these vectors keep meaningful information on their constituting parts.
+It produces small graph embeddings that hold all the text information up to the byte level.
 
 This article is the first part of a serie, starting from single character tokenization.
 It will follow the improvements of the model, building increasingly meaningful and dense tokens.
 
-## Resources
+## State Of The Art Tokenization
 
-Other articles in the serie:
+Suppose you include the following excerpt in a prompt to `GPT-4o`:
 
-- [tokun-4][article-github-tokun-4]
-- [tokun-16][article-github-tokun-16]
+```
+Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+```
 
-All the variants of the model are already available on:
+Since LLMs don't actually handle text, this sentence has first to be translated to numbers.
+This process has several stages: encoding, tokenization and embedding.
 
-- [Github][tokun-github]
-- [Hugging Face][tokun-huggingface]
-- [Kaggle][tokun-kaggle]
+For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`): 
 
-You will also find notebooks on:
+| Token         | ID        |
+| ------------- | --------- |
+| "Une"         | 28821     |
+| " unité"      | 181741    |
+| " lexi"       | 37772     |
+| "cale"        | 135677    |
+| " ou"         | 2031      |
+| " token"      | 6602      |
+| " lexical"    | 173846    |
+| " ou"         | 2031      |
+| " plus"       | 2932      |
+| " simplement" | 45065     |
+| " token"      | 6602      |
+| " est"        | 893       |
+| " un"         | 537       |
+| " couple"     | 7167      |
+| " composé"    | 98898     |
+| " d"          | 272       |
+| "'un"         | 9788      |
+| " nom"        | 8080      |
+| " et"         | 859       |
+| " d"          | 272       |
+| "'une"        | 13337     |
+| " valeur"     | 41664     |
+| " option"     | 5317      |
+| "nelle"       | 30805     |
+| " ("          | 350       |
+| "e"           | 68        |
+| ".g"          | 1940      |
+| "."           | 13        |
+| " "           | 220       |
+| "135"         | 14953     |
+| "677"         | 45835     |
+| ")."          | 741       |
 
-- [Github][notebook-github]
-- [Google Colab][notebook-colab]
-- [Hugging Face][notebook-huggingface]
-- [Kaggle][notebook-kaggle]
+The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
+Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
+
+These IDs are not yet edible for a NN: AI models digest tensors, which are glorified arrays.
+The trick is to interprete each ID as an index in an array of 200k elements:
+
+```
+"." => 13 => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, ..., 0]
+```
+
+This operation is called "one-hot encoding".
+
+It turns the orginal prompt in a `(32, 199998)` tensor:
+32 ones for each token and 6399904 zeroes.
+
+## Relation With Performances
+
+The encoded input has two axes, the dimensions of which have a direct impact on performance.
+
+First, the number of tokens is related to the batch and context dimensions.
+Both of these dimensions define the quantity of information a LLM can process at once.
+
+The prompt of the previous sections had 134 characters, which were reduced to 32 tokens.
+It's roughly a compression by a factor 4.
+
+The higher this factor is, the more information the model can fit into a single forward pass / inference.
+Conversely, it means that it would take less computing resources to process prompts.
+
+The second axis has a constant dimension of 200k.
+It is directly related to the size of the model, as it will require a neuron for each element.
+For example `llama3-8B` has a `128000 x 4096` kernel in its first layer, the embedding, where 128k is the size of the vocabulary.
+
+The size of the model has an overarching impact on the model cost.
+The number of parameters is a key balance between performance and quality.
 
 ## Limitations Of Current Tokenizers
 
-This project was inspired by a recent (2024) video from Andrej Karpathy, ["Let's build the GPT tokenizer"][youtube-karpathy-tokenizer].
+This simple example already brings out a number of quirks.
+For example, the input tensor is *very* large and mostly zero??
 
-In particular, he listed some issues with current (public) tokenizers:
+As Andrej Karpathy [pointed out][youtube-karpathy-tokenizer], there are many more:
 
 - [ ] tokenizers are built and operate outside of the NN models
 - [ ] they generalize poorly across languages
 - [ ] they result in input vectors with dimensions of several 100k
 - [ ] they require the definition of additional "special tokens"
+- [ ] words out of the vocabulary are fragmented: `["option", "nelle"]`
 - [ ] tokens are a priori unrelated to each other:
-    - [ ] `"hello"` has no relation to `"h"` or the ASCII code `104`
+    - [ ] characters: `"hello"` has no relation to `"h"` or the ASCII code `104`
     - [ ] capitalization: `"New-York"` and `"new York"`
     - [ ] typos: `"helllo"` and `"hello"`
     - [ ] repetitions: `"    "` and `"\t"`
@@ -67,6 +129,15 @@ The final model `tokun-4x4` addresses most of these shortcomings.
 
 The serie is heavily focused on western languages, due to personal knowledge.
 Still the concepts were tested on asian and middle-eastern languages.
+
+## Proposition
+
+Instead of building vocabularies outside of LLMs, the idea is to train a NN to produce its own embeddings.
+
+The model will learn to compress and decompress at the same time.
+
+Compared to current techniques, both axes will be reduced by several orders:
+eventually, the example prompt would be represented as a `(9, 256)` tensor.
 
 ## UTF-32 <=> "Better" UTF-8
 
@@ -105,7 +176,7 @@ The original text samples are preprocessed as follows:
 - all samples are flattened into a one-dimensional tensor
 - and finally each byte is represented as a one-hot vector
 
-Most of preprocessing is done in `encode`:
+Most of the preprocessing is done in `encode`:
 
 ```python
 def encode(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
@@ -167,7 +238,7 @@ def decode(tokens: tf.Tensor) -> str:
     return bytes(__b).decode(encoding='utf-32-be', errors='replace')
 ```
 
-The following function translates the model output back to unicode strings:
+The following function translates the model output back to Unicode strings:
 
 ```python
 def postprocess(output: tf.Tensor) -> tf.Tensor:
@@ -244,7 +315,7 @@ This technique further downscales the vectors of dimension 256 to 3D points that
 The labels are HEX encoding of the 4 UTF-32-BE bytes.
 
 The model groups the characters according to their alphabet.
-This is directly bound to the [unicode scheme][unicode-table] where the space of the code points is partitioned according to the most significant bytes.
+This is directly bound to the [Unicode scheme][unicode-table] where the space of the code points is partitioned according to the most significant bytes.
 
 In the images aboves:
 
@@ -292,7 +363,7 @@ Unicode comes with [special characters out-of-the-box][unicode-table]:
 
 Many of these special characters are obsolete and can be repurposed as special tokens.
 
-For instance `0x0002` and `0x0003` stand for "start" and "end of text" in unicode, they are similar to `<|im_start|>` `<|im_end|>` used in GPT-4.
+For instance `0x0002` and `0x0003` stand for "start" and "end of text" in Unicode, they are similar to `<|im_start|>` `<|im_end|>` used in GPT-4.
 
 ### Input Compression
 
@@ -304,10 +375,10 @@ As explained in the [encoder section](#encoder):
 With:
 
 - `B` is the batch dimension or the number of characters processed
-- `G` is the group dimension, 4, which is also the number of bytes per unicode codepoint
+- `G` is the group dimension, 4, which is also the number of bytes per Unicode codepoint
 - `U` is the encoding dimension, 256 = `E` = `L`
 
-In short, this first model **compresses the UTF-32 input by a factor 4**.
+In short, this first model *compresses the UTF-32 input by a factor 4*.
 
 `B` is related but different from a potential attention context.
 
@@ -322,7 +393,7 @@ As illustrated in the section [metrics](#metrics), the model maintains 100% accu
 The "context" feature in the MLQA dataset has no occurence of the newline `"\n"` character.
 Yet, the encoder-decoder is able to reconstruct the newline from the embedding.
 
-This shows that the model learned the abstract structure of unicode rather than particular codepoints.
+This shows that the model learned the abstract structure of Unicode rather than particular codepoints.
 
 To better evaluate the capacity to generalize, the model is evaluated on Korean samples, which was not available in the training dataset:
 
@@ -361,6 +432,25 @@ Now that we have a fixed size encoding to replace UTF-8, input sequences can be 
 
 In the next article, these character level embeddings will be combined into longer tokens / embeddings.
 We will also study the topology of the token space to determine whether the vectors are just arbitrary IDs or meaningful information.
+
+## Resources
+
+Other articles in the serie:
+
+- [tokun-4][article-github-tokun-4]
+- [tokun-16][article-github-tokun-16]
+
+All the variants of the model are already available on:
+
+- [Github][tokun-github]
+- [Kaggle][tokun-kaggle]
+
+You will also find notebooks on:
+
+- [Github][notebook-github]
+- [Google Colab][notebook-colab]
+- [Hugging Face][notebook-huggingface]
+- [Kaggle][notebook-kaggle]
 
 ## Implementation Details
 
@@ -433,16 +523,12 @@ class AutoEncoder(tf.keras.models.Model):
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
 [github-mlqa]: https://github.com/facebookresearch/MLQA
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
+[tiktokenizer-o200k]: https://tiktokenizer.vercel.app/?model=o200k_base
 [unicode-table]: https://symbl.cc/en/unicode-table/
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
 [article-github-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
 [article-github-tokun-16]: https://github.com/apehex/tokun/blob/main/articles/tokun.16.md
-
-[notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
-[notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
-[notebook-huggingface]: https://github.com/apehex/tokun
-[notebook-kaggle]: https://github.com/apehex/tokun
 
 [image-block-encoder]: .images/block-encoder.png
 [image-graph-accuracy]: .images/1/graph.accuracy.png
@@ -456,8 +542,12 @@ class AutoEncoder(tf.keras.models.Model):
 [image-tsne-vietnamese]: .images/1/tsne.vietnamese.png
 [image-tsne-cjk-4e]: .images/1/tsne.cjk.4e.png
 
+[notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
+[notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
+[notebook-huggingface]: https://github.com/apehex/tokun
+[notebook-kaggle]: https://github.com/apehex/tokun
+
 [tokun-github]: https://github.com/apehex/tokun
-[tokun-huggingface]: https://github.com/apehex/tokun
 [tokun-kaggle]: https://github.com/apehex/tokun
 
 [wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
