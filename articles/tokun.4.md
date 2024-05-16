@@ -12,37 +12,46 @@ The process can be iterated to merge the characters into embeddings 4 by 4.
 For reference, OpenAI stated that the [GPT-4 tokenizer has a length of 4 characters on average][openai-tokenizer] and on English.
 So `tokun-4` has comparable sequence compression capabilities, while producing shorter and more meaningful embedding vectors.
 
-## Resources
+## Example
 
-Other articles in the serie:
+The following prompt:
 
-- [`tokun-1`][article-github-tokun-1]
-- [`tokun-16`][article-github-tokun-16]
+```
+Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+```
 
-All the variants of the model are already available on:
+Is segmented into 32 tokens by `o200k` as:
 
-- [Github][tokun-github]
-- [Hugging Face][tokun-huggingface]
-- [Kaggle][tokun-kaggle]
+```
+["Une", " unité", " lexi", "cale", " ou", " token", " lexical", " ou", " plus", " simplement", " token", " est", " un", " couple", " composé", " d", "'un", " nom", " et", " d", "'une", " valeur", " option", "nelle", " (", "e", ".g", ".", " ", "135", "677", ")."]
+```
 
-You will also find notebooks on:
+Or:
 
-- [Github][notebook-github]
-- [Google Colab][notebook-colab]
-- [Hugging Face][notebook-huggingface]
-- [Kaggle][notebook-kaggle]
+```
+[28821, 181741, 37772, 135677, 2031, 6602, 173846, 2031, 2932, 45065, 6602, 893, 537, 7167, 98898, 272, 9788, 8080, 859, 272, 13337, 41664, 5317, 30805, 350, 68, 1940, 13, 220, 14953, 45835, 741,]
+```
 
-## Summary
+Where each of these IDs is actually a one-hot vector of dimension 200k, from the point of view of the LLM.
+
+`tokun4` splits the input into even chunks:
+
+```
+['Une ', 'unit', 'é le', 'xica', 'le o', 'u to', 'ken ', 'lexi', 'cal ', 'ou p', 'lus ', 'simp', 'leme', 'nt t', 'oken', ' est', ' un ', 'coup', 'le c', 'ompo', 'sé d', "'un ", 'nom ', 'et d', "'une", ' val', 'eur ', 'opti', 'onne', 'lle ', '(e.g', '. 13', '5677', ').']
+```
+
+## Roadmap
 
 The VAE model `tokun-1` could be used as a tokenizer that:
 
 - [x] is an actual neural network
-- [x] generalize across all languages
+- [x] generalizes across all languages
 - [x] produces embeddings of dimension 256
 - [x] comes with built-in special tokens
 
 The goal is to maintain these properties in `tokun-4` while solving some of the remaining issues:
 
+- [ ] words out of vocabulary are fragmented
 - [ ] tokens are unrelated to each other
 - [ ] token are unrelated to their own parts
 - [ ] words are tokenized differently depending on their surrounding elements
@@ -153,8 +162,7 @@ Typically the 2 following samples would have unrelated tokens:
 ```
 
 To ensure that the model learns all the splitting variations, the training data is augmented:
-each sample is replicated with its characters shifted by 1, 2 and 3 ticks. 
-
+each sample is replicated with its characters shifted by 1, 2 and 3 ticks.
 Now the data pipeline is:
 
 ```python
@@ -278,7 +286,7 @@ __e.shape # (B', E) = (B * 4 * S) = (128 * 4 * 256)
 
 ### International
 
-The model fully supports the languages it was trained on.
+The model fully supports the 7 languages it was trained on.
 Meaning it can encode (tokenize) and decode (detokenize) without errors:
 
 ![][image-sample-vietnamese]
@@ -287,7 +295,7 @@ Of course, the dataset could be extended to include code, maths, and other langu
 
 ### Generalization
 
-`tokun-4` manages new words and characters, for example it can tokenize its own code flawlessly:
+`tokun-4` can handle new words and characters, for example it can tokenize its own code flawlessly:
 
 ```
 # INPUT ################################################################
@@ -387,6 +395,22 @@ Pushing the model to higher rates of compression is getting harder.
 We saw that naively increasing the number of neurons improved the performance, so there is hope.
 
 `tokun-16` will refine the model architecture and follow a training curriculum to better handle numbers.
+
+## Resources
+
+Other articles in the serie:
+
+- [`tokun-1`][article-github-tokun-1]
+- [`tokun-16`][article-github-tokun-16]
+
+All the variants of the model are already available on:
+
+- [Github][tokun-github]
+
+You will also find notebooks on:
+
+- [Github][notebook-github]
+- [Google Colab][notebook-colab]
 
 ## Implementation Details
 
@@ -617,5 +641,4 @@ class AutoEncoder(tf.keras.models.Model):
 [notebook-kaggle]: https://github.com/apehex/tokun
 
 [tokun-github]: https://github.com/apehex/tokun
-[tokun-huggingface]: https://github.com/apehex/tokun
 [tokun-kaggle]: https://github.com/apehex/tokun
