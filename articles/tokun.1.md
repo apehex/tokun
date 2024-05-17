@@ -3,7 +3,7 @@
 > `to-kun` took tokens to t-can
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
-For example I could not get ChatGPT-3.5 to produce a decent catch-phrase (so you're stuck with mine!).
+For example I could not get `ChatGPT-3.5` to produce a decent catch-phrase (so you're stuck with mine!).
 
 `tokun` is a NN model specialized in text tokenization.
 It produces small graph embeddings that hold all the text information up to the byte level.
@@ -76,6 +76,8 @@ It turns the orginal prompt in a `(32, 199998)` tensor:
 
 ## Relation With Performances
 
+### Inference
+
 The encoded input has two axes, the dimensions of which have a direct impact on performance.
 
 First, the number of tokens is related to the batch and context dimensions.
@@ -94,6 +96,19 @@ For example `llama3-8B` has a `128000 x 4096` kernel in its first layer, the emb
 The size of the model has an overarching impact on the model cost.
 The number of parameters is a key balance between performance and quality.
 
+### Model Training
+
+Since tokens are unrelated to each other, LLMs have to see each variation to build relevant embeddings.
+Having been trained on `"hot dog"` does not transfer to `"hotdog"`.
+
+The model would not link the two and fail to understand puns that play with ambiguity.
+Unless a similar context for the two wordings happens in the training data, which is a lot to ask.
+
+Since `tokun` embeddings hold the information of each character, the two representations will differ only by a space.
+LLMs will not need to be trained on each variation, they would understand the nuances natively.
+
+Although I cannot quantify the magnitude, this will lower the volume of data required to build meaningful embeddings (in pretraining).
+
 ## Limitations Of Current Tokenizers
 
 This simple example already brings out a number of quirks.
@@ -108,7 +123,7 @@ As Andrej Karpathy [pointed out][youtube-karpathy-tokenizer], there are many mor
 - [ ] words out of the vocabulary are fragmented: `["option", "nelle"]`
 - [ ] tokens are a priori unrelated to each other:
     - [ ] characters: `"hello"` has no relation to `"h"` or the ASCII code `104`
-    - [ ] capitalization: `"New-York"` and `"new York"`
+    - [ ] capitalization: `"New-York"` and `"new-york"`
     - [ ] typos: `"helllo"` and `"hello"`
     - [ ] repetitions: `"    "` and `"\t"`
     - [ ] inflections:
@@ -123,6 +138,12 @@ As Andrej Karpathy [pointed out][youtube-karpathy-tokenizer], there are many mor
     - [ ] fragmentation: `"8222.3"` is split into `["822", "2", ".", "3"]`
     - [ ] base: `"0x10"` and `"16"`
     - [ ] format: `"1.6e-1"` and `"0.16"`
+
+Obviously I asked `ChatGPT` if he wanted to add something:
+
+- [ ] dependency on the training data can lead to biases and limit generalization
+- [ ] efficiency: some tokenizers can be slow to encode and decode large texts
+- [ ] handling of compound words: `"hotdog"` is unrelated to `"hot dog"`
 
 The model `tokun-1` presented here will tackle the first 4 points.
 The final model `tokun-4x4` addresses most of these shortcomings.
