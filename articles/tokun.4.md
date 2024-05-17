@@ -12,33 +12,74 @@ The process can be iterated to merge the characters into embeddings 4 by 4.
 For reference, OpenAI stated that the [GPT-4 tokenizer has a length of 4 characters on average][openai-tokenizer] and on English.
 So `tokun-4` has comparable sequence compression capabilities, while producing shorter and more meaningful embedding vectors.
 
-## Example
+## Showcase
 
-The following prompt:
+Before diving into the details of the model, let's see how it handles the prompt:
 
 ```
 Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
 ```
 
-Is segmented into 32 tokens by `o200k` as:
+Even though it was not trained on French, the model can encode and decode the sample without errors:
 
-```
-["Une", " unité", " lexi", "cale", " ou", " token", " lexical", " ou", " plus", " simplement", " token", " est", " un", " couple", " composé", " d", "'un", " nom", " et", " d", "'une", " valeur", " option", "nelle", " (", "e", ".g", ".", " ", "135", "677", ")."]
-```
-
-Or:
-
-```
-[28821, 181741, 37772, 135677, 2031, 6602, 173846, 2031, 2932, 45065, 6602, 893, 537, 7167, 98898, 272, 9788, 8080, 859, 272, 13337, 41664, 5317, 30805, 350, 68, 1940, 13, 220, 14953, 45835, 741,]
+```python
+__s = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
+__x = tokun.pipeline.preprocess(text=__s, groups=N_TOKEN_DIM, flatten=True) # input = UTF-32-BE bytes as one-hot vectors
+__e = MODEL._encoder(__x) # embedding = tokens
+__p = MODEL._decoder(__e) # output = probabilities for each byte
+__y = tokun.pipeline.postprocess(__p) # text = interpreted probabilities
 ```
 
-Where each of these IDs is actually a one-hot vector of dimension 200k, from the point of view of the LLM.
-
-`tokun4` splits the input into even chunks:
-
 ```
-['Une ', 'unit', 'é le', 'xica', 'le o', 'u to', 'ken ', 'lexi', 'cal ', 'ou p', 'lus ', 'simp', 'leme', 'nt t', 'oken', ' est', ' un ', 'coup', 'le c', 'ompo', 'sé d', "'un ", 'nom ', 'et d', "'une", ' val', 'eur ', 'opti', 'onne', 'lle ', '(e.g', '. 13', '5677', ').']
+Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
+1.0
 ```
+
+The variable `__e` is the embedding, the tensor that would be fed to a LLM.
+Contrary to traditional tokens, the output of `tokun` is not directly interpretable:
+
+```python
+print(len(__s))
+# 134
+print(__e.shape)
+# (34, 256)
+tf.print(__e[:4, :8], summarize=-1)
+# [[3.17276168 1.53056908 2.41119337 0.0258403085 1.5207386 1.66698301 2.24263883 2.11223722]
+#  [2.65205669 1.68546355 2.01416564 0.655108571 2.3957293 1.70228446 2.12328672 2.04205203]
+#  [2.4943645 0.441500723 1.79073346 2.31724644 1.87132716 1.36434507 3.37104845 2.3522613]
+#  [2.87078524 1.11898732 2.12827492 0.995271683 0.403087556 0.974042118 1.82035911 2.90426946]]
+```
+
+Still, the vectors / tokens can be mapped to 3D and understood to some extent:
+
+| Accents                       | Symbols                       |
+| ![][image-tsne-token-accents] | ![][image-tsne-token-symbols] |
+
+The images above are 2 views of the UMAP plot of all the embeddings of the French page on [VAE models][wiki-vae-fr].
+
+On the right, the selected point is labeled `"𝑞\nΦ\n"`, it is the embedding for a portion of a LaTeX equation.
+Inded, the input was a raw copy-paste of the article so the equation symbols were spread across several lines:
+
+```latex
+{\displaystyle p_{\theta }(\mathbf {x} )=\int _{\mathbf {z} }p_{\theta }(\mathbf {x,z} )\,d\mathbf {z} ,}
+où 
+𝑝
+𝜃
+(
+𝑥
+,
+𝑧
+)
+```
+
+Hence the newlines `"\n"` in the labels.
+
+Despite the quirks of the inputs, `tokun-4` decodes the embeddings with 99% accuracy, only missing a few Greek symbols in the equations.
+
+It was not trained on any code, French nor Greek: so this issue should be easily remediated with a more complete training dataset.
+
+Also the latent space shows structure, the model has learnt the Unicode scheme and more than 7 languages.
 
 ## Roadmap
 
@@ -211,23 +252,25 @@ print(postprocess(MODEL._decoder(__e)))
 
 ### Robustness
 
-Once again, the embeddings are **very robust to noise** even when it doesn't respect the underlying structure:
+Once again, the embeddings are quite robust to noise even when it doesn't respect the underlying structure:
 
 ```python
 __std = tf.math.reduce_std(EMBEDDINGS[4]['en'], axis=0)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
-__x = preprocess('toku', groups=[16], flatten=True)
+__x = preprocess("""Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).""", groups=[16], flatten=True)
 __e = MODEL._encoder(__x)
-
 print(postprocess(MODEL._decoder(__e))) # original embedding
-# toku
-print(postprocess(MODEL._decoder(__e + __std))) # noise with same structure as an embedding
-# toku
+print(postprocess(MODEL._decoder(__e + 0.8 * __std))) # noise with same structure as an embedding
 print(postprocess(MODEL._decoder(__e + __noise))) # random noise
-# toku
-print(postprocess(MODEL._decoder(__e + 2 * __noise))) # random noise with more amplitude
-# toÁu
+print(postprocess(MODEL._decoder(__e + 1.2 * __noise))) # random noise with more amplitude
+```
+
+```
+# Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
+# Une unité lexicale ou token lexical ou plus simple�ent token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
+# Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une vaɬeur optionnelle (e.g. 135677).�e
+# Une unité lexicale ou token lex坥cal ou ɰlus simplement token est un cou坰le composé d'un nom et 8'une vaɬeur optionnelle (e.g. 135677).�e
 ```
 
 ### Configurations
@@ -621,6 +664,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 [github-mlqa]: https://github.com/facebookresearch/MLQA
 [openai-tokenizer]: https://platform.openai.com/tokenizer
+[wiki-vae-fr]: https://fr.wikipedia.org/wiki/Auto-encodeur_variationnel
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
@@ -631,9 +675,11 @@ class AutoEncoder(tf.keras.models.Model):
 [image-sample-vietnamese]: .images/4/sample.vietnamese.png
 [image-tsne-latent-space]: .images/4/tsne.latent-space.png
 [image-tsne-token-chinese-space]: .images/4/tsne.token.chinese.space.png
+[image-tsne-token-accents]: .images/4/tsne.token.accents.png
 [image-tsne-token-comma]: .images/4/tsne.token.comma.png
 [image-tsne-token-number]: .images/4/tsne.token.number.png
 [image-tsne-token-space]: .images/4/tsne.token.space.png
+[image-tsne-token-symbols]: .images/4/tsne.token.symbols.png
 
 [notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
 [notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
