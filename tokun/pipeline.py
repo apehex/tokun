@@ -6,16 +6,6 @@ import math
 
 import tensorflow as tf
 
-# GENERIC #####################################################################
-
-def compare(left: str, right: str) -> float:
-    return sum(__l == __r for __l, __r in zip(left, right)) / max(1, len(left))
-
-def intersection(left: str, right: str) -> float:
-    __intersection = len(set(left).intersection(set(right)))
-    __reference = min(len(set(left)), len(set(right)))
-    return __intersection / max(1., __reference)
-
 # ENCODE ######################################################################
 
 def _encode_scalar(text: str, token_size: int) -> tf.Tensor:
