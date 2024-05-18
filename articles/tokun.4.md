@@ -12,6 +12,18 @@ The process can be iterated to merge the characters into embeddings 4 by 4.
 For reference, OpenAI stated that the [GPT-4 tokenizer has a length of 4 characters on average][openai-tokenizer] and on English.
 So `tokun-4` has comparable sequence compression capabilities, while producing shorter and more meaningful embedding vectors.
 
+## Intuition
+
+The base of all `tokun` models is the UTF-32-BE scheme:
+each Unicode character is encoded with 4 bytes.
+
+`tokun-4` offers to merge every 4 characters into a `float32` vector of dimension 256.
+In short 16 input bytes are represented by 1024 output bytes.
+
+Even though it is significantly more efficient than current tokenizers, it looks like it is far from the limit.
+
+So it is expected that the compression performed by the encoder of `tokun-4` is reversible without loss.
+
 ## Showcase
 
 Before diving into the details of the model, let's see how it handles the prompt:
@@ -266,6 +278,8 @@ print(postprocess(MODEL._decoder(__e + __noise))) # random noise
 print(postprocess(MODEL._decoder(__e + 1.2 * __noise))) # random noise with more amplitude
 ```
 
+At most, the embeddings can withstand a random noise of $1.2 * \sigma$:
+
 ```
 # Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
 # Une unité lexicale ou token lexical ou plus simple�ent token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
@@ -437,7 +451,7 @@ In summary, `tokun-4`:
 Pushing the model to higher rates of compression is getting harder.
 We saw that naively increasing the number of neurons improved the performance, so there is hope.
 
-`tokun-16` will refine the model architecture and follow a training curriculum to better handle numbers.
+`tokun-16` will refine the model architecture and push towards the compression limit.
 
 ## Resources
 
