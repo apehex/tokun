@@ -8,6 +8,31 @@ llama3 would...
 
 A "compelling argument" as ChatGPT puts it, right?
 
+## Intuition
+
+With `tokun-16`, the model is getting one step closer to the limit of input compression.
+
+16 Unicode characters will be represented by a `float32` vector of dimension 256.
+It's 1024 output bytes for every 64 input bytes.
+
+It would appear that there is still a lot of leeway.
+Actually, if there was a 1:1 match it would mean that only a single embedding value would map to each token.
+
+It would be impractical since it would require LLMs to predict very precise values.
+Suppose that `[0.025 1.52 1.67 2.24 ...]` represents `"hello world! \o/"`.
+If the LLM outputs `[0.025 1.53 1.67 2.24 ...]` it may just have produced a totally random string.
+
+In fact, $\frac{1024}{64} = 16$ is a good ratio:
+we want each chunk of 16 characters to be represented by a region in the space of dimension 256.
+
+Ultimately, we would like to map the entire Unicode space.
+In theory, Unicode is made of $2^32$ code points.
+
+However only [17 Unicode planes][wiki-unicode-plane] are used because of the limitations.
+Out of those 17 planes, only 6 are actually used.
+
+So our final goal is only to map 393,216 code points.
+
 ## Applying Tokun To Current LLMs
 
 ### Model Shape
@@ -81,43 +106,106 @@ This guarantees that the tokenizer captures the structure of the whole Unicode s
 
 Then it may be merged with a LLM and fine-tuned to fit perfectly.
 
-Still, there may be arguments for freezing the weights of `tokun`:
-
-- sharing the model: community effort to improve the tokenizer?
-- modularity:
-- interpretation: common ground to compare the internals?
-- normalization:
-- security: having a shared referential also facilitates
-
 ## Roadmap
 
-`tokun-4` actually solved most of the target limitations:
+`tokun-4` actually reached most of the target goals:
 
-- [x] bla
+- [x] is an actual neural network
+- [x] generalizes across all languages
+- [x] compresses input sequences 4 times
+- [x] produces embeddings of dimension 256
+- [x] comes with built-in special tokens
+- [x] treats all inputs evenly
+- [x] keeps all the semantic information regardless of the splits
+- [x] embeddings hold information on their parts up to the byte level
 
 Now we're just pushing the concept to the limit with the `4x4x4` variant `tokun-16`.
+And try to map all the Unicode planes.
 
 ## Model
 
-Similar to previous models, with either more or bigger `tokenize` blocks.
+The model is very similar to previous iterations, with either more or bigger `tokenize` blocks.
 
-Push the concept / compression until the model fails to achieve 100% accuracy.
+Most of the model is kept identical: details are available in the [first][article-github-tokun-1] and [second][article-github-tokun-4] articles.
+Only the changes are described here.
 
 ### Inputs
 
-### Architecture
+The input is a flat array of UTF-32-BE bytes, of shape `(B' * G * G * G, 256)`.
 
-Added non causal self-attention to the blocks.
+Actually, the exact factorisation of the batch dimension depends on the model architecture:
+the (de)tokenization block at depth $i$ will group $G_i$ units.
+
+In the end, the input tensor is factored as:
+
+$$\begin{align}
+(B' * G_0 * G_1 * G_2) \text{ or more generally } (B' * \prod_{i = 0}^{D - 1} G_i)
+\end{align}$$
+
+Where $D$ is the depth of the model or the number of (de)tokenization blocks.
+
+Typically $G_0 = G_1 = G_2 = 4$ and the model is labeled `4x4x4`.
+This variant groups 64 UTF-32-BE bytes or 16 characters.
+
+But there are other possibilities: for example, the architectures `4x16` and `2x2x2x8` have the same compression factor.
+The cardinal configurations are compared in the [results section](#configurations).
+
+It may happen happen that a `4x4x4` model is actually called `tokun-4x4`, like the title of this article.
+When named `4x4x4` it is considered from the byte level, while `4x4` designates the tokenization on the character level.
+
+I haven't decided yet on the convention.
+On one hand it would be more precise to describe all the layers.
+On the other hand UTF-32-BE always produces 4 bytes which form a logical unit that looks like an automatic candidate for the first layer.
+
+### Architecture
 
 #### Hyper Parameters
 
+`tokun-4x4` is still a CNN VAE with the following hyper parameters:
+
+```python
+ATTENTION = True
+NORMALIZATION = True
+
+N_TOKEN_DIM = [4, 4, 4] # G, for each block
+N_ENCODING_DIM = 256 # U
+N_EMBEDDING_DIM = N_ENCODING_DIM # E
+N_LATENT_DIM = N_EMBEDDING_DIM # L
+```
+
+The encoder and the decoder perform symmetric merge and divide operations on the batch axis of the input tensor.
+
 #### Encoder
 
+The encoder is a stack of `TokenizeBlock`, with added normalization and self-attention layers.
+
+0. the `LayerNormalization`
+1. the `Divide` layer splits the batch axis: `(B * G, E)` => `(B, G, E)`
+2. the `PositionalEmbedding` layer distinguishes each of the `G` token units with a specific bias
+3. the `Attention`
+4. the `Merge` layer groups all the embeddings on the last dimension: `(B * G, E)` => `(B, G * E)`
+5. the `Dense` layer finally compresses the dimension `G * E` into `E`
+
 #### Decoder
+
+The decoder is a stack of `DetokenizeBlock`
+
+1. the `Dense` layer expands the latent embedding: `(B, E)` => `(B, G * E)`
+2. the `Divide` layer splits the last axis: `(B, G * E)` => `(B, G, E)`
+3. the `PositionalEmbedding` layer adds markers to each token unit
+4. the `Attention`
+5. the `Merge` layer flattens the tensor: `(B, G, E)` => `(B * G, E)`
+6. the `LayerNormalization`
 
 ### Outputs
 
 ## Training
+
+So far, `tokun` has been
+
+languages have very predictable patterns => lazy
+
+whole Unicode space = any 
 
 ### Augmentations
 
@@ -180,7 +268,13 @@ t-঄壬 畕浠鸁 鲄鲠娩(t-SNE)｀ 数이阰畘 차원 岕梌狐 憬鮩夘�
 
 ## Next
 
-Showcase the tokenizer on a full transformer model like llama3.
+make a full transformer on top of `tokun`: llaminate?
+
+- sharing the model: community effort to improve the tokenizer?
+- modularity:
+- interpretation: common ground to compare the internals?
+- normalization:
+- security: having a shared referential also facilitates
 
 ## Resources
 
@@ -198,14 +292,200 @@ You will also find notebooks on:
 
 - [Github][notebook-github]
 - [Google Colab][notebook-colab]
-- [Hugging Face][notebook-huggingface]
-- [Kaggle][notebook-kaggle]
 
 ## Implementation Details
+
+All the layers now define `get_config` and `from_config` to enable the exporting features in Keras.
+
+Apart from that, the `PositionalEmbedding`, `Divide` and `Merge` layers have the same logic as the previous iteration.
+
+### Tokenization Block
+
+```python
+@tf.keras.saving.register_keras_serializable(package='blocks')
+class TokenizeBlock(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        left_axis: int=-2,
+        right_axis: int=-1,
+        token_dim: int=4,
+        latent_dim: int=256,
+        attention: bool=False,
+        normalization: bool=False,
+        **kwargs
+    ) -> None:
+        super(TokenizeBlock, self).__init__(**kwargs)
+        # layers
+        self._normalization = tf.keras.layers.LayerNormalization(axis=-1, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
+        self._divide = Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
+        self._embedding = PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='position') # (B, G, E) + (1, G, E)
+        self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
+        self._merge = Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merging') # (B, G, E) => (B, G * E)
+        self._dense = tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, G * E) => (B, L), typically L = E
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        __t = self._normalization(inputs) if self._normalization else inputs
+        __t = self._embedding(self._divide(__t))
+        __t = self._attention([__t, __t, __t], return_attention_scores=False, use_causal_mask=False) if self._attention else __t
+        return self._dense(self._merge(__t))
+
+    def get_config(self) -> dict:
+        __parent_config = super(TokenizeBlock, self).get_config()
+        __child_config = {
+            'left_axis': self._merge._left_axis,
+            'right_axis': self._merge._right_axis,
+            'token_dim': self._divide._factor,
+            'latent_dim': self._dense.units,
+            'attention': bool(self._attention),
+            'normalization': bool(self._normalization)}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+```
+
+### Detokenization Block
+
+```python
+@tf.keras.saving.register_keras_serializable(package='blocks')
+class DetokenizeBlock(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        token_dim: int=4,
+        embedding_dim: int=256,
+        attention: bool=False,
+        normalization: bool=False,
+        **kwargs
+    ) -> None:
+        super(DetokenizeBlock, self).__init__(**kwargs)
+        # layers
+        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
+        self._divide = Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='split') # (B, G * E) => (B, G, E)
+        self._embedding = PositionalEmbedding(input_axis=-2, output_axis=-1, name='position') # (B, G, E) + (1, G, E)
+        self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
+        self._merge = Merge(left_axis=0, right_axis=1, left=True) # (B, G, E) => (B * G, E)
+        self._normalization = tf.keras.layers.LayerNormalization(axis=-1, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        __t = self._embedding(self._divide(self._dense(inputs)))
+        __t = self._attention([__t, __t, __t], return_attention_scores=False, use_causal_mask=False) if self._attention else __t
+        __t = self._merge(__t)
+        return self._normalization(__t) if self._normalization else __t
+
+    def get_config(self) -> dict:
+        __parent_config = super(DetokenizeBlock, self).get_config()
+        __child_config = {
+            'token_dim': self._dense.units // self._divide._factor,
+            'embedding_dim': self._divide._factor,
+            'attention': bool(self._attention),
+            'normalization': bool(self._normalization)}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+```
+
+### Encoder
+
+```python
+@tf.keras.saving.register_keras_serializable(package='models')
+class Encoder(tf.keras.models.Model):
+    def __init__(self, token_dim: list, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
+        super(Encoder, self).__init__(**kwargs)
+        self._encoder = tf.keras.Sequential([
+            tf.keras.Input(shape=(encoding_dim,), batch_size=batch_dim, name='input'), # (B * G ^ D, U)
+            tf.keras.layers.Dense(units=embedding_dim, activation=None, use_bias=False, kernel_initializer='glorot_uniform', bias_initializer=None, name='embed-1'),] # (B * G ^ D, U) => (B * G ^ D, E)
+            + [TokenizeBlock(left_axis=-2, right_axis=-1, token_dim=__g, latent_dim=latent_dim, attention=attention, normalization=normalization, name='tokenize-{}_{}'.format(__g, __i)) for __i, __g in enumerate(token_dim)]) # (B * G ^ i, E) => (B * G ^ (i-1), E)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._encoder(x)
+
+    def get_config(self) -> dict:
+        __parent_config = super(Encoder, self).get_config()
+        __input_shape = list(self._encoder.inputs[0].shape)
+        __embedding_config = self._encoder.layers[0].get_config()
+        __tokenizer_config = self._encoder.layers[1].get_config()
+        __token_dim = [__b.get_config().get('token_dim', 4) for __b in self._encoder.layers[1:]]
+        __child_config = {
+            'batch_dim': __input_shape[0],
+            'encoding_dim': __input_shape[-1],
+            'embedding_dim': __embedding_config['units'],
+            'token_dim': __token_dim,
+            'latent_dim': __tokenizer_config['latent_dim'],
+            'attention': __tokenizer_config['attention'],
+            'normalization': __tokenizer_config['normalization'],}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+```
+
+### Decoder
+
+```python
+@tf.keras.saving.register_keras_serializable(package='models')
+class Decoder(tf.keras.models.Model):
+    def __init__(self, token_dim: list, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
+        super(Decoder, self).__init__(**kwargs)
+        self._decoder = tf.keras.Sequential(
+            [tf.keras.Input(shape=(latent_dim,), batch_size=batch_dim, name='input')] # (B, E)
+            + [DetokenizeBlock(token_dim=__g, embedding_dim=embedding_dim, attention=attention, normalization=normalization, name='detokenize-{}_{}'.format(__g, __i)) for __i, __g in enumerate(token_dim)] # (B * G ^ i, E) => (B * G ^ (i+1), E)
+            + [HeadBlock(encoding_dim=encoding_dim, name='project-head')]) # (B * G ^ D, E) => (B * G ^ D, U)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._decoder(x)
+
+    def get_config(self) -> dict:
+        __parent_config = super(Decoder, self).get_config()
+        __input_shape = list(self._decoder.inputs[0].shape)
+        __detokenizer_config = self._decoder.layers[0].get_config()
+        __head_config = self._decoder.layers[-1].get_config()
+        __token_dim = [__b.get_config().get('token_dim', 4) for __b in self._encoder.layers[:-1]]
+        __child_config = {
+            'batch_dim': __input_shape[0],
+            'latent_dim': __input_shape[-1],
+            'encoding_dim': __head_config['encoding_dim'],
+            'token_dim': __detokenizer_config['token_dim'],
+            'embedding_dim': __detokenizer_config['embedding_dim'],
+            'attention': __detokenizer_config['attention'],
+            'normalization': __detokenizer_config['normalization'],}
+        return {**__parent_config, **__child_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+```
+
+### VAE
+
+```python
+@tf.keras.saving.register_keras_serializable(package='models')
+class AutoEncoder(tf.keras.models.Model):
+    def __init__(self, token_dim: list, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, attention: bool=False, normalization: bool=False, **kwargs) -> None:
+        super(AutoEncoder, self).__init__(**kwargs)
+        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention, normalization=normalization)
+        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention, normalization=normalization)
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return self._decoder(self._encoder(x))
+
+    def get_config(self) -> dict:
+        __parent_config = super(AutoEncoder, self).get_config()
+        __encoder_config = self._encoder.get_config()
+        return {**__encoder_config, **__parent_config}
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
+```
 
 [github-llama3]: https://github.com/meta-llama/llama3/blob/main/llama/model.py
 [github-mlqa]: https://github.com/facebookresearch/MLQA
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
+[wiki-unicode-plane]: https://en.wikipedia.org/wiki/Plane_(Unicode)
 
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
 [article-github-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
