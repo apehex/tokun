@@ -8,6 +8,7 @@ import os
 import keras
 import tensorflow as tf
 
+import tokun.evaluation
 import tokun.meta
 import tokun.model
 import tokun.pipeline
@@ -47,7 +48,7 @@ __x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=
 
 print(__s)
 print(__y)
-print(tokun.pipeline.compare(__s, __y))
+print(tokun.evaluation.compare(__s, __y))
 
 # ROBUSTNESS ##################################################################
 
