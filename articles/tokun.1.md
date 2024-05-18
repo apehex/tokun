@@ -11,6 +11,17 @@ It produces small graph embeddings that hold all the text information up to the 
 This article is the first part of a serie, starting from single character tokenization.
 It will follow the improvements of the model, building increasingly meaningful and dense tokens.
 
+## Intuition
+
+OpenAI stated that the [GPT-4 tokens have a length of 4 characters][openai-tokenizer], on average and in English.
+
+With UTF-8 encoding these 4 characters amount to less than 8 bytes in the vast majority of cases.
+
+These 8 bytes are translated into a vector of dimension 100k by a common tokenizer like `cl100`.
+If the elements of the vectors are stored as `float32` that's **400k bytes worth of space** for each 4 characters.
+
+That's just the tip of the iceberg.
+
 ## State Of The Art Tokenization
 
 Suppose you include the following excerpt in a prompt to `GPT-4o`:
@@ -89,12 +100,12 @@ It's roughly a compression by a factor 4.
 The higher this factor is, the more information the model can fit into a single forward pass / inference.
 Conversely, it means that it would take less computing resources to process prompts.
 
-The second axis has a constant dimension of 200k.
+The second axis has a constant dimension of several 100k.
 It is directly related to the size of the model, as it will require a neuron for each element.
 For example `llama3-8B` has a `128000 x 4096` kernel in its first layer, the embedding, where 128k is the size of the vocabulary.
 
-The size of the model has an overarching impact on the model cost.
-The number of parameters is a key balance between performance and quality.
+The size of the model has an overarching impact on the cost.
+The number of parameters is a key balance between efficiency and quality.
 
 ### Model Training
 
