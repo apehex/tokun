@@ -1,8 +1,6 @@
 """Apply the model to various samples."""
 
-import datetime
-import functools
-import math
+import itertools
 import os
 
 import keras
@@ -18,7 +16,7 @@ import tokun.pipeline
 ATTENTION = True
 NORMALIZATION = True
 
-N_TOKEN_DIM = [4, 4, 4] # G, for each block
+N_TOKEN_DIM = [4, 4] # G, for each block
 
 # DERIVED #####################################################################
 
@@ -27,7 +25,7 @@ TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in b
 # IMPORT ######################################################################
 
 VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-LABEL = '0.99996'
+LABEL = '1.0'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -46,9 +44,9 @@ SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(TOKEN_SIZES[-1] // 4)
 
 __x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=N_TOKEN_DIM, flatten=True)
 
-print(__s)
+print(SAMPLES[0])
 print(__y)
-print(tokun.evaluation.compare(__s, __y))
+print(tokun.evaluation.compare(SAMPLES[0], __y))
 
 # ROBUSTNESS ##################################################################
 
