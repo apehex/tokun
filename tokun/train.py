@@ -117,7 +117,7 @@ MODEL.compile(
 # TRAIN #######################################################################
 
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
-cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_accuracy', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
+cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
 lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 if TRAINING:
