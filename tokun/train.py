@@ -11,6 +11,7 @@ import tensorflow_datasets as tfds
 
 import mlable.tensorflow.optimizers as _mto
 
+import tokun.data
 import tokun.meta
 import tokun.model
 import tokun.pipeline
@@ -62,7 +63,10 @@ LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
-# PREPROCESS ##################################################################
+RANDOM_TRAIN = tokun.data.random_dataset(size=2**14, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
+RANDOM_TEST = tokun.data.random_dataset(size=2**13, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
+
+# PREPROCESS MLQA #############################################################
 
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
@@ -80,6 +84,21 @@ OPERATIONS, REPLACE = zip(*PIPELINE)
 
 TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
 TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
+
+# PREPROCESS RANDOM ###########################################################
+
+PIPELINE = [
+    # reshape => (B * G * S,) int
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
+    # one-hot encoding => (B * G * S, E) int (bool)
+    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
+    # replace sample inputs with (input, target) for supervised learning
+    ((lambda x: (x, x)), True)]
+
+OPERATIONS, REPLACE = zip(*PIPELINE)
+
+RANDOM_TRAIN = tokun.pipeline.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = tokun.pipeline.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
 
 # INIT ########################################################################
 
@@ -103,11 +122,11 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.le
 
 if TRAINING:
     HISTORY = MODEL.fit(
-        x=TRAIN['ar'].concatenate(TRAIN['en']).concatenate(TRAIN['es']).concatenate(TRAIN['de']).concatenate(TRAIN['hi']).concatenate(TRAIN['vi']).concatenate(TRAIN['zh']),
+        x=RANDOM_TRAIN,
         batch_size=N_BATCH,
         epochs=N_EPOCHS,
         validation_split=None,
-        validation_data=TEST['zh'], # full of glyphs
+        validation_data=RANDOM_TEST,
         validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
         verbose=2,
         callbacks=[lr_callback, cp_callback, tb_callback])
