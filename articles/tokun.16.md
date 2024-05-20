@@ -29,9 +29,9 @@ Ultimately, we would like to map the entire Unicode space.
 In theory, Unicode is made of $2^32$ code points.
 
 However only [17 Unicode planes][wiki-unicode-plane] are used because of the limitations.
-Out of those 17 planes, only 6 are actually used.
+Out of those 17 planes only 7 are actually used, with 2 reserved for user customization (think empty).
 
-So our final goal is only to map 393,216 code points.
+So our final goal is only to map 327,680 code points.
 
 ## Applying Tokun To Current LLMs
 
@@ -83,9 +83,9 @@ So it looks like an embedding dimension of 4096 is excessive, especially for a m
 At most, bringing the embedding dimension to 256 would mean:
 
 - removing the embedding layer entirely
-- roughly dividing the attention layers by a factor ` 256 ** 2 = 65536`
+- roughly dividing the attention layers by a factor `16 ** 2 = 256`
 - dividing the feed forward layers by the same factor
-- all in all the model would be shrunk to 15M parameters
+- all in all the model would be shrunk to 38M parameters or so
 
 But that's an extreme scenario, the balance is definitely somewhere in-between.
 
@@ -201,6 +201,8 @@ The decoder is a stack of `DetokenizeBlock`
 
 ## Training
 
+Once again, training was performed on [MLQA][github-mlqa] to compare the performances with previous models.
+
 So far, `tokun` has been
 
 languages have very predictable patterns => lazy
@@ -231,6 +233,14 @@ print(postprocess(MODEL._decoder(__e + 0.5 * __std)))
 print(postprocess(MODEL._decoder(__e + 0.5 * __noise)))
 # to³un to can t³k
 ```
+
+| Overview                  | Zoom                              |
+| ------------------------- | --------------------------------- |
+| ![][image-tsne-neighbors] | ![][image-tsne-neighbors-zoom]    |
+
+Contrary to the previous models, `tokun-16` is susceptible to noise.
+
+This could be a deal-breaker, as it may be hard for a LLM to predict precise embeddings.
 
 ### Configurations
 
@@ -489,6 +499,9 @@ class AutoEncoder(tf.keras.models.Model):
 
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
 [article-github-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
+
+[image-tsne-neighbors]: .images/16/pca.neighbors.png
+[image-tsne-neighbors-zoom]: .images/16/pca.neighbors.zoom.png
 
 [notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.16.ipynb
 [notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.16.ipynb

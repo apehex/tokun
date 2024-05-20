@@ -287,6 +287,14 @@ At most, the embeddings can withstand a random noise of $1.2 * \sigma$:
 # Une unité lexicale ou token lex坥cal ou ɰlus simplement token est un cou坰le composé d'un nom et 8'une vaɬeur optionnelle (e.g. 135677).�e
 ```
 
+A few errors can be seen in the neighborhoods of embeddings:
+
+| Overview                  | Zoom                              |
+| ------------------------- | --------------------------------- |
+| ![][image-tsne-neighbors] | ![][image-tsne-neighbors-zoom]    |
+
+While `tokun-1` embeddings could withstand up to $4 * \sigma$, here $2 * \sigma$ is already past the limit.
+
 ### Configurations
 
 As expected from the model architecture, the positional embedding did not improve the performances.
@@ -688,6 +696,8 @@ class AutoEncoder(tf.keras.models.Model):
 [image-graph-accuracy-4x4]: .images/4/graph.accuracy.4x4.png
 [image-sample-vietnamese]: .images/4/sample.vietnamese.png
 [image-tsne-latent-space]: .images/4/tsne.latent-space.png
+[image-tsne-neighbors]: .images/4/tsne.neighbors.png
+[image-tsne-neighbors-zoom]: .images/4/tsne.neighbors.zoom.png
 [image-tsne-token-chinese-space]: .images/4/tsne.token.chinese.space.png
 [image-tsne-token-accents]: .images/4/tsne.token.accents.png
 [image-tsne-token-comma]: .images/4/tsne.token.comma.png
