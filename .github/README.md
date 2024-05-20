@@ -6,30 +6,76 @@ Current tokenizers have notorious issues that are bringing all the LLMs down.
 For example I could not get ChatGPT to produce a decent catch-phrase (so you're stuck with mine!).
 
 `tokun` is a NN model specialized in text tokenization.
-It produces 256-embedding vectors with a 1:1 match to 64 UTF-32 bytes.
+It produces 256-embedding vectors equivalent to 64 UTF-32-BE bytes.
 
 IE each `tokun` embedding can be thought of as a token of length 16 characters.
-But these vectors keep meaningful information on their constituting parts.
+
+But these vectors are more than basic IDs, they keep meaningful information on their constituting parts.
+
+The architecture, dataviz, ambition and results are detailed in the [articles](../articles).
 
 ## Installation
 
-### Using HuggingFace
+For now, the model is only available here, [on Github](../tokun/).
 
-### From The Weights
+You can simply clone the repository: in particular, it will download [the weights](../models/).
 
 ## Usage
 
+The model can be loaded from the exported weights:
+
+```python
+import os
+import tensorflow as tf
+
+import tokun.meta # default values for the hyper parameters
+import tokun.model # required to register the Keras classes
+import tokun.pipeline # pre and post-processing
+
+# META ########################################################################
+
+ATTENTION = True
+NORMALIZATION = True
+
+N_TOKEN_DIM = [4, 4] # G, for each block
+
+# DERIVED #####################################################################
+
+LABEL = '8.5'
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
+
+# IMPORT ######################################################################
+
+PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
+
+MODEL = tf.keras.models.load_model(PATH_IMPORT)
+```
+
+Since it is small (between 1 and 2M parameters depending on the exact configuration), the model can also be [trained on Google Colab][notebook-file-tokun-train].
+
 ### Tokenization
 
-#### External
+Once the model loaded, a text strings `__s` can be encoded with:
 
-#### Internal
+```python
+__x = tokun.pipeline.preprocess(text=__s, groups=N_TOKEN_DIM, flatten=True)
+__e = MODEL._encoder(__x) # final embedding = input for another model
+```
 
-### Fine-Tuning
+### Detokenization
+
+An embedding tensor `__e` (or prediction) can be reversed into Unicode text with:
+
+```python
+__p = MODEL._decoder(__e)
+__y = tokun.pipeline.postprocess(__p)
+```
 
 ## Resources
 
 ### Models
+
+The most common variations have been trained and exported to the [models subdirectory](../models/).
 
 The main variant of the model is `tokun-16`.
 
@@ -39,8 +85,7 @@ Its hyper-parameters are:
 ATTENTION = True # whether the blocks include an attention layer
 NORMALIZATION = True # whether the blocks include a normalization layer
 
-N_DEPTH = 3 # D, the number of successive token groupings
-N_TOKEN_DIM = 4 # G, the size of a single token group, also the factor of compression
+N_TOKEN_DIM = [4, 4, 4] # G, the size of the token groups, for each block
 N_ENCODING_DIM = 256 # U, then dimension of a single byte as a one-hot vector
 N_EMBEDDING_DIM = N_ENCODING_DIM # E, the dimension of each group
 N_LATENT_DIM = N_EMBEDDING_DIM # L, the dimension of the resulting embedding
@@ -48,15 +93,22 @@ N_LATENT_DIM = N_EMBEDDING_DIM # L, the dimension of the resulting embedding
 
 ### Notebooks
 
-- `tokun-1`: [File][notebook-file-tokun-1] / [Colab][notebook-colab-tokun-1] / [Kaggle][notebook-kaggle-tokun-1] / [Hugging Face][notebook-hf-tokun-1]
-- `tokun-4`: [File][notebook-file-tokun-4] / [Colab][notebook-colab-tokun-4] / [Kaggle][notebook-kaggle-tokun-4] / [Hugging Face][notebook-hf-tokun-4]
-- `tokun-16`: [File][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16] / [Kaggle][notebook-kaggle-tokun-16] / [Hugging Face][notebook-hf-tokun-16]
+Final model:
+
+- train: [File][notebook-file-tokun-train] / [Colab][notebook-colab-tokun-train]
+- demo: [File][notebook-file-tokun-demo] / [Colab][notebook-colab-tokun-demo]
+
+Older / simpler model iterations:
+
+- `tokun-1`: [File][notebook-file-tokun-1] / [Colab][notebook-colab-tokun-1]
+- `tokun-4`: [File][notebook-file-tokun-4] / [Colab][notebook-colab-tokun-4]
+- `tokun-16`: [File][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16]
 
 ### Articles
 
-- `tokun-1`: [File][article-file-tokun-1] / [Notion][article-notion-tokun-1] / [Medium][article-medium-tokun-1]
-- `tokun-4`: [File][article-file-tokun-4] / [Notion][article-notion-tokun-4] / [Medium][article-medium-tokun-4]
-- `tokun-16`: [File][article-file-tokun-16] / [Notion][article-notion-tokun-16] / [Medium][article-medium-tokun-16]
+- `tokun-1`: [File][article-file-tokun-1] / [Notion][article-notion-tokun-1]
+- `tokun-4`: [File][article-file-tokun-4] / [Notion][article-notion-tokun-4]
+- `tokun-16`: [File][article-file-tokun-16] / [Notion][article-notion-tokun-16]
 
 ## TODO
 
@@ -83,14 +135,16 @@ Licensed under the [aGPLv3](LICENSE.md).
 [notebook-colab-tokun-1]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.1.ipynb
 [notebook-colab-tokun-4]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.4.ipynb
 [notebook-colab-tokun-16]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.16.ipynb
+[notebook-colab-tokun-demo]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.demo.ipynb
+[notebook-colab-tokun-train]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.train.ipynb
 [notebook-file-tokun-1]: ../notebooks/tokun.1.ipynb
 [notebook-file-tokun-4]: ../notebooks/tokun.4.ipynb
 [notebook-file-tokun-16]: ../notebooks/tokun.16.ipynb
-[notebook-hf-tokun-1]: ../notebooks/tokun.1.ipynb
-[notebook-hf-tokun-4]: ../notebooks/tokun.4.ipynb
-[notebook-hf-tokun-16]: ../notebooks/tokun.16.ipynb
-[notebook-kaggle-tokun-1]: ../notebooks/tokun.1.ipynb
-[notebook-kaggle-tokun-4]: ../notebooks/tokun.4.ipynb
-[notebook-kaggle-tokun-16]: ../notebooks/tokun.16.ipynb
+[notebook-file-tokun-demo]: ../notebooks/tokun.demo.ipynb
+[notebook-file-tokun-train]: ../notebooks/tokun.train.ipynb
+[notebook-hf-tokun-demo]: ../notebooks/tokun.demo.ipynb
+[notebook-hf-tokun-train]: ../notebooks/tokun.train.ipynb
+[notebook-kaggle-tokun-demo]: ../notebooks/tokun.demo.ipynb
+[notebook-kaggle-tokun-train]: ../notebooks/tokun.train.ipynb
 
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
