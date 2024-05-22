@@ -20,7 +20,8 @@ each Unicode character is encoded with 4 bytes.
 `tokun-4` offers to merge every 4 characters into a `float32` vector of dimension 256.
 In short 16 input bytes are represented by 1024 output bytes.
 
-Even though it is significantly more efficient than current tokenizers, it looks like it is far from the limit.
+In comparison, current tokenizer use several 100k bytes per token.
+While it is significantly more efficient than current tokenizers, it is far from the limit.
 
 So it is expected that the compression performed by the encoder of `tokun-4` is reversible without loss.
 
@@ -66,9 +67,11 @@ tf.print(__e[:4, :8], summarize=-1)
 Still, the vectors / tokens can be mapped to 3D and understood to some extent:
 
 | Accents                       | Symbols                       |
+| ----------------------------- | ----------------------------- |
 | ![][image-tsne-token-accents] | ![][image-tsne-token-symbols] |
 
-The images above are 2 views of the UMAP plot of all the embeddings of the French page on [VAE models][wiki-vae-fr].
+The images above are 2 views from the UMAP plot of embeddings.
+These embeddings are the representation of the French page on [VAE models][wiki-vae-fr].
 
 On the right, the selected point is labeled `"𝑞\nΦ\n"`, it is the embedding for a portion of a LaTeX equation.
 Inded, the input was a raw copy-paste of the article so the equation symbols were spread across several lines:
@@ -89,9 +92,10 @@ Hence the newlines `"\n"` in the labels.
 
 Despite the quirks of the inputs, `tokun-4` decodes the embeddings with 99% accuracy, only missing a few Greek symbols in the equations.
 
-It was not trained on any code, French nor Greek: so this issue should be easily remediated with a more complete training dataset.
+It was not trained on any code, French nor Greek: it is performing well across languages.
+In any case, the few errors should be easily remediated with a more complete training dataset.
 
-Also the latent space shows structure, the model has learnt the Unicode scheme and more than 7 languages.
+Also the latent space shows structure: the model has learnt the Unicode scheme and more than 7 languages.
 
 ## Roadmap
 
@@ -436,7 +440,7 @@ This is expecially apparent with punctuation:
 
 And numbers:
 
-![][image-tsne-token-number]
+![][image-tsne-token-numbers]
 
 Even though i can't decipher the Arabic, Chinese and Hindi tokens, the model seems to associate samples that have punctuation:
 
@@ -701,7 +705,7 @@ class AutoEncoder(tf.keras.models.Model):
 [image-tsne-token-chinese-space]: .images/4/tsne.token.chinese.space.png
 [image-tsne-token-accents]: .images/4/tsne.token.accents.png
 [image-tsne-token-comma]: .images/4/tsne.token.comma.png
-[image-tsne-token-number]: .images/4/tsne.token.number.png
+[image-tsne-token-numbers]: .images/4/tsne.token.numbers.png
 [image-tsne-token-space]: .images/4/tsne.token.space.png
 [image-tsne-token-symbols]: .images/4/tsne.token.symbols.png
 
