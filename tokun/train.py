@@ -23,6 +23,7 @@ TRAINING = True
 
 # META ########################################################################
 
+ACTIVATION = 'silu'
 ATTENTION = True
 NORMALIZATION = True
 
@@ -47,11 +48,11 @@ OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2))
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/4x4x4/True/True/0.99996.keras')
+PATH_IMPORT = os.path.join('models/4x4x4/relu/True/True/3.8.keras')
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, attention=ATTENTION, normalization=NORMALIZATION)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
@@ -60,8 +61,8 @@ PATH_EXPORT = os.path.join('models/', *VERSION, DATETIME + '.keras')
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
-TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
 RANDOM_TRAIN = tokun.data.random_dataset(size=2**14, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
 RANDOM_TEST = tokun.data.random_dataset(size=2**13, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
@@ -82,8 +83,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
-TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
+MLQA_TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # PREPROCESS RANDOM ###########################################################
 
@@ -105,7 +106,7 @@ RANDOM_TEST = tokun.pipeline.process(dataset=RANDOM_TEST, feature='', pipeline=O
 if IMPORT and os.path.isfile(PATH_IMPORT):
     MODEL = tf.keras.models.load_model(PATH_IMPORT)
 else:
-    MODEL = tokun.model.AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION)
+    MODEL = tokun.model.AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION, activation=ACTIVATION)
 
 # COMPILE #####################################################################
 

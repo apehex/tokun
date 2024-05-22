@@ -19,6 +19,7 @@ import tokun.pipeline
 
 # META ########################################################################
 
+ACTIVATION = 'relu'
 ATTENTION = True
 NORMALIZATION = True
 
@@ -34,8 +35,8 @@ OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2))
 
 # IMPORT ######################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-LABEL = '1.0'
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, attention=ATTENTION, normalization=NORMALIZATION)
+LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -44,8 +45,8 @@ MODEL = keras.models.load_model(PATH_IMPORT)
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
-TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
 # PREPROCESS ##################################################################
 
@@ -63,8 +64,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TRAIN.items()}
-TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in TEST.items()}
+MLQA_TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # SAMPLES #####################################################################
 
@@ -72,9 +73,9 @@ SAMPLES = {}
 TOKENS = {__i: {} for __i in TOKEN_SIZES} # in bytes
 EMBEDDINGS = {__i: {} for __i in TOKEN_SIZES} # in bytes
 
-for __lang in TEST:
+for __lang in MLQA_TEST:
     # compute predictions
-    __batch = iter(TEST[__lang]) # iterate over batches of samples
+    __batch = iter(MLQA_TEST[__lang]) # iterate over batches of samples
     __input = next(__batch)[0] # take input only
     __output = MODEL(__input)
     # sample predictions (inputs, outputs)
