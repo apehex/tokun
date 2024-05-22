@@ -13,6 +13,7 @@ import tokun.pipeline
 
 # META ########################################################################
 
+ACTIVATION = 'relu'
 ATTENTION = True
 NORMALIZATION = True
 
@@ -24,8 +25,8 @@ TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in b
 
 # IMPORT ######################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-LABEL = '1.0'
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, attention=ATTENTION, normalization=NORMALIZATION)
+LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 

@@ -17,6 +17,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
         latent_dim: int=256,
         attention: bool=False,
         normalization: bool=False,
+        activation: str='silu',
         **kwargs
     ) -> None:
         super(TokenizeBlock, self).__init__(**kwargs)
@@ -26,7 +27,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
         self._embedding = _mtl.PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='position') # (B, G, E) + (1, G, E)
         self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
         self._merge = _mtl.Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merging') # (B, G, E) => (B, G * E)
-        self._dense = tf.keras.layers.Dense(units=latent_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, G * E) => (B, L), typically L = E
+        self._dense = tf.keras.layers.Dense(units=latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, G * E) => (B, L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         __t = self._normalization(inputs) if self._normalization else inputs
@@ -42,7 +43,8 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'token_dim': self._divide._factor,
             'latent_dim': self._dense.units,
             'attention': bool(self._attention),
-            'normalization': bool(self._normalization)}
+            'normalization': bool(self._normalization),
+            'activation': self._dense.activation.__name__,}
         return {**__parent_config, **__child_config}
 
     @classmethod
@@ -59,11 +61,12 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         embedding_dim: int=256,
         attention: bool=False,
         normalization: bool=False,
+        activation: str='silu',
         **kwargs
     ) -> None:
         super(DetokenizeBlock, self).__init__(**kwargs)
         # layers
-        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation='relu', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
+        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
         self._divide = _mtl.Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='split') # (B, G * E) => (B, G, E)
         self._embedding = _mtl.PositionalEmbedding(input_axis=-2, output_axis=-1, name='position') # (B, G, E) + (1, G, E)
         self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
@@ -82,7 +85,8 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'token_dim': self._dense.units // self._divide._factor,
             'embedding_dim': self._divide._factor,
             'attention': bool(self._attention),
-            'normalization': bool(self._normalization)}
+            'normalization': bool(self._normalization),
+            'activation': self._dense.activation.__name__,}
         return {**__parent_config, **__child_config}
 
     @classmethod
