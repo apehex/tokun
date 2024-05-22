@@ -208,21 +208,16 @@ The original text samples are preprocessed as follows:
 - all samples are flattened into a one-dimensional tensor
 - and finally each byte is represented as a one-hot vector
 
-Most of the preprocessing is done in `encode`:
+The main preprocessing step is done in `encode`:
 
 ```python
-def encode(data: tf.Tensor, layer_count: int=1, group_size: int=4, sample_size: int=64, flatten: bool=False) -> tf.Tensor:
-    # make sure each sample has a length multiple of G ** L = T, the token dim
-    __mod = group_size ** layer_count
-    __dim = math.ceil(4 * sample_size / __mod) * __mod # factor 4 because of the UTF-32 encoding
-    # output shape
-    __shape = shape(layer_count=layer_count, group_size=group_size, flatten=flatten)
+def encode(data: tf.Tensor, token_size: int, sample_size: int=64) -> tf.Tensor:
+    # factor 4 because of the UTF-32 encoding
+    __dim = math.ceil(4 * sample_size / token_size) * token_size
     # Decode bytes from UTF-8
     __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
     # Decode byte strings to arrays of integers
-    __ints = tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
-    # group the characters into tokens
-    return tf.reshape(tensor=__ints, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
+    return tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
 ```
 
 Where `data` is a tensor of UTF-8 byte objects. 
@@ -290,7 +285,7 @@ The training was done on:
     - totalling 1721536 character level tokens 
 - the ADAM optimizer:
     - on 8 epochs
-    - with a learning rate rampup and decay from `1e-3` to `1e-4`
+    - with a learning rate decay from `1e-3` to `1e-4`
 
 ```python
 TRAINING_HISTORY = MODEL.fit(
@@ -326,8 +321,8 @@ Since the one-hot input is mostly empty, this simple model is easily able to per
 
 ### Samples
 
-Since this first model is 1:1, it looks like it does nothing.
-A comparison of input and output on German test samples:
+This first model is 1:1, it looks like it does nothing.
+Here's a comparison of input and output on German test samples:
 
 ![][image-sample-german]
 
@@ -404,7 +399,9 @@ This simple model is very resilient, but we will see that susceptibility to nois
 
 Unicode comes with [special characters out-of-the-box][unicode-table]:
 
-![][image-unicode-table]
+| 0000 - 001F                       | 007F - 009F                       |
+| --------------------------------- | --------------------------------- |
+| ![][image-unicode-table-00-1f]    | ![][image-unicode-table-7f-9f]    |
 
 Many of these special characters are obsolete and can be repurposed as special tokens.
 
@@ -534,6 +531,8 @@ class Encoder(tf.keras.models.Model):
 
 ### Decoder:
 
+The decoder is mostly the same in reverse order:
+
 ```python
 class Decoder(tf.keras.models.Model):
     def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
@@ -551,6 +550,8 @@ class Decoder(tf.keras.models.Model):
 
 ### Autoencoder
 
+The overall model trains both encoder and decoder at the same time:
+
 ```python
 class AutoEncoder(tf.keras.models.Model):
     def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:
@@ -561,6 +562,8 @@ class AutoEncoder(tf.keras.models.Model):
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
 ```
+
+But they are actually used separately to tokenize before a LLM and then detokenize on its output.
 
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
 [github-mlqa]: https://github.com/facebookresearch/MLQA
@@ -577,7 +580,8 @@ class AutoEncoder(tf.keras.models.Model):
 [image-graph-accuracy]: .images/1/graph.accuracy.png
 [image-graph-loss]: .images/1/graph.loss.png
 [image-sample-german]: .images/1/sample.german.png
-[image-unicode-table]: .images/unicode-table.special-tokens.png
+[image-unicode-table-00-1f]: .images/unicode-table.special-tokens.00-1f.png
+[image-unicode-table-7f-9f]: .images/unicode-table.special-tokens.7f-9f.png
 
 [image-tsne-4c]: .images/1/tsne.4c.png
 [image-tsne-arabic]: .images/1/tsne.arabic.png

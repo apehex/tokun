@@ -179,12 +179,22 @@ The encoder and the decoder perform symmetric merge and divide operations on the
 
 The encoder is a stack of `TokenizeBlock`, with added normalization and self-attention layers.
 
-0. the `LayerNormalization`
+0. the `LayerNormalization` helps maintain coherence between layers
 1. the `Divide` layer splits the batch axis: `(B * G, E)` => `(B, G, E)`
 2. the `PositionalEmbedding` layer distinguishes each of the `G` token units with a specific bias
-3. the `Attention`
+3. the `Attention` gives relative weights to each token unit, enabling more complex patterns
 4. the `Merge` layer groups all the embeddings on the last dimension: `(B * G, E)` => `(B, G * E)`
 5. the `Dense` layer finally compresses the dimension `G * E` into `E`
+
+`token-4` had 2 such layers and `tokun-4x4` just stacks 3.
+
+Actually, [the implementation](#implementation-details) allows any configuration:
+
+```python
+N_TOKEN_DIM = [4, 4] # tokens of length 4 characters / 16 UTF-32 bytes (tokun-4)
+N_TOKEN_DIM = [4, 4, 4] # tokens of length 16 characters (tokun-4x4)
+N_TOKEN_DIM = [4, 16] # alternative configuration with tokens of length 16
+```
 
 #### Decoder
 
@@ -193,27 +203,34 @@ The decoder is a stack of `DetokenizeBlock`
 1. the `Dense` layer expands the latent embedding: `(B, E)` => `(B, G * E)`
 2. the `Divide` layer splits the last axis: `(B, G * E)` => `(B, G, E)`
 3. the `PositionalEmbedding` layer adds markers to each token unit
-4. the `Attention`
+4. the `Attention` gives relative weight to each token unit
 5. the `Merge` layer flattens the tensor: `(B, G, E)` => `(B * G, E)`
-6. the `LayerNormalization`
+6. the `LayerNormalization` adds stability so that training a block doesn't dissociate it from the others
 
 ### Outputs
 
+By definition of a VAE, the outputs have the same shape as the input.
+
+They are filled with probabilities instead of just zeros and ones.
+
 ## Training
 
-Once again, training was performed on [MLQA][github-mlqa] to compare the performances with previous models.
+Once again, training / testing were performed on [MLQA][github-mlqa] to compare the performances with previous models.
 
-So far, `tokun` has been
+But the aim is to cover the whole Unicode space:
+actually words, numbers and code have cover a very limited range of the possibles.
 
-languages have very predictable patterns => lazy
+Using standard datasets with common patterns may push the model into learning common patterns.
+This may prevent the model from generalizing to new regions of the Unicode space
 
-whole Unicode space = any 
+So the most significant change is to **train the model on random sequences** of UTF-32-BE bytes.
+The role of `tokun` is actually to compress the encoding, *not* the language.
 
-### Augmentations
-
-### Perturbations
+Since the dataset is random, there is no need for data augmentation.
 
 ## Results
+
+For this model to be relevant, it has to be perfectly accurate so that embeddings can be reversed into their matching sequence of characters.
 
 ### Metrics
 
