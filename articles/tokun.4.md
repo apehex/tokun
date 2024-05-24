@@ -332,7 +332,7 @@ In the end, the `4x4` architecture reaches the same performance.
 
 ## Features
 
-### Extension
+### Extension Of Tokun-1
 
 `tokun-4` keeps all the features of the previous model `tokun-1`:
 
