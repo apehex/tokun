@@ -217,15 +217,15 @@ They are filled with probabilities instead of just zeros and ones.
 
 Once again, training / testing were performed on [MLQA][github-mlqa] to compare the performances with previous models.
 
-But the aim is to cover the whole Unicode space:
-actually words, numbers and code have cover a very limited range of the possibles.
+But, now the aim is to cover the whole Unicode space:
+words, numbers and code actually cover a very limited range of the possibles.
 
-Using standard datasets with common patterns may push the model into learning common patterns.
-This may prevent the model from generalizing to new regions of the Unicode space
+Using standard datasets with may push the model into learning common patterns.
+This may prevent the model from generalizing to new regions of the Unicode space.
 
-So the most significant change is to **train the model on random sequences** of UTF-32-BE bytes.
 The role of `tokun` is actually to compress the encoding, *not* the language.
 
+So the most significant change in this iteration is to **train the model on random sequences** of UTF-32-BE bytes.
 Since the dataset is random, there is no need for data augmentation.
 
 ## Results
@@ -234,9 +234,18 @@ For this model to be relevant, it has to be perfectly accurate so that embedding
 
 ### Metrics
 
+All the configurations reach 100% accuracy on the MLQA validation dataset.
+
+However, the goal is to have `tokun` be able to encode any arbitrary 16-gram (token) of codepoints.
+On the random dataset, the `4x4x4` configuration is stuck at 75% accuracy.
+
 ### Embeddings
 
+Even though the model was trained on random bytes, the embeddings
+
 ### Robustness
+
+Contrary to the previous models, `tokun-16` is susceptible to noise:
 
 ```python
 __std = tf.math.reduce_std(EMBEDDINGS[4]['en'], axis=0)
@@ -251,11 +260,11 @@ print(postprocess(MODEL._decoder(__e + 0.5 * __noise)))
 # to³un to can t³k
 ```
 
+Even under a single standard deviation the embedding neighborhoods are unstable:
+
 | Overview                  | Zoom                              |
 | ------------------------- | --------------------------------- |
-| ![][image-tsne-neighbors] | ![][image-tsne-neighbors-zoom]    |
-
-Contrary to the previous models, `tokun-16` is susceptible to noise.
+| ![][image-pca-neighbors] | ![][image-pca-neighbors-zoom]    |
 
 This could be a deal-breaker, as it may be hard for a LLM to predict precise embeddings.
 
@@ -269,9 +278,27 @@ Parameters:
 
 - 2770688 for `4x16`
 
+### Activation
+
+### Attention And Normalization
+
+It seems that the attention layer makes no difference:
+
+![][image-graph-accuracy-layers]
+
+Having a normalization layer (`LayerNorm`) accelerates the training more than two times.
+
 ## Features
 
-### Extension
+### Extension Of Tokun-4
+
+`tokun-16` keeps all the features of the previous model `tokun-4`:
+
+- it is obviously still a NN tokenizer
+- it has special tokens because UTF-32-BE has special characters
+- it produces vector embeddings of dimension 256
+- it has 100% encode-decode accuracy on its training languages
+- 
 
 ### Compression
 
@@ -294,6 +321,12 @@ t-঄壬 畕浠鸁 鲄鲠娩(t-SNE)｀ 数이阰畘 차원 岕梌狐 憬鮩夘�
 ```
 
 ## Next
+
+On its own `tokun` is performing surprisingly well.
+Every 4-gram of Unicode codepoints can be , even arbitrary byte sequences.
+
+Now, the question is whether it integrates well within a full featured LLM.
+Next we'll plug `tokun` into a custom `llama3`, `llaminate`.
 
 make a full transformer on top of `tokun`: llaminate?
 
@@ -517,8 +550,11 @@ class AutoEncoder(tf.keras.models.Model):
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
 [article-github-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
 
-[image-tsne-neighbors]: .images/16/pca.neighbors.png
-[image-tsne-neighbors-zoom]: .images/16/pca.neighbors.zoom.png
+[image-graph-accuracy-layers]: .images/16/graph.accuracy.layers.png
+[image-graph-accuracy-16x4-64]: .images/16/graph.accuracy.16x4-vs-64.png
+[image-graph-accuracy-4x4x4-4x16]: .images/16/graph.accuracy.4x16-vs-4x4x4.png
+[image-pca-neighbors]: .images/16/pca.neighbors.png
+[image-pca-neighbors-zoom]: .images/16/pca.neighbors.zoom.png
 
 [notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.16.ipynb
 [notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.16.ipynb
