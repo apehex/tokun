@@ -237,7 +237,9 @@ For this model to be relevant, it has to be perfectly accurate so that embedding
 All the configurations reach 100% accuracy on the MLQA validation dataset.
 
 However, the goal is to have `tokun` be able to encode any arbitrary 16-gram (token) of codepoints.
-On the random dataset, the `4x4x4` configuration is stuck at 75% accuracy.
+On the random dataset, the `4x4x4` configuration is stuck at 75% accuracy:
+
+![][image-graph-accuracy-4x4x4]
 
 However model configurations with larger weight tensors like `4x16` achieve 99.999% accuracy on the whole Unicode space (and 100% on MLQA).
 
@@ -619,9 +621,10 @@ def random_dataset(size: int, sample_size: int, lower_plane: int=0, upper_plane:
 [article-github-tokun-1]: https://github.com/apehex/tokun/blob/main/articles/tokun.1.md
 [article-github-tokun-4]: https://github.com/apehex/tokun/blob/main/articles/tokun.4.md
 
-[image-graph-accuracy-layers]: .images/16/graph.accuracy.layers.png
-[image-graph-accuracy-16x4-64]: .images/16/graph.accuracy.16x4-vs-64.png
+[image-graph-accuracy-4x4x4]: .images/16/graph.accuracy.4x4x4.png
 [image-graph-accuracy-4x4x4-4x16]: .images/16/graph.accuracy.4x16-vs-4x4x4.png
+[image-graph-accuracy-16x4-64]: .images/16/graph.accuracy.16x4-vs-64.png
+[image-graph-accuracy-layers]: .images/16/graph.accuracy.layers.png
 [image-pca-neighbors]: .images/16/pca.neighbors.png
 [image-pca-neighbors-zoom]: .images/16/pca.neighbors.zoom.png
 [image-16-umap-german]: .images/16/umap.16.german.png
