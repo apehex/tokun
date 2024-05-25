@@ -177,7 +177,7 @@ The encoder and the decoder perform symmetric merge and divide operations on the
 
 #### Encoder
 
-The encoder is a stack of `TokenizeBlock`, with added normalization and self-attention layers.
+The encoder is a stack of `TokenizeBlock`, with added normalization and self-attention layers:
 
 0. the `LayerNormalization` helps maintain coherence between layers
 1. the `Divide` layer splits the batch axis: `(B * G, E)` => `(B, G, E)`
@@ -239,16 +239,40 @@ All the configurations reach 100% accuracy on the MLQA validation dataset.
 However, the goal is to have `tokun` be able to encode any arbitrary 16-gram (token) of codepoints.
 On the random dataset, the `4x4x4` configuration is stuck at 75% accuracy.
 
+However model configurations with larger weight tensors like `4x16` achieve 99.999% accuracy on the whole Unicode space (and 100% on MLQA).
+
 ### Embeddings
 
-Even though the model was trained on random bytes, the embeddings
+Even though the model was trained on random bytes, the embeddings show intuitive properties.
+
+The model tends to group tokens by language:
+
+| German                    | Vietnamese                    |
+| ------------------------- | ----------------------------- |
+| ![][image-16-umap-german] | ![][image-16-umap-vietnamese] |
+
+Since German share the same alphabet as English and Spanish, it is surprising that tokens are not mixed.
+Vietnamese has a more distinct wording with its accent so it is both expected and more apparent.
+
+The encoder model performs nested tokenization, with each successive block grouping previous embeddings.
+So the tokens of length 16 are made of tokens of length 4.
+
+The embeddings for the 4-tokens can also be viewed.
+Their latent space shows even more structure:
+
+| PCA                       | UMAP                          |
+| ------------------------- | ----------------------------- |
+| ![][image-4-pca]          | ![][image-4-umap]             |
+
+It is easier to make sense of the embeddings by exploring them.
+A few samples were encoded and [exported to the Github repository](../embeddings/) and can be viewed with the [tensorboard projector][tensorboard-projector].
 
 ### Robustness
 
 Contrary to the previous models, `tokun-16` is susceptible to noise:
 
 ```python
-__std = tf.math.reduce_std(EMBEDDINGS[4]['en'], axis=0)
+__std = tf.math.reduce_std(EMBEDDINGS[16]['en'], axis=0)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 __x = preprocess('tokun to can tok', groups=N_TOKEN_DIM, flatten=True)
 __e = MODEL._encoder(__x)
@@ -270,15 +294,21 @@ This could be a deal-breaker, as it may be hard for a LLM to predict precise emb
 
 ### Configurations
 
+Performance is very dependent on the configuration.
+While all models achieve 100% accuracy on MLQA, it is harder to cover the whole Unicode space:
+
 | 4x4x4 vs 4x16                         | 16x4 vs 64                        |
 | ------------------------------------- | --------------------------------- |
 | ![][image-graph-accuracy-4x4x4-4x16]  | ![][image-graph-accuracy-16x4-64] |
 
-Parameters:
+Only the `4x16` and `16x4` are able to reach 100% on random byte sequences.
+These models have more parameters:
 
-- 2770688 for `4x16`
+- `4` blocks have a kernel of size `4 * 256 * 256 = 262144`
+- `16` blocks have `16 * 256 * 256 = 1048576`
+- `64` blocks have `64 * 256 * 256 = 4194304`
 
-### Activation
+But the `64` configuration has trouble learning because it treats each combination of 64 bytes as unique while others operate on abstractions for each unit.
 
 ### Attention And Normalization
 
@@ -286,7 +316,14 @@ It seems that the attention layer makes no difference:
 
 ![][image-graph-accuracy-layers]
 
-Having a normalization layer (`LayerNorm`) accelerates the training more than two times.
+Having a normalization layer (`LayerNorm`) accelerates the training by more than two times.
+
+### Activation
+
+The model was trained with `tanh`, `relu` and `silu` / `swish` activation functions.
+
+No significant impact was seen on the overall performance.
+The latent space shows different patterns for each.
 
 ## Features
 
@@ -298,11 +335,28 @@ Having a normalization layer (`LayerNorm`) accelerates the training more than tw
 - it has special tokens because UTF-32-BE has special characters
 - it produces vector embeddings of dimension 256
 - it has 100% encode-decode accuracy on its training languages
-- 
+- it is independent from the input splitting
+- its tokens all have an even 16 character length
+- its tokens are related to each other
+- its tokens hold all the information on their parts
 
 ### Compression
 
+The input tensor has shape `(B' * G * G * G, E)` and the embedding is `(B, E)`:
+the model performs a compression by factor 64 compared to the UTF-32 bytes, or 16 wrt unicode strings.
+
+```python
+__x.shape # (B' * G * G * G, E) = (B * 4 * S, E) = (128 * 4 * 256, 256)
+# (131072, 256)
+__e.shape # (B', E) = (B * 4 * S / (G * G * G), E) = (128 * 4 * 256 / 64, 256)
+# (2048, 256)
+```
+
 ### Generalization
+
+The variant `4x4x4` is stuck around 50% on new Unicode regions, even when trained on random data.
+
+While the `4x16`, with its larger weight tensors, is able to operate on the whole Unicode space:
 
 ```
 # INPUT ################################################################
@@ -312,29 +366,21 @@ t-분포 확률적 임베딩(t-SNE)은 데이터의 차원 축소에 사용되�
 
 # OUTPUT ###############################################################
 
-鰄烒由싼, 鮰리 梨奐畘 由싼사鸄.
-t-঄壬 畕浠鸁 鲄鲠娩(t-SNE)｀ 数이阰畘 차원 岕梌狐 憬鮩夘涔 栰싄 镙습 詌고리즘 萑 じ媘筜, 2002屄 痘 ｜이겤Sam Rowise筀 鸜锄리 傌妼꧐ 쁘해 娜娜夘峈￤.[1] t-SNE涔 ♄栠甕 차闐 岕梌 細鲕＼｜, 고차원 数이阰浼 妹傈 2, 3차원 篱甼｜ 萄壬 踀시罔镘羔豰峐 유ᢩ镘ƌ 사ᢩ夜篤. 구骴ā＼｜ t-SNE妔 畄获ぜ 数이鐰妔 狼耑镜 2, 3섨원鱘 지耐甼筜, 淤･ 数이鐰涔 奀리 媨導懄 지渐＼｜ 淵镑彜￤.
+위키백과, 우리 모두의 백과사전.
+t-분포 확률적 임베딩(t-SNE)은 데이터의 차원 축소에 사용되는 기계 학습 알고리즘 중 하나로, 2002년 샘 로이스Sam Rowise와 제프리 힌튼에 의해 개발되었다.[1] t-SNE는 비선형 차원 축소 기법으로, 고차원 데이터를 특히 2, 3차원 등으로 줄여 가시화하는데에 유용하게 사용된다. 구체적으로 t-SNE는 비슷한 데이터는 근접한 2, 3차원의 지점으로, 다른 데이터는 멀리 떨어진 지점으로 맵핑한다.����
 
 # SCORE ################################################################
 
-0.5158730158730159
+1.0
 ```
 
 ## Next
 
 On its own `tokun` is performing surprisingly well.
-Every 4-gram of Unicode codepoints can be , even arbitrary byte sequences.
+Every 4-gram of Unicode codepoints can be compressed without loss, even arbitrary byte sequences.
 
-Now, the question is whether it integrates well within a full featured LLM.
+Now, the question is whether `tokun` integrates well within a full featured LLM.
 Next we'll plug `tokun` into a custom `llama3`, `llaminate`.
-
-make a full transformer on top of `tokun`: llaminate?
-
-- sharing the model: community effort to improve the tokenizer?
-- modularity:
-- interpretation: common ground to compare the internals?
-- normalization:
-- security: having a shared referential also facilitates
 
 ## Resources
 
@@ -542,8 +588,31 @@ class AutoEncoder(tf.keras.models.Model):
         return cls(**config)
 ```
 
+### Random Dataset
+
+The training dataset is made of random codepoints in the first 4 planes of Unicode:
+
+```python
+def random_codepoint(lower_plane: int=0, upper_plane: int=0x40000) -> list:
+    __h = '{0:0>8x}'.format(int(random.uniform(lower_plane, upper_plane)))
+    return list(bytes.fromhex(__h))
+
+def random_sample(sample_size: int, lower_plane: int=0, upper_plane: int=0x40000) -> list:
+    __nested = [random_codepoint(lower_plane=lower_plane, upper_plane=upper_plane) for _ in range(sample_size)]
+    return list(itertools.chain.from_iterable(__nested))
+
+def random_dataset(size: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x40000) -> tf.data.Dataset:
+    def __generator() -> iter:
+        for _ in range(size):
+            yield random_sample(sample_size=sample_size, lower_plane=lower_plane, upper_plane=upper_plane)
+    return tf.data.Dataset.from_generator(
+        generator=__generator,
+        output_signature=tf.TensorSpec(shape=(4 * sample_size,), dtype=tf.int32))
+```
+
 [github-llama3]: https://github.com/meta-llama/llama3/blob/main/llama/model.py
 [github-mlqa]: https://github.com/facebookresearch/MLQA
+[tensorboard-projector]: https://projector.tensorflow.org/
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 [wiki-unicode-plane]: https://en.wikipedia.org/wiki/Plane_(Unicode)
 
@@ -555,6 +624,10 @@ class AutoEncoder(tf.keras.models.Model):
 [image-graph-accuracy-4x4x4-4x16]: .images/16/graph.accuracy.4x16-vs-4x4x4.png
 [image-pca-neighbors]: .images/16/pca.neighbors.png
 [image-pca-neighbors-zoom]: .images/16/pca.neighbors.zoom.png
+[image-16-umap-german]: .images/16/umap.16.german.png
+[image-16-umap-vietnamese]: .images/16/umap.16.vietnamese.png
+[image-4-pca]: .images/16/pca.4.png
+[image-4-umpa]: .images/16/umap.4.png
 
 [notebook-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.16.ipynb
 [notebook-github]: https://github.com/apehex/tokun/blob/main/notebooks/tokun.16.ipynb

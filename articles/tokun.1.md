@@ -359,6 +359,9 @@ there are relatively few compared to other alphabets, like CJK, so the model did
 
 It put more emphasis on the "Latin Extended" characters because of their diversity and representation in Vietnamese samples.
 
+It is easier to make sense of the embeddings by exploring them.
+A few samples were encoded and [exported to the Github repository](../embeddings/) and can be viewed with the [tensorboard projector][tensorboard-projector].
+
 ### Robustness
 
 The embeddings are **very robust to noise** even when it doesn't respect the underlying structure:
@@ -568,6 +571,7 @@ But they are actually used separately to tokenize before a LLM and then detokeni
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
 [github-mlqa]: https://github.com/facebookresearch/MLQA
 [openai-tokenizer]: https://platform.openai.com/tokenizer
+[tensorboard-projector]: https://projector.tensorflow.org/
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
 [tiktokenizer-o200k]: https://tiktokenizer.vercel.app/?model=o200k_base
 [unicode-table]: https://symbl.cc/en/unicode-table/

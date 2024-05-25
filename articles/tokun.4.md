@@ -266,6 +266,9 @@ print(postprocess(MODEL._decoder(__e)))
 # toku
 ```
 
+It is easier to make sense of the embeddings by exploring them.
+A few samples were encoded and [exported to the Github repository](../embeddings/) and can be viewed with the [tensorboard projector][tensorboard-projector].
+
 ### Robustness
 
 Once again, the embeddings are quite robust to noise even when it doesn't respect the underlying structure:
@@ -690,6 +693,7 @@ class AutoEncoder(tf.keras.models.Model):
 
 [github-mlqa]: https://github.com/facebookresearch/MLQA
 [openai-tokenizer]: https://platform.openai.com/tokenizer
+[tensorboard-projector]: https://projector.tensorflow.org/
 [wiki-vae-fr]: https://fr.wikipedia.org/wiki/Auto-encodeur_variationnel
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
