@@ -9,7 +9,7 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import mlable.tensorflow.optimizers as _mto
+import mlable.optimizers
 
 import tokun.data
 import tokun.meta
@@ -119,7 +119,7 @@ MODEL.compile(
 
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
 cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(_mto.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
+lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(mlable.optimizers.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 if TRAINING:
     HISTORY = MODEL.fit(
