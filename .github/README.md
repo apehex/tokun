@@ -106,9 +106,9 @@ Older / simpler model iterations:
 
 ### Articles
 
-- `tokun-1`: [File][article-file-tokun-1] / [Notion][article-notion-tokun-1]
-- `tokun-4`: [File][article-file-tokun-4] / [Notion][article-notion-tokun-4]
-- `tokun-16`: [File][article-file-tokun-16] / [Notion][article-notion-tokun-16]
+- `tokun-1`: [Github][article-file-tokun-1]
+- `tokun-4`: [Github][article-file-tokun-4]
+- `tokun-16`: [Github][article-file-tokun-16]
 
 ## TODO
 
