@@ -3,7 +3,8 @@
 import keras
 import tensorflow as tf
 
-import mlable.layers
+import mlable.layers.embedding
+import mlable.layers.reshaping
 
 # ENCODING BLOCKS #############################################################
 
@@ -23,10 +24,10 @@ class TokenizeBlock(tf.keras.layers.Layer):
         super(TokenizeBlock, self).__init__(**kwargs)
         # layers
         self._normalization = tf.keras.layers.LayerNormalization(axis=-1, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
-        self._divide = mlable.layers.Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
-        self._embedding = mlable.layers.PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='position') # (B, G, E) + (1, G, E)
+        self._divide = mlable.layers.reshaping.Divide(input_axis=0, output_axis=1, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
+        self._embedding = mlable.layers.embedding.PositionalEmbedding(input_axis=left_axis, output_axis=right_axis, name='position') # (B, G, E) + (1, G, E)
         self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
-        self._merge = mlable.layers.Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merging') # (B, G, E) => (B, G * E)
+        self._merge = mlable.layers.reshaping.Merge(left_axis=left_axis, right_axis=right_axis, left=True, name='merging') # (B, G, E) => (B, G * E)
         self._dense = tf.keras.layers.Dense(units=latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, G * E) => (B, L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
@@ -67,10 +68,10 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         super(DetokenizeBlock, self).__init__(**kwargs)
         # layers
         self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
-        self._divide = mlable.layers.Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='split') # (B, G * E) => (B, G, E)
-        self._embedding = mlable.layers.PositionalEmbedding(input_axis=-2, output_axis=-1, name='position') # (B, G, E) + (1, G, E)
+        self._divide = mlable.layers.reshaping.Divide(input_axis=-2, output_axis=-1, insert=True, factor=embedding_dim, name='split') # (B, G * E) => (B, G, E)
+        self._embedding = mlable.layers.embedding.PositionalEmbedding(input_axis=-2, output_axis=-1, name='position') # (B, G, E) + (1, G, E)
         self._attention = tf.keras.layers.Attention(use_scale=False, score_mode='dot', dropout=0., seed=None, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
-        self._merge = mlable.layers.Merge(left_axis=0, right_axis=1, left=True) # (B, G, E) => (B * G, E)
+        self._merge = mlable.layers.reshaping.Merge(left_axis=0, right_axis=1, left=True) # (B, G, E) => (B * G, E)
         self._normalization = tf.keras.layers.LayerNormalization(axis=-1, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
