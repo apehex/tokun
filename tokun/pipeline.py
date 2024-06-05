@@ -64,19 +64,6 @@ def decode(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
     return bytes(__b).decode(encoding='utf-32-be', errors='replace')
 
-# END-TO-END ##################################################################
-
-def process(dataset: tf.data.Dataset, pipeline: list, replace: bool=True, feature: str=None) -> tf.data.Dataset:
-    # fetch the target feature in the dataset
-    __dataset = dataset.map(lambda x: x[feature]) if feature else dataset
-    # specify how to combine each operation result with the original dataset
-    __replace = len(list(pipeline)) * [replace] if isinstance(replace, bool) else replace
-    # apply the operation successively  
-    for __fn, __repl in zip(pipeline, __replace):
-        __new = __dataset.map(__fn)
-        __dataset = __new if __repl else __dataset.concatenate(__new)
-    return __dataset
-
 # > ###########################################################################
 
 def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:

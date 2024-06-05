@@ -10,6 +10,7 @@ import random
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import mlable.data
 import mlable.io
 
 import tokun.evaluation
@@ -64,8 +65,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-MLQA_TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # SAMPLES #####################################################################
 
