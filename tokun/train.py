@@ -9,6 +9,7 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import mlable.data
 import mlable.optimizers
 
 import tokun.data
@@ -83,8 +84,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-MLQA_TRAIN = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: tokun.pipeline.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # PREPROCESS RANDOM ###########################################################
 
@@ -98,8 +99,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = tokun.pipeline.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = tokun.pipeline.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
 
 # INIT ########################################################################
 
