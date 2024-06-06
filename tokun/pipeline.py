@@ -39,14 +39,14 @@ def chunk(seq: list, size: int, repeats: bool=True) -> list:
 def merge(chunks: list) -> list:
     return list(itertools.chain.from_iterable(chunks))
 
-def shape(groups: list, flatten: bool=False) -> list:
-    return [-1] + (1 - int(flatten)) * groups
+def shape(groups: list, expand: list=[], flatten: bool=False) -> list:
+    return expand + [-1] + (1 - int(flatten)) * groups
 
-def reshape(data: tf.Tensor, groups: list, flatten: bool=True) -> tf.Tensor:
+def reshape(data: tf.Tensor, groups: list, expand: list=[], flatten: bool=True) -> tf.Tensor:
     # total length of the token
     __token_size = math.prod(groups)
     # group by token unit
-    __shape = shape(groups=groups, flatten=flatten)
+    __shape = shape(groups=groups, expand=expand, flatten=flatten)
     # partition or flatten the data
     return tf.reshape(tensor=data, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
 
@@ -66,13 +66,13 @@ def decode(tokens: tf.Tensor) -> str:
 
 # > ###########################################################################
 
-def preprocess(text: str, groups: list, flatten: bool=True) -> tf.Tensor:
+def preprocess(text: str, groups: list, expand: list=[], flatten: bool=True) -> tf.Tensor:
     # total length of the token
     __token_size = math.prod(groups)
     # list of bytes
     __bytes = encode(data=text, token_size=__token_size)
     # partition or flatten
-    __bytes = reshape(data=__bytes, groups=groups, flatten=flatten)
+    __bytes = reshape(data=__bytes, groups=groups, expand=expand, flatten=flatten)
     # one-hot
     return tf.one_hot(indices=__bytes, depth=256, axis=-1)
 
