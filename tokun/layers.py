@@ -12,6 +12,7 @@ import mlable.layers.reshaping
 class TokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
+        sequence_axis: int=0,
         feature_axis: int=-1,
         token_dim: int=4,
         latent_dim: int=256,
@@ -22,9 +23,10 @@ class TokenizeBlock(tf.keras.layers.Layer):
     ) -> None:
         super(TokenizeBlock, self).__init__(**kwargs)
         # this axis is inserted and then merged
-        __temp_axis = 1
+        __temp_axis = sequence_axis + 1
         # config
         self._config = {
+            'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'token_dim': token_dim,
             'latent_dim': latent_dim,
@@ -33,9 +35,9 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,}
         # layers
         self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
-        self._divide = mlable.layers.reshaping.Divide(input_axis=0, output_axis=__temp_axis, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
+        self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=__temp_axis, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
         # self._embedding = mlable.layers.embedding.PositionalEmbedding(input_axis=__temp_axis, output_axis=feature_axis, name='position') # (B, G, E) + (1, G, E)
-        self._attention = tf.keras.layers.MultiHeadAttention(num_heads=4, key_dim=latent_dim, value_dim=latent_dim, attention_axes=[__temp_axis], use_bias=True, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
+        self._attention = tf.keras.layers.MultiHeadAttention(num_heads=4, key_dim=latent_dim // 4, value_dim=latent_dim // 4, attention_axes=[__temp_axis], use_bias=True, name='attention') if attention else None # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
         self._merge = mlable.layers.reshaping.Merge(left_axis=__temp_axis, right_axis=feature_axis, left=False, name='merging') # (B, G, E) => (B, G * E)
         self._dense = tf.keras.layers.Dense(units=latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, G * E) => (B, L), typically L = E
 
@@ -60,6 +62,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
 class DetokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
+        sequence_axis: int=0,
         feature_axis: int=-1,
         token_dim: int=4,
         embedding_dim: int=256,
@@ -70,9 +73,10 @@ class DetokenizeBlock(tf.keras.layers.Layer):
     ) -> None:
         super(DetokenizeBlock, self).__init__(**kwargs)
         # this axis is inserted and then merged
-        __temp_axis = 1
+        __temp_axis = sequence_axis + 1
         # config
         self._config = {
+            'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'token_dim': token_dim,
             'embedding_dim': embedding_dim,
@@ -83,8 +87,8 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
         self._divide = mlable.layers.reshaping.Divide(input_axis=feature_axis, output_axis=__temp_axis, insert=True, factor=token_dim, name='split') # (B, G * E) => (B, G, E)
         # self._embedding = mlable.layers.embedding.PositionalEmbedding(input_axis=__temp_axis, output_axis=feature_axis, name='position') # (B, G, E) + (1, G, E)
-        self._attention = tf.keras.layers.MultiHeadAttention(num_heads=4, key_dim=embedding_dim, value_dim=embedding_dim, attention_axes=[__temp_axis], use_bias=True, name='attention') if attention else None  # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
-        self._merge = mlable.layers.reshaping.Merge(left_axis=0, right_axis=__temp_axis, left=True) # (B, G, E) => (B * G, E)
+        self._attention = tf.keras.layers.MultiHeadAttention(num_heads=4, key_dim=embedding_dim // 4, value_dim=embedding_dim // 4, attention_axes=[__temp_axis], use_bias=True, name='attention') if attention else None  # (B, G, E) + (B, G, E) * (B, E, G) * (B, G, E)
+        self._merge = mlable.layers.reshaping.Merge(left_axis=sequence_axis, right_axis=__temp_axis, left=True) # (B, G, E) => (B * G, E)
         self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
