@@ -24,6 +24,8 @@ ACTIVATION = 'relu'
 GATE = True
 NORMALIZATION = True
 
+SEQUENCE_AXIS = 1
+
 N_TOKEN_DIM = [4, 4] # G, for each block
 
 N_BATCH = 128 # number of samples per batch
@@ -57,7 +59,7 @@ PIPELINE = [
     # encode => (B, G * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -98,14 +100,14 @@ for __size in TOKENS:
 for __depth, __size in enumerate(TOKEN_SIZES):
     for __lang, __tokens in TOKENS[__size].items():
         # re-encode without token repeats
-        __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, flatten=True)
+        __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
         for __i in range(__depth + 1):
             __embedding = MODEL._encoder._encoder.layers[__i + 1](__embedding)
         # remove the (tokenized) padding
-        EMBEDDINGS[__size][__lang] = __embedding[:len(__tokens)]
+        EMBEDDINGS[__size][__lang] = tf.squeeze(__embedding)[:len(__tokens)]
 
 # NEIGHBORHOODS ###############################################################
 
@@ -115,13 +117,12 @@ __count = 256
 TOKENS['local'] = {'all': []}
 EMBEDDINGS['local'] = {'all': []}
 
-for __lang, __sample in IO.items():
+for __lang, __tokens in TOKENS[__unit].items():
     # stats on the embeddings for the current language
     __std = tf.math.reduce_std(EMBEDDINGS[__unit][__lang], axis=0, keepdims=True)
     __radius = 2. * tf.reduce_mean(__std).numpy()
     # choose a single token
-    __i = int(random.uniform(0, len(__sample[0]) // 4))
-    __t = __sample[0][4 * __i:__unit + 4 * __i]
+    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
     # encode it
     __e = MODEL._encoder(__t)
     # add noise to generate random neighbors
@@ -129,10 +130,10 @@ for __lang, __sample in IO.items():
     # decode the noisy embeddings
     __d = MODEL._decoder(__n)
     # postprocess
-    __m = chunk(seq=tokun.pipeline.postprocess(__d), size=__unit // 4, repeats=True)
+    __m = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__d), size=__unit // 4, repeats=True)
     # save
     TOKENS['local']['all'].extend(__m)
-    EMBEDDINGS['local']['all'].append(__n)
+    EMBEDDINGS['local']['all'].append(tf.squeeze(__n))
 
 # merge all the embedding tensors
 EMBEDDINGS['local']['all'] = tf.concat(values=EMBEDDINGS['local']['all'], axis=0)

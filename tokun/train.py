@@ -28,7 +28,7 @@ ACTIVATION = 'silu'
 GATE = True
 NORMALIZATION = True
 
-SEQUENCE_AXIS = 0
+SEQUENCE_AXIS = 1
 FEATURE_AXIS = -1
 
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
@@ -69,8 +69,8 @@ LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
 
-RANDOM_TRAIN = tokun.data.random_dataset(size=2**14, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
-RANDOM_TEST = tokun.data.random_dataset(size=2**13, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
+RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH * 2 ** 10, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
+RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH * 2 ** 8, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
 
 # PREPROCESS MLQA #############################################################
 
@@ -80,7 +80,7 @@ PIPELINE = [
     # encode => (B, G * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -95,7 +95,7 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=O
 
 PIPELINE = [
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, flatten=True), True),
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -103,8 +103,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN.batch(N_BATCH), feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST.batch(N_BATCH), feature='', pipeline=OPERATIONS, replace=REPLACE)
 
 # INIT ########################################################################
 
