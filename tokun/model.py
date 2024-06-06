@@ -14,10 +14,11 @@ class Encoder(tf.keras.models.Model):
         token_dim: list,
         encoding_dim: int,
         embedding_dim: int,
+        hidden_dim: int,
         latent_dim: int,
         batch_dim: int=None,
-        attention: bool=True,
         normalization: bool=True,
+        gate: bool=True,
         activation: str='silu',
         sequence_axis: int=0,
         feature_axis: int=-1,
@@ -30,10 +31,11 @@ class Encoder(tf.keras.models.Model):
             'token_dim': token_dim,
             'encoding_dim': encoding_dim,
             'embedding_dim': embedding_dim,
+            'hidden_dim': hidden_dim,
             'latent_dim': latent_dim,
             'batch_dim': batch_dim,
-            'attention': attention,
             'normalization': normalization,
+            'gate': gate,
             'activation': activation,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,}
@@ -53,9 +55,11 @@ class Encoder(tf.keras.models.Model):
                 sequence_axis=sequence_axis,
                 feature_axis=feature_axis,
                 token_dim=__g,
+                embedding_dim=embedding_dim,
+                hidden_dim=hidden_dim,
                 latent_dim=latent_dim,
-                attention=attention,
                 normalization=normalization,
+                gate=gate,
                 activation=activation,
                 name='tokenize-{}_{}'.format(__g, __i))
             for __i, __g in enumerate(__token_dim)]
@@ -83,10 +87,11 @@ class Decoder(tf.keras.models.Model):
         token_dim: list,
         encoding_dim: int,
         embedding_dim: int,
+        hidden_dim: int,
         latent_dim: int,
         batch_dim: int=None,
-        attention: bool=True,
         normalization: bool=True,
+        gate: bool=True,
         activation: str='silu',
         sequence_axis: int=0,
         feature_axis: int=-1,
@@ -99,10 +104,11 @@ class Decoder(tf.keras.models.Model):
             'token_dim': token_dim,
             'encoding_dim': encoding_dim,
             'embedding_dim': embedding_dim,
+            'hidden_dim': hidden_dim,
             'latent_dim': latent_dim,
             'batch_dim': batch_dim,
-            'attention': attention,
             'normalization': normalization,
+            'gate': gate,
             'activation': activation,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,}
@@ -116,8 +122,9 @@ class Decoder(tf.keras.models.Model):
                 feature_axis=feature_axis,
                 token_dim=__g,
                 embedding_dim=embedding_dim,
-                attention=attention,
+                hidden_dim=hidden_dim,
                 normalization=normalization,
+                gate=gate,
                 activation=activation,
                 name='detokenize-{}_{}'.format(__g, __i))
             for __i, __g in enumerate(__token_dim)] + [
@@ -147,10 +154,11 @@ class AutoEncoder(tf.keras.models.Model):
         token_dim: list,
         encoding_dim: int,
         embedding_dim: int,
+        hidden_dim: int,
         latent_dim: int,
         batch_dim: int=None,
-        attention: bool=False,
-        normalization: bool=False,
+        normalization: bool=True,
+        gate: bool=True,
         activation: str='silu',
         sequence_axis: int=0,
         feature_axis: int=-1,
@@ -159,8 +167,8 @@ class AutoEncoder(tf.keras.models.Model):
         # init
         super(AutoEncoder, self).__init__(**kwargs)
         # layers
-        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention, normalization=normalization, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
-        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim, attention=attention, normalization=normalization, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
+        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, hidden_dim=hidden_dim, latent_dim=latent_dim, batch_dim=batch_dim, gate=gate, normalization=normalization, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
+        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, hidden_dim=hidden_dim, latent_dim=latent_dim, batch_dim=batch_dim, gate=gate, normalization=normalization, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))

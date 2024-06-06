@@ -25,12 +25,16 @@ TRAINING = True
 # META ########################################################################
 
 ACTIVATION = 'silu'
-ATTENTION = True
+GATE = True
 NORMALIZATION = True
+
+SEQUENCE_AXIS = 0
+FEATURE_AXIS = -1
 
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
+N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # H
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
 N_EPOCHS = 8
@@ -53,7 +57,7 @@ PATH_IMPORT = os.path.join('models/4x4x4/relu/True/True/3.8.keras')
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, gate=GATE, normalization=NORMALIZATION)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
@@ -107,7 +111,7 @@ RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, feature='', pipeline=OPER
 if IMPORT and os.path.isfile(PATH_IMPORT):
     MODEL = tf.keras.models.load_model(PATH_IMPORT)
 else:
-    MODEL = tokun.model.AutoEncoder(token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, attention=ATTENTION, normalization=NORMALIZATION, activation=ACTIVATION)
+    MODEL = tokun.model.AutoEncoder(sequence_axis=SEQUENCE_AXIS, feature_axis=FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, hidden_dim=N_HIDDEN_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, gate=GATE, normalization=NORMALIZATION, activation=ACTIVATION)
 
 # COMPILE #####################################################################
 

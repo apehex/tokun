@@ -21,7 +21,7 @@ import tokun.pipeline
 # META ########################################################################
 
 ACTIVATION = 'relu'
-ATTENTION = True
+GATE = True
 NORMALIZATION = True
 
 N_TOKEN_DIM = [4, 4] # G, for each block
@@ -36,7 +36,7 @@ OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2))
 
 # IMPORT ######################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, attention=ATTENTION, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, gate=GATE, normalization=NORMALIZATION)
 LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
