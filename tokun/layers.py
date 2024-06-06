@@ -21,6 +21,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
         normalization: bool=False,
         gate: bool=False,
         activation: str='silu',
+        epsilon: float=1e-6,
         **kwargs
     ) -> None:
         super(TokenizeBlock, self).__init__(**kwargs)
@@ -36,9 +37,10 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'latent_dim': latent_dim,
             'normalization': normalization,
             'gate': gate,
-            'activation': activation,}
+            'activation': activation,
+            'epsilon': epsilon,}
         # layers
-        self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
+        self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
         self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=__temp_axis, factor=token_dim, insert=True, name='group') # (B * G, E) => (B, G, E)
         self._gate = mlable.layers.transformer.FeedForwardGate(input_dim=embedding_dim, hidden_dim=hidden_dim, name='gate') if gate else None # (B, G, E) => (B, G, H) => (B, G, E)
         self._merge = mlable.layers.reshaping.Merge(left_axis=__temp_axis, right_axis=feature_axis, left=False, name='merging') # (B, G, E) => (B, G * E)
@@ -73,6 +75,7 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         normalization: bool=False,
         gate: bool=False,
         activation: str='silu',
+        epsilon: float=1e-6,
         **kwargs
     ) -> None:
         super(DetokenizeBlock, self).__init__(**kwargs)
@@ -87,13 +90,14 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'hidden_dim': hidden_dim,
             'normalization': normalization,
             'gate': gate,
-            'activation': activation,}
+            'activation': activation,
+            'epsilon': epsilon,}
         # layers
         self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, L) => (B, G * E), typically L = E
         self._divide = mlable.layers.reshaping.Divide(input_axis=feature_axis, output_axis=__temp_axis, insert=True, factor=token_dim, name='split') # (B, G * E) => (B, G, E)
         self._gate = mlable.layers.transformer.FeedForwardGate(input_dim=embedding_dim, hidden_dim=hidden_dim, name='gate') if gate else None # (B, G, E) => (B, G, H) => (B, G, E)
         self._merge = mlable.layers.reshaping.Merge(left_axis=sequence_axis, right_axis=__temp_axis, left=True) # (B, G, E) => (B * G, E)
-        self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=0.001, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
+        self._normalization = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') if normalization else None # normalize each token unit independently
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         __t = self._divide(self._dense(inputs))
