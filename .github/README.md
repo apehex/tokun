@@ -14,6 +14,19 @@ But these vectors are more than basic IDs, they keep meaningful information on t
 
 The architecture, dataviz, ambition and results are detailed in the [articles](../articles).
 
+## Features
+
+The model produces vector embeddings that can be directly ingested by another model.
+
+Regular tokens are unrelated IDs, while `tokun` has the following properties:
+
+- **international**: `tokun` performs evenly on the whole Unicode space
+- **compression**: the sequence length is divided by 16
+- **embeddings**: the output vectors have only a dimension 256
+- **lossless**: embeddings store all the information up to the byte level
+- **built-ins**: Unicode has built-in special tokens, no need for `<|im_start|>`
+- **meaningful**: embeddings are natively related to each-other based on their parts
+
 ## Installation
 
 For now, the model is only available here, [on Github](../tokun/).
