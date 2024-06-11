@@ -19,13 +19,14 @@ import tokun.pipeline
 
 # TOGGLE ######################################################################
 
-IMPORT = True
+IMPORT = False
 TRAINING = True
+RANDOM = True
 
 # META ########################################################################
 
 ACTIVATION = 'silu'
-GATE = True
+GATE = False
 NORMALIZATION = True
 
 SEQUENCE_AXIS = 1
@@ -37,7 +38,7 @@ N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # H
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
-N_EPOCHS = 8
+N_EPOCHS = 16
 N_EPOCHS_RAMPUP = 0
 N_EPOCHS_SUSTAIN = 0
 
@@ -66,8 +67,8 @@ PATH_EXPORT = os.path.join('models/', *VERSION, DATETIME + '.keras')
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
-MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 
 RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH * 2 ** 10, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
 RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH * 2 ** 8, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
@@ -80,7 +81,7 @@ PIPELINE = [
     # encode => (B, G * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=[], flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -95,7 +96,7 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=O
 
 PIPELINE = [
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
+    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=[], flatten=True), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -103,8 +104,13 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN.batch(N_BATCH), feature='', pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST.batch(N_BATCH), feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
+
+# COMBINE DATASETS ############################################################
+
+DATASET_TRAIN = RANDOM_TRAIN if RANDOM else MLQA_TRAIN['ar'].concatenate(MLQA_TRAIN['en']).concatenate(MLQA_TRAIN['es']).concatenate(MLQA_TRAIN['de']).concatenate(MLQA_TRAIN['hi']).concatenate(MLQA_TRAIN['vi']).concatenate(MLQA_TRAIN['zh'])
+DATASET_TEST = MLQA_TEST['ar'].concatenate(MLQA_TEST['en']).concatenate(MLQA_TEST['es']).concatenate(MLQA_TEST['de']).concatenate(MLQA_TEST['hi']).concatenate(MLQA_TEST['vi']).concatenate(MLQA_TEST['zh'])
 
 # INIT ########################################################################
 
@@ -128,11 +134,11 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(mlable.
 
 if TRAINING:
     HISTORY = MODEL.fit(
-        x=RANDOM_TRAIN,
-        batch_size=N_BATCH,
+        x=DATASET_TRAIN.batch(N_BATCH).prefetch(tf.data.AUTOTUNE),
+        batch_size=None,
         epochs=N_EPOCHS,
         validation_split=None,
-        validation_data=RANDOM_TEST,
-        validation_freq=list(range(1, N_EPOCHS + 1, N_EPOCHS // 8)),
+        validation_data=DATASET_TEST.batch(N_BATCH).prefetch(tf.data.AUTOTUNE),
+        validation_freq=list(range(1, N_EPOCHS + 1)),
         verbose=2,
         callbacks=[lr_callback, cp_callback, tb_callback])
