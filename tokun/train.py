@@ -42,8 +42,8 @@ N_EPOCHS = 16
 N_EPOCHS_RAMPUP = 0
 N_EPOCHS_SUSTAIN = 0
 
-N_BATCH = 128 # number of samples per batch
-N_SAMPLE = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
+N_BATCH_DIM = 128 # number of samples per batch
+N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
 
 R_MIN, R_MAX, R_EXP = tokun.meta.rates(pretrained=IMPORT, normalization=NORMALIZATION, base=0.001)
 
@@ -70,19 +70,19 @@ LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 
-RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH * 2 ** 10, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
-RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH * 2 ** 8, sample_size=N_SAMPLE, lower_plane=0, upper_plane=0x40000)
+RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 10, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
+RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
 
 # PREPROCESS MLQA #############################################################
 
 PIPELINE = [
-    # offset by 1 to 15 character => (B, 1) bytes
+    # offset by 1 to 15 character => (1,) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
-    # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=[], flatten=True), True),
-    # one-hot encoding => (B * G * S, E) int (bool)
+    # encode => (4 * S,) int
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    # reshape => (4 * S,) int
+    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
+    # one-hot encoding => (4 * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
     ((lambda x: (x, x)), True)]
@@ -134,11 +134,11 @@ lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(mlable.
 
 if TRAINING:
     HISTORY = MODEL.fit(
-        x=DATASET_TRAIN.batch(N_BATCH).prefetch(tf.data.AUTOTUNE),
+        x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
         batch_size=None,
         epochs=N_EPOCHS,
         validation_split=None,
-        validation_data=DATASET_TEST.batch(N_BATCH).prefetch(tf.data.AUTOTUNE),
+        validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
         validation_freq=list(range(1, N_EPOCHS + 1)),
         verbose=2,
         callbacks=[lr_callback, cp_callback, tb_callback])

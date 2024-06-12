@@ -28,8 +28,8 @@ SEQUENCE_AXIS = 1
 
 N_TOKEN_DIM = [4, 4] # G, for each block
 
-N_BATCH = 128 # number of samples per batch
-N_SAMPLE = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE integers per sample)
+N_BATCH_DIM = 128 # number of samples per batch
+N_SAMPLE_DIM = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
 
 # DERIVED #####################################################################
 
@@ -48,8 +48,8 @@ MODEL = keras.models.load_model(PATH_IMPORT)
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
-MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=N_BATCH) for __l in LANG}
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 
 # PREPROCESS ##################################################################
 
@@ -57,9 +57,9 @@ PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE), True),
+    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [N_BATCH], flatten=True), True),
+    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -76,9 +76,9 @@ SAMPLES = {}
 TOKENS = {__i: {} for __i in TOKEN_SIZES} # in bytes
 EMBEDDINGS = {__i: {} for __i in TOKEN_SIZES} # in bytes
 
-for __lang in MLQA_TEST:
+for __lang, __dataset in MLQA_TEST.items():
     # compute predictions
-    __batch = iter(MLQA_TEST[__lang]) # iterate over batches of samples
+    __batch = iter(__dataset.batch(N_BATCH_DIM)) # iterate over batches of samples
     __input = next(__batch)[0] # take input only
     __output = MODEL(__input)
     # sample predictions (inputs, outputs)
