@@ -13,21 +13,16 @@ import tokun.pipeline
 
 # META ########################################################################
 
-ACTIVATION = 'relu'
-GATE = True
-NORMALIZATION = True
-
-SEQUENCE_AXIS = 1
-
+N_SEQUENCE_AXIS = 1
 N_TOKEN_DIM = [4, 4] # G, for each block
 
 # DERIVED #####################################################################
 
-TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
+N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
 
 # IMPORT ######################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, gate=GATE, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
 LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
@@ -41,11 +36,11 @@ SAMPLES = [
     """class AutoEncoder(tf.keras.models.Model):\n    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:\n        super(AutoEncoder, self).__init__(**kwargs)\n        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)\n        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._decoder(self._encoder(x))""",
     """class AutoEncoder(tf.keras.models.Model):\n  def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, latent_dim: int, batch_dim: int=None, **kwargs) -> None:\n    super(AutoEncoder, self).__init__(**kwargs)\n    self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)\n    self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, latent_dim=latent_dim, batch_dim=batch_dim)\n\n  def call(self, x: tf.Tensor) -> tf.Tensor:\n    return self._decoder(self._encoder(x))"""]
 
-SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(TOKEN_SIZES[-1] // 4)])
+SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 4)])
 
 # TEST ########################################################################
 
-__x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
+__x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
 
 print(SAMPLES[0])
 print(__y)
@@ -56,7 +51,7 @@ print(tokun.evaluation.compare(SAMPLES[0], __y))
 __std = tf.math.reduce_std(__e, axis=0)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
-__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
+__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
 
 print(tokun.pipeline.postprocess(MODEL._decoder(__e)))
 print(tokun.pipeline.postprocess(MODEL._decoder(__e + 1.6 * __std)))
