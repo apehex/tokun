@@ -1,12 +1,16 @@
-# Tokun
+# Tokenization Is A Dead Weight
 
 > `tokun` took tokens to t-can
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
-
 These algortihms incarnate the human intuition of language tokens.
 
 We will show that neural networks can be trained to produce a much more efficient text encoding.
+
+Interestingly, this process is different from understanding language:
+
+- the proposed model has a different architecture from transformers
+- the best training data is **not** human text but random bytes
 
 ## Intuition
 
@@ -33,40 +37,7 @@ This process has several stages: encoding, tokenization and embedding.
 
 For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`): 
 
-| Token         | ID        |
-| ------------- | --------- |
-| "Une"         | 28821     |
-| " unité"      | 181741    |
-| " lexi"       | 37772     |
-| "cale"        | 135677    |
-| " ou"         | 2031      |
-| " token"      | 6602      |
-| " lexical"    | 173846    |
-| " ou"         | 2031      |
-| " plus"       | 2932      |
-| " simplement" | 45065     |
-| " token"      | 6602      |
-| " est"        | 893       |
-| " un"         | 537       |
-| " couple"     | 7167      |
-| " composé"    | 98898     |
-| " d"          | 272       |
-| "'un"         | 9788      |
-| " nom"        | 8080      |
-| " et"         | 859       |
-| " d"          | 272       |
-| "'une"        | 13337     |
-| " valeur"     | 41664     |
-| " option"     | 5317      |
-| "nelle"       | 30805     |
-| " ("          | 350       |
-| "e"           | 68        |
-| ".g"          | 1940      |
-| "."           | 13        |
-| " "           | 220       |
-| "135"         | 14953     |
-| "677"         | 45835     |
-| ")."          | 741       |
+<img src=".images/tiktoken.gpt-4o.png" width="75%"/>
 
 The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
 Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
@@ -160,31 +131,6 @@ The final model `tokun-4x4` addresses most of these shortcomings.
 The serie is heavily focused on western languages, due to personal knowledge.
 Still the concepts were tested on asian and middle-eastern languages.
 
-### Limit / Locality / Robustness
-
-With `tokun-16`, the model is getting one step closer to the limit of input compression.
-
-16 Unicode characters will be represented by a `float32` vector of dimension 256.
-It's 1024 output bytes for every 64 input bytes.
-
-It would appear that there is still a lot of leeway.
-Actually, if there was a 1:1 match it would mean that only a single embedding value would map to each token.
-
-It would be impractical since it would require LLMs to predict very precise values.
-Suppose that `[0.025 1.52 1.67 2.24 ...]` represents `"hello world! \o/"`.
-If the LLM outputs `[0.025 1.53 1.67 2.24 ...]` it may just have produced a totally random string.
-
-In fact, $\frac{1024}{64} = 16$ is a good ratio:
-we want each chunk of 16 characters to be represented by a region in the space of dimension 256.
-
-Ultimately, we would like to map the entire Unicode space.
-In theory, Unicode is made of $2^32$ code points.
-
-However only [17 Unicode planes][wiki-unicode-plane] are used because of the limitations.
-Out of those 17 planes only 7 are actually used, with 2 reserved for user customization (think empty).
-
-So our final goal is only to map 327,680 code points.
-
 ## Showcase
 
 Before diving into the details of the model, let's see how it handles the prompt:
@@ -256,3 +202,46 @@ It was not trained on any code, French nor Greek: it is performing well across l
 In any case, the few errors should be easily remediated with a more complete training dataset.
 
 Also the latent space shows structure: the model has learnt the Unicode scheme and more than 7 languages.
+
+### Limit / Locality / Robustness
+
+With `tokun-16`, the model is getting one step closer to the limit of input compression.
+
+16 Unicode characters will be represented by a `float32` vector of dimension 256.
+It's 1024 output bytes for every 64 input bytes.
+
+It would appear that there is still a lot of leeway.
+Actually, if there was a 1:1 match it would mean that only a single embedding value would map to each token.
+
+It would be impractical since it would require LLMs to predict very precise values.
+Suppose that `[0.025 1.52 1.67 2.24 ...]` represents `"hello world! \o/"`.
+If the LLM outputs `[0.025 1.53 1.67 2.24 ...]` it may just have produced a totally random string.
+
+In fact, $\frac{1024}{64} = 16$ is a good ratio:
+we want each chunk of 16 characters to be represented by a region in the space of dimension 256.
+
+Ultimately, we would like to map the entire Unicode space.
+In theory, Unicode is made of $2^32$ code points.
+
+However only [17 Unicode planes][wiki-unicode-plane] are used because of the limitations.
+Out of those 17 planes only 7 are actually used, with 2 reserved for user customization (think empty).
+
+So our final goal is only to map 327,680 code points.
+
+## Conclusion
+
+Until now, LLMs learnt to understand the language in the pretraining phase.
+Then to understand human interactions or other tasks in the fine-tuning phase.
+And finally were taught to behave according to policies.
+
+Here, we argued that neural networks can learn to encode and decode text to better fit their needs.
+
+These processes require specific architectures and data.
+Just like in regular programming languages, neural modules are being built.
+
+Machine learning is actually reminiscent of HTML and declarative programming languages:
+instead of specifying the process that NN have to follow the properties of the result are shown through data.
+
+Rather than refering to vague, manipulative and emotionally charged notions like "AGI", this field would benefit from being standardized and rationalized like a new programming language.
+
+## Resources
