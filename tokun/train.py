@@ -25,12 +25,8 @@ RANDOM = True
 
 # META ########################################################################
 
-ACTIVATION = 'silu'
-GATE = False
-NORMALIZATION = True
-
-SEQUENCE_AXIS = 1
-FEATURE_AXIS = -1
+N_SEQUENCE_AXIS = 1
+N_FEATURE_AXIS = -1
 
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
 N_ENCODING_DIM = 256 # U
@@ -38,19 +34,19 @@ N_EMBEDDING_DIM = N_ENCODING_DIM # E
 N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # H
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
+N_BATCH_DIM = 128 # number of samples per batch
+N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
+
 N_EPOCHS = 16
 N_EPOCHS_RAMPUP = 0
 N_EPOCHS_SUSTAIN = 0
 
-N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
-
-R_MIN, R_MAX, R_EXP = tokun.meta.rates(pretrained=IMPORT, normalization=NORMALIZATION, base=0.001)
+R_MIN, R_MAX, R_EXP = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
 
 # DERIVED #####################################################################
 
-TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
-OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2)))] # in characters
+N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
+N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4, 2)))] # in characters
 
 # IMPORT ######################################################################
 
@@ -58,7 +54,7 @@ PATH_IMPORT = os.path.join('models/4x4x4/relu/True/True/3.8.keras')
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, gate=GATE, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
@@ -77,9 +73,9 @@ RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N
 
 PIPELINE = [
     # offset by 1 to 15 character => (1,) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (4 * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding => (4 * S, E) int (bool)
@@ -96,7 +92,7 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=O
 
 PIPELINE = [
     # reshape => (B * G * S,) int
-    (functools.partial(tokun.pipeline.reshape, groups=N_TOKEN_DIM, expand=[], flatten=True), True),
+    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding => (B * G * S, E) int (bool)
     (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
     # replace sample inputs with (input, target) for supervised learning
@@ -117,7 +113,7 @@ DATASET_TEST = MLQA_TEST['ar'].concatenate(MLQA_TEST['en']).concatenate(MLQA_TES
 if IMPORT and os.path.isfile(PATH_IMPORT):
     MODEL = tf.keras.models.load_model(PATH_IMPORT)
 else:
-    MODEL = tokun.model.AutoEncoder(sequence_axis=SEQUENCE_AXIS, feature_axis=FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, hidden_dim=N_HIDDEN_DIM, latent_dim=N_LATENT_DIM, batch_dim=None, gate=GATE, normalization=NORMALIZATION, activation=ACTIVATION)
+    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, hidden_dim=N_HIDDEN_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
 
 # COMPILE #####################################################################
 

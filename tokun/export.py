@@ -20,12 +20,7 @@ import tokun.pipeline
 
 # META ########################################################################
 
-ACTIVATION = 'relu'
-GATE = True
-NORMALIZATION = True
-
-SEQUENCE_AXIS = 1
-
+N_SEQUENCE_AXIS = 1
 N_TOKEN_DIM = [4, 4] # G, for each block
 
 N_BATCH_DIM = 128 # number of samples per batch
@@ -33,12 +28,12 @@ N_SAMPLE_DIM = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_
 
 # DERIVED #####################################################################
 
-TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
-OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(TOKEN_SIZES[-1] // 4, 2)))] # in characters
+N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
+N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4, 2)))] # in characters
 
 # IMPORT ######################################################################
 
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, activation=ACTIVATION, gate=GATE, normalization=NORMALIZATION)
+VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
 LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
@@ -55,9 +50,9 @@ MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=Fal
 
 PIPELINE = [
     # offset by 1 to 15 character => (B, 1) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (B, G * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (B * G * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding => (B * G * S, E) int (bool)
@@ -73,8 +68,8 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=O
 # SAMPLES #####################################################################
 
 SAMPLES = {}
-TOKENS = {__i: {} for __i in TOKEN_SIZES} # in bytes
-EMBEDDINGS = {__i: {} for __i in TOKEN_SIZES} # in bytes
+TOKENS = {__i: {} for __i in N_TOKEN_SIZES} # in bytes
+EMBEDDINGS = {__i: {} for __i in N_TOKEN_SIZES} # in bytes
 
 for __lang, __dataset in MLQA_TEST.items():
     # compute predictions
@@ -97,10 +92,10 @@ for __size in TOKENS:
 
 # EMBEDDINGS ##################################################################
 
-for __depth, __size in enumerate(TOKEN_SIZES):
+for __depth, __size in enumerate(N_TOKEN_SIZES):
     for __lang, __tokens in TOKENS[__size].items():
         # re-encode without token repeats
-        __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
+        __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
@@ -111,7 +106,7 @@ for __depth, __size in enumerate(TOKEN_SIZES):
 
 # NEIGHBORHOODS ###############################################################
 
-__unit = TOKEN_SIZES[-1]
+__unit = N_TOKEN_SIZES[-1]
 __count = 256
 
 TOKENS['local'] = {'all': []}
@@ -122,7 +117,7 @@ for __lang, __tokens in TOKENS[__unit].items():
     __std = tf.math.reduce_std(EMBEDDINGS[__unit][__lang], axis=0, keepdims=True)
     __radius = 2. * tf.reduce_mean(__std).numpy()
     # choose a single token
-    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), groups=N_TOKEN_DIM, expand=SEQUENCE_AXIS * [1], flatten=True)
+    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
     # encode it
     __e = MODEL._encoder(__t)
     # add noise to generate random neighbors
