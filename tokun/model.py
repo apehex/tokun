@@ -149,7 +149,7 @@ class AutoEncoder(tf.keras.models.Model):
         super(AutoEncoder, self).__init__(**kwargs)
         # layers
         self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, hidden_dim=hidden_dim, latent_dim=latent_dim, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
-        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, hidden_dim=hidden_dim, latent_dim=latent_dim, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
+        self._decoder = Decoder(token_dim=token_dim[::-1], encoding_dim=encoding_dim, embedding_dim=embedding_dim, hidden_dim=hidden_dim, latent_dim=latent_dim, activation=activation, sequence_axis=sequence_axis, feature_axis=feature_axis)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(self._encoder(x))
