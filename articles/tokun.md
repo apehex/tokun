@@ -3,14 +3,28 @@
 > `tokun` took tokens to t-can
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
-These algortihms incarnate the human intuition of language tokens.
 
-We will show that neural networks can be trained to produce a much more efficient text encoding.
+These algortihms follow the human intuition of language to convert text to numbers.
+But neural networks have ways to store and process data unlike any interpretable algorithm. 
 
-Interestingly, this process is different from understanding language:
+We will show that a model can be trained to produce a much more efficient text encoding.
+
+Interestingly, this process is different from training a model to understand language:
 
 - the proposed model has a different architecture from transformers
 - the best training data is **not** human text but random bytes
+
+Also, the text will be split in chunks of 16 Unicode characters, regardless of the content and meaning.
+
+Obfuscated code, raw HEX or brainf\*ck programming language are all compressed by a factor 16:
+
+| Embedding 1           | Embedding 2           | Embedding 3        |
+| --------------------- | --------------------- | ------------------ |
+| `$P='++)u){$o.=u)`    | `$t{u)$i}^$k{$j};`    | `}}u)retuu)rn $o;` |
+| `0x60806040523480`    | `1561001057600080`    | `fd5b506000805460` |
+| `++++++++[>++++[>`    | `++>+++>+++>+<<<<`    | `-]>+>+>->>+[<]<-` |
+
+None of these combinations of characters would ever be made into tokens by traditional tokenizers, especially not of length 16.
 
 ## Intuition
 
@@ -131,6 +145,145 @@ The final model `tokun-4x4` addresses most of these shortcomings.
 The serie is heavily focused on western languages, due to personal knowledge.
 Still the concepts were tested on asian and middle-eastern languages.
 
+## Proposition
+
+Instead of building vocabularies outside of LLMs, the idea is to train a NN to transform any character sequence into a vector embedding.
+
+The model will learn to compress and decompress text at the same time, *from the raw Unicode bytes*.
+
+Compared to current techniques, both axes will be reduced by several orders:
+eventually, the example prompt of 134 characters would be represented as a `(9, 256)` tensor.
+
+## UTF-32 <=> "Better" UTF-8
+
+Just like traditional tokenization, the goal is to compose meaningful tokens from independent bytes.
+
+It starts with the encoding of text characters and symbols, following the [Unicode standard][wiki-unicode].
+
+Usually the translation is performed using UTF, but these schemes do not perfectly fit NN requirements:
+
+| Encoding | Advantages  | Shortcomings |
+| ---------| ----------- | ------------ |
+| UTF-8    | No gaps     | Varying size |
+| UTF-32   | Fixed size  | Null data    |
+
+Having a constant size will allow to split the input text into tensors of fixed shape.
+
+And avoiding null data will help to maximize the information density in the input space.
+
+Actually, we can achieve both goals at once by compressing UTF-32 with a neural network.
+This will be the first block layer of the `tokun` model.
+
+## The Model
+
+Overall, the model is a straightforward [variational autoencoder][wiki-vae].
+
+The original [implementation is using Tensorflow][tokun-github], as detailed in the appendices.
+
+### Inputs
+
+The input tensor has shape `(B, S * T, U)`, where:
+
+- `B` is the batch dimension
+- `S` is the sequence dimension
+- `T` is the token dimension, typically 64
+- `U` is the encoding dimension, 256
+
+The original text samples are preprocessed as follows:
+
+- each text sample is padded with `0x00` to a fixed length (on the right)
+- then encoded as UTF-32, which means 4 bytes per character
+- and finally each byte is represented as a one-hot vector
+
+### Embeddings
+
+The first half of the model, the encoder, turns the inputs into compressed embedding vectors.
+
+Given the input tensor `(B, S * T, U)`, the embeddings have a shape `(B, S, L)`.
+`L` is the latent dimension, typically chosen so that `U = L = 256`.
+
+So the encoder divides the sequence length by a factor `T = 64`.
+Since the sequence is made of UTF-32 bytes, 4 per character, the text sequence is *compressed 16 times*.
+
+### Outputs
+
+The second half of the model decodes these embeddings back into their constituting bytes.
+
+So, the overall model (encoder + decoder) produces probabilitiy vectors with the same shape as the input.
+They can be easily post-processed with `argmax` to predict the actual byte values.
+
+### Architecture
+
+#### Hyper Parameters
+
+- `N = 3`, the number of tokenization blocks
+- `G = [4, 4, 4]`, the token unit dimension for each block
+- `U = 256`, the encoding dimension from UTF-32-BE
+- `E = 256`, the embedding dimension
+- `L = 256`, the latent dimension
+
+A priori the dimensions of the last axes could be different.
+As we'll see in [the results](#results), these choices seem to fit best.
+
+#### Encoder
+
+The encoder is a CNN, with stacked dilated convolutions similar the the [WaveNet model][arxiv-wavenet].
+In the case of a stack of 2 tokenization blocks, the encoding process is:
+
+<img src=".images/4/encoder-blocks.png" width="75%"/>
+
+Each block layer merges the sequence axis chunk by chunk, by a factor $G_i$:
+
+1. the `LayerNorm` layer performs layer normalization
+2. the `Reshape` layer splits the sequence axis: `(B, S * G_i, E)` => `(B, S, G_i * E)`
+3. the `Dense` layer finally compresses the last dimension `G_i * E` into `E`
+
+With `G = [4, 4, 4]`, the first block merges UTF-32 bytes 4 by 4 and then produces one embedding vector for each Unicode character.
+Then the second layer merges the embeddings 4 by 4, etc.
+
+#### Decoder
+
+The decoder performs exactly the reverse operations, with the same token units:
+
+1. the `Dense` layer expands the latent dimension from `E` to `G_i * E`
+2. the `Reshape` layer splits the feature axis:  `(B, S, G_i * E)` => `(B, S * G_i, E)`
+3. the `LayerNorm` layer performs layer normalization
+
+It is a stack of detokenization layers, decompressing the successive embeddings.
+
+#### Head
+
+The head applies a projection follow by a softmax on the last axis to compute the probability of each byte.
+
+#### Variants
+
+Many variations of the model were trained and compared, with and without :
+
+- normalization, both RMS and layer norm
+- attention
+- positional embedding
+- feed forward layers
+
+Surprisingly, the simplest model performs significantly better.
+
+The only variations of the model are on the token units:
+
+- `[16, 4]` has the best balance between capacity and flexibility
+- `[4, 4, 4]` often gets stuck at 75% accuracy but can reach 100% with luck: it is brittle
+- `[4, 4]` can be used for extra resilience of the embeddings
+
+## Training
+
+Words, numbers and code amount for a very limited range of the possible combinations of Unicode characters.
+And using standard datasets may push the model to emphasize common patterns and undermine unique sequences.
+
+The role of `tokun` is actually to compress the encoding, **not** the language.
+
+So the most significant part is to **train the model on random sequences** of UTF-32-BE bytes.
+Since the dataset is random, it can natively scale and there is no need for data augmentation.
+
+Validation was also performed on [MLQA][github-mlqa] to make sure the model keeps its accuracy on regular text.
+
 ## Showcase
 
 Before diving into the details of the model, let's see how it handles the prompt:
@@ -245,3 +398,24 @@ instead of specifying the process that NN have to follow the properties of the r
 Rather than refering to vague, manipulative and emotionally charged notions like "AGI", this field would benefit from being standardized and rationalized like a new programming language.
 
 ## Resources
+
+
+[arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
+[github-mlqa]: https://github.com/facebookresearch/MLQA
+[openai-tokenizer]: https://platform.openai.com/tokenizer
+[tensorboard-projector]: https://projector.tensorflow.org/
+[tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
+[tiktokenizer-o200k]: https://tiktokenizer.vercel.app/?model=o200k_base
+[unicode-table]: https://symbl.cc/en/unicode-table/
+
+[youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
+
+[tokun-articles]: https://github.com/apehex/tokun/tree/main/articles
+[tokun-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.model.ipynb
+[tokun-github]: https://github.com/apehex/tokun
+[tokun-notebooks]: https://github.com/apehex/tokun/tree/main/notebooks
+
+[wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
+[wiki-vae]: https://en.wikipedia.org/wiki/Variational_autoencoder
+[wiki-tsne]: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
+
