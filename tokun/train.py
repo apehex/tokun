@@ -78,10 +78,8 @@ PIPELINE = [
     (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
-    # one-hot encoding => (4 * S, E) int (bool)
-    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
-    # replace sample inputs with (input, target) for supervised learning
-    ((lambda x: (x, x)), True)]
+    # one-hot encoding for the targets => (4 * S, E) int (bool)
+    ((lambda x: (x, tf.one_hot(x, depth=N_ENCODING_DIM, axis=-1))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
@@ -91,12 +89,10 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=O
 # PREPROCESS RANDOM ###########################################################
 
 PIPELINE = [
-    # reshape => (B * G * S,) int
+    # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
-    # one-hot encoding => (B * G * S, E) int (bool)
-    (functools.partial(tf.one_hot, depth=N_ENCODING_DIM, axis=-1), True),
-    # replace sample inputs with (input, target) for supervised learning
-    ((lambda x: (x, x)), True)]
+    # one-hot encoding for the targets => (4 * S, E) int (bool)
+    ((lambda x: (x, tf.one_hot(x, depth=N_ENCODING_DIM, axis=-1))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 

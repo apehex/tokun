@@ -72,9 +72,7 @@ def preprocess(text: str, groups: list, expand: list=[], flatten: bool=True) -> 
     # list of bytes
     __bytes = encode(data=text, token_size=__token_size)
     # partition or flatten
-    __bytes = reshape(data=__bytes, groups=groups, expand=expand, flatten=flatten)
-    # one-hot
-    return tf.one_hot(indices=__bytes, depth=256, axis=-1)
+    return reshape(data=__bytes, groups=groups, expand=expand, flatten=flatten)
 
 # < ###########################################################################
 
@@ -94,6 +92,6 @@ def postprocess(output: tf.Tensor) -> str:
 def sample(model: tf.keras.models.Model, text: str, **kwargs) -> tuple:
     __x = preprocess(text=text, **kwargs)
     __e = model._encoder(__x)
-    __p = model(__x)
+    __p = model._decoder(__e)
     __y = postprocess(__p)
     return (__x, __e, __p, __y)

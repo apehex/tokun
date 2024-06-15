@@ -38,11 +38,10 @@ class Encoder(tf.keras.models.Model):
         # layers
         __layers = [
             # (B * G ^ D, U) => (B * G ^ D, E)
-            tf.keras.layers.Dense(
-                units=embedding_dim,
-                activation='linear',
-                use_bias=False,
-                kernel_initializer='glorot_uniform',
+            tf.keras.layers.Embedding(
+                input_dim=encoding_dim,
+                output_dim=embedding_dim,
+                embeddings_initializer='glorot_uniform',
                 name='embed-1'),] + [
             # (B * G ^ i, E) => (B * G ^ (i-1), E)
             tokun.layers.TokenizeBlock(
