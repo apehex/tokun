@@ -72,10 +72,10 @@ EMBEDDINGS = {__i: {} for __i in N_TOKEN_SIZES} # in bytes
 for __lang, __dataset in MLQA_TEST.items():
     # compute predictions
     __batch = iter(__dataset.batch(N_BATCH_DIM)) # iterate over batches of samples
-    __input = next(__batch)[0] # take input only
-    __output = MODEL(__input)
+    __inputs, __targets = next(__batch)
+    __outputs = MODEL(__inputs)
     # sample predictions (inputs, outputs)
-    SAMPLES[__lang] = (__input, __output)
+    SAMPLES[__lang] = (__targets, __outputs)
 
 # TOKENS ######################################################################
 

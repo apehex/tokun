@@ -79,9 +79,9 @@ def preprocess(text: str, groups: list, expand: list=[], flatten: bool=True) -> 
 def unpad(text: str) -> str:
     return text.strip('\x00')
 
-def postprocess(output: tf.Tensor) -> str:
+def postprocess(output: tf.Tensor, onehot: bool=True) -> str:
     # from one-hot to UTF-32 bytes
-    __output = interpret(output=output)
+    __output = interpret(output=output) if onehot else output
     # flatten the groups of 4 bytes
     __output = decode(tokens=__output)
     # remove the padding
