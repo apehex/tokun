@@ -14,7 +14,7 @@ Interestingly, this process is different from training a model to understand lan
 - the proposed model has a different architecture from transformers
 - the best training data is **not** human text but random bytes
 
-Also, the text will be split in chunks of 16 Unicode characters, regardless of the content and meaning.
+Input text will be split in chunks of 16 Unicode characters, regardless of the content and meaning.
 
 Obfuscated code, raw HEX or brainf\*ck programming language are all compressed by a factor 16:
 
@@ -49,9 +49,9 @@ Une unité lexicale ou token lexical ou plus simplement token est un couple comp
 Since LLMs don't actually handle text, this sentence has first to be translated to numbers.
 This process has several stages: encoding, tokenization and embedding.
 
-For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`): 
+For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`):
 
-<img src=".images/tiktoken.gpt-4o.png" width="75%"/>
+<img src=".images/tiktoken/gpt-4o.png" width="75%"/>
 
 The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
 Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
@@ -139,8 +139,7 @@ Obviously I asked `ChatGPT` if he / it / they wanted to add something:
 - [ ] efficiency: some tokenizers can be slow to encode and decode large texts
 - [ ] handling of compound words: `"hotdog"` is unrelated to `"hot dog"`
 
-The model `tokun-1` presented here will tackle the first 4 points.
-The final model `tokun-4x4` addresses most of these shortcomings.
+`tokun` addresses most of these shortcomings.
 
 The serie is heavily focused on western languages, due to personal knowledge.
 Still the concepts were tested on asian and middle-eastern languages.
@@ -152,7 +151,7 @@ Instead of building vocabularies outside of LLMs, the idea is to train a NN to t
 The model will learn to compress and decompress text at the same time, *from the raw Unicode bytes*.
 
 Compared to current techniques, both axes will be reduced by several orders:
-eventually, the example prompt of 134 characters would be represented as a `(9, 256)` tensor.
+eventually, the example prompt of 134 characters would be represented as a `(9, 256)` tensor, just the length of "Une unité".
 
 ## UTF-32 <=> "Better" UTF-8
 
@@ -264,13 +263,14 @@ Many variations of the model were trained and compared, with and without :
 - positional embedding
 - feed forward layers
 
-Surprisingly, the simplest model performs significantly better.
+Surprisingly, *the simplest model performs significantly better*.
 
 The only variations of the model are on the token units:
 
-- `[16, 4]` has the best balance between capacity and flexibility
+- `[4, 16]` has the best balance between capacity and flexibility
 - `[4, 4, 4]` often gets stuck at 75% accuracy but can reach 100% with luck: it is brittle
 - `[4, 4]` can be used for extra resilience of the embeddings
+- other variants are underperforming / bloated
 
 ## Training
 
@@ -284,102 +284,159 @@ Since the dataset is random, it can natively scale and there is no need for data
 
 Validation was also performed on [MLQA][github-mlqa] to make sure the model keeps its accuracy on regular text.
 
-## Showcase
+## Features
 
-Before diving into the details of the model, let's see how it handles the prompt:
+The model is meant to be used as a tokenizer: it should decode the embeddings back to the original byte sequence without fail.
 
-```
-Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
-```
+This is why we will be comparing inputs and outputs thoughout this section.
 
-Even though it was not trained on French, the model can encode and decode the sample without errors:
+For example, they are calculated on the prompt from [the introduction](#state-of-the-art-tokenization) as follows:
 
 ```python
-__s = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
-__x = tokun.pipeline.preprocess(text=__s, groups=N_TOKEN_DIM, flatten=True) # input = UTF-32-BE bytes as one-hot vectors
-__e = MODEL._encoder(__x) # embedding = tokens
-__p = MODEL._decoder(__e) # output = probabilities for each byte
-__y = tokun.pipeline.postprocess(__p) # text = interpreted probabilities
+sample = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
+inputs = tokun.pipeline.preprocess(text=sample, groups=N_TOKEN_DIM, expand=[1], flatten=True) # input = UTF-32-BE bytes
+embeddings = MODEL._encoder(inputs) # embedding = tokens
+outputs = MODEL._decoder(embeddings) # output = probabilities for each byte
+predictions = tokun.pipeline.postprocess(outputs) # text = interpreted probabilities
 ```
 
-```
-Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
-Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).��
-1.0
-```
+### Input Compression
 
-The variable `__e` is the embedding, the tensor that would be fed to a LLM.
-Contrary to traditional tokens, the output of `tokun` is not directly interpretable:
+The sequence length of *any input tensor* is **divided by 16**:
 
 ```python
-print(len(__s))
+print(len(sample)) # count in Unicode characters
 # 134
-print(__e.shape)
-# (34, 256)
-tf.print(__e[:4, :8], summarize=-1)
-# [[3.17276168 1.53056908 2.41119337 0.0258403085 1.5207386 1.66698301 2.24263883 2.11223722]
-#  [2.65205669 1.68546355 2.01416564 0.655108571 2.3957293 1.70228446 2.12328672 2.04205203]
-#  [2.4943645 0.441500723 1.79073346 2.31724644 1.87132716 1.36434507 3.37104845 2.3522613]
-#  [2.87078524 1.11898732 2.12827492 0.995271683 0.403087556 0.974042118 1.82035911 2.90426946]]
+print(inputs.shape) # count in UTF-32 bytes
+# (1, 576)
+print(embeddings.shape) # number of embeddings
+# (1, 9, 256)
+print(9 * 16) # padded input
+# 144
 ```
 
-Still, the vectors / tokens can be mapped to 3D and understood to some extent:
+And the embeddings have a dimension 256 only, compared to 4096 in `llama3-8B` for example.
 
-| Accents                       | Symbols                       |
-| ----------------------------- | ----------------------------- |
-| ![][image-tsne-token-accents] | ![][image-tsne-token-symbols] |
+### Reliance
 
-The images above are 2 views from the UMAP plot of embeddings.
-These embeddings are the representation of the French page on [VAE models][wiki-vae-fr].
+Current tokenizers are biased toward the most frequent occurences in their training set.
+Their performance is dependent on the content of the input text.
 
-On the right, the selected point is labeled `"𝑞\nΦ\n"`, it is the embedding for a portion of a LaTeX equation.
-Inded, the input was a raw copy-paste of the article so the equation symbols were spread across several lines:
+`tokun` will **always** chunk the input by blocks of 16, whatever the content.
 
-```latex
-{\displaystyle p_{\theta }(\mathbf {x} )=\int _{\mathbf {z} }p_{\theta }(\mathbf {x,z} )\,d\mathbf {z} ,}
-où 
-𝑝
-𝜃
-(
-𝑥
-,
-𝑧
-)
+### Language Agnostic
+
+The model can encode any Unicode sequence, including any human language.
+
+It was never trained on Korean and still the embeddings are decoded with 100% accuracy:
+
+```python
+print(sample)
+# 프롬프트 엔지니어링(영어: prompt engineering)은 인공지능의 한 개념으로 특히 자연어 처리 부분에 해당된다.
+print(predictions)
+# 프롬프트 엔지니어링(영어: prompt engineering)은 인공지능의 한 개념으로 특히 자연어 처리 부분에 해당된다.
+print(tokun.evaluation.compart(sample, prediction))
+# 1.0
 ```
 
-Hence the newlines `"\n"` in the labels.
+Any programming language:
 
-Despite the quirks of the inputs, `tokun-4` decodes the embeddings with 99% accuracy, only missing a few Greek symbols in the equations.
+```python
+print(sample)
+# ++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
+print(predictions)
+# ++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
+print(tokun.evaluation.compart(sample, prediction))
+# 1.0
+```
 
-It was not trained on any code, French nor Greek: it is performing well across languages.
-In any case, the few errors should be easily remediated with a more complete training dataset.
+Or random binary (HEX encoded before printing):
 
-Also the latent space shows structure: the model has learnt the Unicode scheme and more than 7 languages.
+```python
+print(sample.encode('utf-8').hex())
+# 000084ea000055510001952c00018225000007a00003163c0003e4ff0003726b
+print(predictions.encode('utf-8').hex())
+# 000084ea000055510001952c00018225000007a00003163c0003e4ff0003726b
+print(tokun.evaluation.compart(sample, prediction))
+# 1.0
+```
 
-### Limit / Locality / Robustness
+### Meaningful Tokens
 
-With `tokun-16`, the model is getting one step closer to the limit of input compression.
+The embedding vectors hold all the information up to the byte level.
 
-16 Unicode characters will be represented by a `float32` vector of dimension 256.
-It's 1024 output bytes for every 64 input bytes.
+This ensures that text inputs with similar content, like "hotdog" and "hot-dog", are close in the latent space.
 
-It would appear that there is still a lot of leeway.
-Actually, if there was a 1:1 match it would mean that only a single embedding value would map to each token.
+This can be visualized thanks to the algorithm t-SNE, here on random embeddings from the validation dataset:
 
-It would be impractical since it would require LLMs to predict very precise values.
-Suppose that `[0.025 1.52 1.67 2.24 ...]` represents `"hello world! \o/"`.
-If the LLM outputs `[0.025 1.53 1.67 2.24 ...]` it may just have produced a totally random string.
+<img src=".images/16/tsne.languages.4x16.gif" width="75%"/>
 
-In fact, $\frac{1024}{64} = 16$ is a good ratio:
-we want each chunk of 16 characters to be represented by a region in the space of dimension 256.
+Languages from different Unicode planes are clearly separated.
+Even within the same alphabet the German, English and Vietnamese samples are segregated.
 
-Ultimately, we would like to map the entire Unicode space.
-In theory, Unicode is made of $2^32$ code points.
+The neighbors of the following embedding
 
-However only [17 Unicode planes][wiki-unicode-plane] are used because of the limitations.
-Out of those 17 planes only 7 are actually used, with 2 reserved for user customization (think empty).
+| "ion of the Six A"                | "r anderem drei 5"                |
+| --------------------------------- | --------------------------------- |
+| ![][image-tsne-english]           | ![][image-tsne-german]            |
 
-So our final goal is only to map 327,680 code points.
+### Built-in Special Tokens
+
+Unicode comes with [special characters out-of-the-box][unicode-table]:
+
+| 0000 - 001F                       | 007F - 009F                       |
+| --------------------------------- | --------------------------------- |
+| ![][image-unicode-table-00-1f]    | ![][image-unicode-table-7f-9f]    |
+
+Many of these special characters are obsolete and can be repurposed as special tokens.
+
+For instance `0x0002` and `0x0003` stand for "start" and "end of text" in Unicode, they are similar to `<|im_start|>` `<|im_end|>` used in GPT-4.
+
+### Robustness
+
+The embeddings are quite robust to noise even when it doesn't respect the underlying structure:
+
+```python
+std = tf.math.reduce_std(EMBEDDINGS[N_TOKEN_SIZES[-1]]['en'], axis=0)
+noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+
+inputs = tokun.pipeline.preprocess(sample, groups=[4, 16], expand=[1], flatten=True)
+embeddings = MODEL._encoder(inputs)
+```
+
+The embeddings can withstand a random noise of $0.1 * \sigma$ and start making mistakes outside this range:
+
+```python
+print(tokun.pipeline.postprocess(MODEL._decoder(embeddings)))
+# Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+```
+
+```python
+print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 1.2 * std)))
+# Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 1.3 * std)))
+# Une unité lexicale ou token lexical ou plus simpleねent token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+```
+
+```python
+print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 0.1 * noise)))
+# Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
+print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 0.2 * noise)))
+# Une unité lꝥxicɡle ou token꜠lexɩcal ou plus꜠simᝰlement tokeꝮ es᝴ un couple ꝣompɯsé d'un nom꜠づt ᝤ'une ɶaleur꜠optɩonnelle (e.ꝧ. 1ȳ5677).�����꜀팀��
+```
+
+The stability of decoding on the neighborhood of each embedding is more apparent on a UMAP graph:
+
+<img src=".images/16/neighbors.4x16.gif" width="75%"/>
+
+It is actually a good property that a whole set of vectors encode the same text.
+If the model had a 1:1 match it would be very brittle and the host LLM would be unable to predict the exact vector.
+
+Going back to the estimation based on the storage space, 1024 embedding bytes for every 64 input bytes seems like a decent ratio.
+It gives leeway for the predictions of LLMs while having a significant compression factor.
+
+This also explains why robustness is very dependent on the model variation:
+`tokun-4x16` can only take $0.1 * \sigma$ but `tokun-4x4` can go up to $\sigma$.
 
 ## Conclusion
 
@@ -399,6 +456,15 @@ Rather than refering to vague, manipulative and emotionally charged notions like
 
 ## Resources
 
+All the variants of the model are already available on:
+
+- [Github][tokun-github]
+- [Kaggle][tokun-kaggle]
+
+You will also find notebooks on:
+
+- [Github][notebook-github]
+- [Google Colab][notebook-colab]
 
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
 [github-mlqa]: https://github.com/facebookresearch/MLQA
@@ -407,6 +473,12 @@ Rather than refering to vague, manipulative and emotionally charged notions like
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
 [tiktokenizer-o200k]: https://tiktokenizer.vercel.app/?model=o200k_base
 [unicode-table]: https://symbl.cc/en/unicode-table/
+
+[image-unicode-table-00-1f]: .images/unicode/special-tokens.00-1f.png
+[image-unicode-table-7f-9f]: .images/unicode/special-tokens.7f-9f.png
+
+[image-tsne-english]: .images/16/tsne.english.4x16.png
+[image-tsne-german]: .images/16/tsne.german.4x16.png
 
 [youtube-karpathy-tokenizer]: https://www.youtube.com/watch?v=zduSFxRajkE
 
@@ -418,4 +490,3 @@ Rather than refering to vague, manipulative and emotionally charged notions like
 [wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
 [wiki-vae]: https://en.wikipedia.org/wiki/Variational_autoencoder
 [wiki-tsne]: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
-
