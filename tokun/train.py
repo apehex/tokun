@@ -72,6 +72,8 @@ RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N
 # PREPROCESS MLQA #############################################################
 
 PIPELINE = [
+    # join the features
+    ((lambda x: tf.strings.join(inputs=[x['context'], x['question'], x['answers']['text']], separator='\x1d')), True),
     # offset by 1 to 15 character => (1,) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (4 * S,) int
@@ -83,8 +85,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: mlable.data.process(dataset=__d, feature='context', pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # PREPROCESS RANDOM ###########################################################
 
@@ -96,8 +98,8 @@ PIPELINE = [
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, feature='', pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, feature='', pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, pipeline=OPERATIONS, replace=REPLACE)
 
 # COMBINE DATASETS ############################################################
 
