@@ -8,21 +8,12 @@ import tensorflow as tf
 
 # UNICODE #####################################################################
 
-CODE_STX = '\x02'
-CODE_ETX = '\x03'
-CODE_FS = '\x1c'
-CODE_GS = '\x1d'
-CODE_RS = '\x1e'
-CODE_US = '\x1f'
-
-# STRUCTURE ###################################################################
-
-SEPARATORS = {0: CODE_GS, 1: CODE_RS, 2: CODE_US, -1: ''}
-
-def structure(parts: list, level: int=0, separators: str=SEPARATORS) -> str:
-    __sep = separators.get(level, separators.get(-1, ''))
-    __parts = [parts] if isinstance(parts, str) else [structure(parts=__p, level=level + 1, separators=separators) for __p in parts]
-    return __sep.join(__parts)
+CODE_STX = b'\x02'
+CODE_ETX = b'\x03'
+CODE_FS = b'\x1c'
+CODE_GS = b'\x1d'
+CODE_RS = b'\x1e'
+CODE_US = b'\x1f'
 
 # ENCODE ######################################################################
 
