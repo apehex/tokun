@@ -14,7 +14,7 @@ Interestingly, this process is different from training a model to understand lan
 - the proposed model has a different architecture from transformers
 - the best training data is **not** human text but random bytes
 
-Input text will be split in chunks of 16 Unicode characters, regardless of the content and meaning.
+Input text will be split in chunks of 16 Unicode characters, regardless of the content.
 
 Obfuscated code, raw HEX or brainf\*ck programming language are all compressed by a factor 16:
 
@@ -30,7 +30,7 @@ None of these combinations of characters would ever be made into tokens by tradi
 
 OpenAI stated that the [GPT-4 tokens have a length of 4 characters][openai-tokenizer], on average and in English.
 
-With UTF-8, these 4 characters amount to less than 8 bytes in the vast majority of cases.
+With UTF-8, these 4 characters amount to less than 8 bytes for the Latin languages and less than 12 bytes in the vast majority of cases.
 
 These 8 bytes are translated into a vector of dimension 100k by a common tokenizer like `cl100`.
 If the elements of the vectors are stored as `float32` that's **400k bytes worth of space** for each 4 characters.
@@ -70,22 +70,24 @@ It turns the orginal prompt in a `(32, 199998)` tensor:
 
 ## Relation With Performances
 
-### Inference
-
 The encoded input has two axes, the dimensions of which have a direct impact on performance.
+
+### Forward-Pass
 
 First, the number of tokens is related to the sequence dimension.
 It defines the quantity of information a LLM can process at once.
 
-The prompt of the previous sections had 134 characters, which were reduced to 32 tokens.
-It's roughly a compression by a factor 4.
+By fitting more characters in each token you can either:
 
-The higher this factor is, the more information the model can fit into a single forward pass / inference.
-Conversely, it means that it would take less computing resources to process prompts.
+- lower the sequence dimension: keep the same attention scope but reduce computing requirements
+- keep the same sequence dimension: increase the attention with unchanged 
 
-The second axis has a constant dimension of several 100k.
+### Model Size
+
+The second axis has a constant dimension of several 100k, the vocabulary size.
+
 It is directly related to the size of the model, as it will require a neuron for each element.
-For example `llama3-8B` has a `128000 x 4096` kernel in its first layer, the embedding, where 128k is the size of the vocabulary.
+For example `llama3-8B` has a `128000 x 4096` kernel in its first layer, the embedding layer.
 
 The size of the model has an overarching impact on the cost.
 The number of parameters is roughly a balance between efficiency and quality.
@@ -142,7 +144,7 @@ Obviously I asked `ChatGPT` if he / it / they wanted to add something:
 `tokun` addresses most of these shortcomings.
 
 The serie is heavily focused on western languages, due to personal knowledge.
-Still the concepts were tested on asian and middle-eastern languages.
+Still the concepts were tested on Asian and Middle-Eastern languages.
 
 ## Proposition
 
@@ -159,7 +161,7 @@ Just like traditional tokenization, the goal is to compose meaningful tokens fro
 
 It starts with the encoding of text characters and symbols, following the [Unicode standard][wiki-unicode].
 
-Usually the translation is performed using UTF, but these schemes do not perfectly fit NN requirements:
+Usually the translation is performed using [UTF][wiki-utf], but these schemes do not perfectly fit NN requirements:
 
 | Encoding | Advantages  | Shortcomings |
 | ---------| ----------- | ------------ |
@@ -177,7 +179,7 @@ This will be the first block layer of the `tokun` model.
 
 Overall, the model is a straightforward [variational autoencoder][wiki-vae].
 
-The original [implementation is using Tensorflow][tokun-github], as detailed in the appendices.
+The original [implementation is using Tensorflow][tokun-github].
 
 ### Inputs
 
@@ -190,9 +192,8 @@ The input tensor has shape `(B, S * T, U)`, where:
 
 The original text samples are preprocessed as follows:
 
-- each text sample is padded with `0x00` to a fixed length (on the right)
+- each text sample is padded (on the right) with `0x00` to a fixed length `S`
 - then encoded as UTF-32, which means 4 bytes per character
-- and finally each byte is represented as a one-hot vector
 
 ### Embeddings
 
@@ -202,7 +203,7 @@ Given the input tensor `(B, S * T, U)`, the embeddings have a shape `(B, S, L)`.
 `L` is the latent dimension, typically chosen so that `U = L = 256`.
 
 So the encoder divides the sequence length by a factor `T = 64`.
-Since the sequence is made of UTF-32 bytes, 4 per character, the text sequence is *compressed 16 times*.
+Since the sequence is made of UTF-32 bytes, 4 per character, the text sequence is **compressed 16 times**.
 
 ### Outputs
 
@@ -222,7 +223,7 @@ They can be easily post-processed with `argmax` to predict the actual byte value
 - `L = 256`, the latent dimension
 
 A priori the dimensions of the last axes could be different.
-As we'll see in [the results](#results), these choices seem to fit best.
+As we'll see in [the results](#features), these choices seem to fit best.
 
 #### Encoder
 
@@ -252,7 +253,7 @@ It is a stack of detokenization layers, decompressing the successive embeddings.
 
 #### Head
 
-The head applies a projection follow by a softmax on the last axis to compute the probability of each byte.
+The head applies a projection followed by a softmax on the last axis to compute the probability of each byte.
 
 #### Variants
 
@@ -263,9 +264,9 @@ Many variations of the model were trained and compared, with and without :
 - positional embedding
 - feed forward layers
 
-Surprisingly, *the simplest model performs significantly better*.
+Surprisingly, **the simplest model performs significantly better**.
 
-The only variations of the model are on the token units:
+The only relevant variations of the model are on the token units:
 
 - `[4, 16]` has the best balance between capacity and flexibility
 - `[4, 4, 4]` often gets stuck at 75% accuracy but can reach 100% with luck: it is brittle
@@ -290,13 +291,13 @@ The model is meant to be used as a tokenizer: it should decode the embeddings ba
 
 This is why we will be comparing inputs and outputs thoughout this section.
 
-For example, they are calculated on the prompt from [the introduction](#state-of-the-art-tokenization) as follows:
+For example, they are calculated on the prompt from [the introduction](#state-of-the-art-tokenization) with:
 
 ```python
-sample = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
-inputs = tokun.pipeline.preprocess(text=sample, groups=N_TOKEN_DIM, expand=[1], flatten=True) # input = UTF-32-BE bytes
-embeddings = MODEL._encoder(inputs) # embedding = tokens
-outputs = MODEL._decoder(embeddings) # output = probabilities for each byte
+sample      = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
+inputs      = tokun.pipeline.preprocess(text=sample, groups=[4, 16], expand=[1], flatten=True) # input = UTF-32-BE bytes
+embeddings  = MODEL._encoder(inputs) # embedding = tokens
+outputs     = MODEL._decoder(embeddings) # output = probabilities for each byte
 predictions = tokun.pipeline.postprocess(outputs) # text = interpreted probabilities
 ```
 
@@ -367,18 +368,37 @@ The embedding vectors hold all the information up to the byte level.
 
 This ensures that text inputs with similar content, like "hotdog" and "hot-dog", are close in the latent space.
 
-This can be visualized thanks to the algorithm t-SNE, here on random embeddings from the validation dataset:
+This can be visualized [in tensorboard][tensorboard-projector] with the [algorithm t-SNE][wiki-tsne] or [UMAP][wiki-dimensionality-reduction]:
 
 <img src=".images/16/tsne.languages.4x16.gif" width="75%"/>
 
-Languages from different Unicode planes are clearly separated.
+Languages from different Unicode planes are clearly separated:
+the Unicode space is very structured and the proximity of codepoints is meaningful.
+
 Even within the same alphabet the German, English and Vietnamese samples are segregated.
+The more characters the embeddings share, the closer they are:
 
-The neighbors of the following embedding
-
-| "ion of the Six A"                | "r anderem drei 5"                |
+| "ated in the cons"                | "r anderem drei 5"                |
 | --------------------------------- | --------------------------------- |
 | ![][image-tsne-english]           | ![][image-tsne-german]            |
+
+Order is also encoded and it plays a major role:
+
+| samples               | Shared    | Position  |
+| --------------------- | --------- | --------- |
+| `ated in the cons`    | 100%      | 100%      |
+| `ated by the conc`    | 82%       | 81%       |
+| `ased on the Cons`    | 90%       | 81%       |
+| `\ video game cons`   | 82%       | 44%       |
+| `ower in the arch`    | 82%       | 56%       |
+| `ations, the Brit`    | 82%       | 44%       |
+| `rtension is more`    | 78%       | 31%       |
+| `\ jury in the 5th`   | 55%       | 0%        |
+
+The samples above are sorted according to the distance of their embedding to the vector or "ated in the cons".
+The first percentage on the right is the ratio of shared characters, and the second one is the ratio of characters with exactly the same position.
+
+Keep in mind that this model was not trained on human language but on random Unicode data.
 
 ### Built-in Special Tokens
 
@@ -390,26 +410,26 @@ Unicode comes with [special characters out-of-the-box][unicode-table]:
 
 Many of these special characters are obsolete and can be repurposed as special tokens.
 
-For instance `0x0002` and `0x0003` stand for "start" and "end of text" in Unicode, they are similar to `<|im_start|>` `<|im_end|>` used in GPT-4.
+For instance `0x0002` and `0x0003` stand for "start" and "end of text" in Unicode, they are similar to `<|im_start|>` `<|im_end|>` used in `GPT-4`.
 
 ### Robustness
 
-The embeddings are quite robust to noise even when it doesn't respect the underlying structure:
+The embeddings are quite robust to noise even when it doesn't respect the underlying structure.
 
 ```python
-std = tf.math.reduce_std(EMBEDDINGS[N_TOKEN_SIZES[-1]]['en'], axis=0)
+std = tf.math.reduce_std(EMBEDDINGS[64]['en'], axis=0)
 noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
 inputs = tokun.pipeline.preprocess(sample, groups=[4, 16], expand=[1], flatten=True)
 embeddings = MODEL._encoder(inputs)
 ```
 
-The embeddings can withstand a random noise of $0.1 * \sigma$ and start making mistakes outside this range:
-
 ```python
 print(tokun.pipeline.postprocess(MODEL._decoder(embeddings)))
 # Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
 ```
+
+The embeddings can withstand a structured noise of amplitude $\sigma$ and start making mistakes outside this range:
 
 ```python
 print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 1.2 * std)))
@@ -417,6 +437,8 @@ print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 1.2 * std)))
 print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 1.3 * std)))
 # Une unité lexicale ou token lexical ou plus simpleねent token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677).
 ```
+
+They are more susceptible to random noise:
 
 ```python
 print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 0.1 * noise)))
@@ -446,13 +468,13 @@ And finally were taught to behave according to policies.
 
 Here, we argued that neural networks can learn to encode and decode text to better fit their needs.
 
-These processes require specific architectures and data.
+Each of these processes require specific architectures and data.
 Just like in regular programming languages, neural modules are being built.
 
 Machine learning is actually reminiscent of HTML and declarative programming languages:
 instead of specifying the process that NN have to follow the properties of the result are shown through data.
 
-Rather than refering to vague, manipulative and emotionally charged notions like "AGI", this field would benefit from being standardized and rationalized like a new programming language.
+Rather than referring to vague notions like "AGI", this field would benefit from being standardized and rationalized like a new *programming language*.
 
 ## Resources
 
@@ -487,6 +509,8 @@ You will also find notebooks on:
 [tokun-github]: https://github.com/apehex/tokun
 [tokun-notebooks]: https://github.com/apehex/tokun/tree/main/notebooks
 
+[wiki-dimensionality-reduction]: https://en.wikipedia.org/wiki/Nonlinear_dimensionality_reduction
 [wiki-unicode]: https://en.wikipedia.org/wiki/Unicode
+[wiki-utf]: https://en.wikipedia.org/wiki/Unicode#UTF
 [wiki-vae]: https://en.wikipedia.org/wiki/Variational_autoencoder
 [wiki-tsne]: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
