@@ -2,8 +2,6 @@
 
 > `to-kun` took tokens to t-can
 
-<img src="header.png" width="32%"/>
-
 Current tokenizers have notorious issues that are bringing all the LLMs down.
 
 `tokun` is a NN model specialized in text tokenization.
