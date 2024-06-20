@@ -2,7 +2,7 @@
 
 > `to-kun` took tokens to t-can
 
-<img src="header.png" width="75%"/>
+<img src="header.png" width="32%"/>
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
 

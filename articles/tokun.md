@@ -2,7 +2,7 @@
 
 > `tokun` took tokens to t-can
 
-<img src="../.github/header.png" width="75%"/>
+<img src="../.github/header.png" width="32%"/>
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
 
