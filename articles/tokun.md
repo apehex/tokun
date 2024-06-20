@@ -2,6 +2,8 @@
 
 > `tokun` took tokens to t-can
 
+<img src="../.github/header.png" width="75%"/>
+
 Current tokenizers have notorious issues that are bringing the LLMs down.
 
 These algortihms follow the human intuition of language to convert text to numbers.
