@@ -2,10 +2,7 @@
 
 > `tokun` took tokens to t-can
 
-<figure>
-    <img src="../.github/header.png" alt="Neural tokenization" width="32%">
-    <figcaption>Source: Image by Author and generated with MidJourney</figcaption>
-</figure>
+<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="32%">
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
 
