@@ -481,12 +481,14 @@ Rather than referring to vague notions like "AGI", this field would benefit from
 All the variants of the model are already available on:
 
 - [Github][tokun-github]
-- [Kaggle][tokun-kaggle]
+- [Hugging Face][tokun-hf]
 
 You will also find notebooks on:
 
-- [Github][notebook-github]
-- [Google Colab][notebook-colab]
+- [Github][tokun-notebooks]
+- [Google Colab][tokun-colab]
+
+And [more detailed articles][tokun-articles] on the iterations of the model on Github.
 
 [arxiv-wavenet]: https://arxiv.org/pdf/1609.03499.pdf
 [github-mlqa]: https://github.com/facebookresearch/MLQA
@@ -507,6 +509,7 @@ You will also find notebooks on:
 [tokun-articles]: https://github.com/apehex/tokun/tree/main/articles
 [tokun-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.model.ipynb
 [tokun-github]: https://github.com/apehex/tokun
+[tokun-hf]: https://github.com/apehex/tokun
 [tokun-notebooks]: https://github.com/apehex/tokun/tree/main/notebooks
 
 [wiki-dimensionality-reduction]: https://en.wikipedia.org/wiki/Nonlinear_dimensionality_reduction
