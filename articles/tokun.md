@@ -389,11 +389,11 @@ Order is also encoded and it plays a major role:
 | `ated in the cons`    | 100%      | 100%      |
 | `ated by the conc`    | 82%       | 81%       |
 | `ased on the Cons`    | 90%       | 81%       |
-| `\ video game cons`   | 82%       | 44%       |
+| ` video game cons`    | 82%       | 44%       |
 | `ower in the arch`    | 82%       | 56%       |
 | `ations, the Brit`    | 82%       | 44%       |
 | `rtension is more`    | 78%       | 31%       |
-| `\ jury in the 5th`   | 55%       | 0%        |
+| ` jury in the 5th`    | 55%       | 0%        |
 
 The samples above are sorted according to the distance of their embedding to the vector or "ated in the cons".
 The first percentage on the right is the ratio of shared characters, and the second one is the ratio of characters with exactly the same position.
