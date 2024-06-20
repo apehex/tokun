@@ -2,8 +2,9 @@
 
 > `to-kun` took tokens to t-can
 
+<img src="header.png" width="75%"/>
+
 Current tokenizers have notorious issues that are bringing all the LLMs down.
-For example I could not get ChatGPT to produce a decent catch-phrase (so you're stuck with mine!).
 
 `tokun` is a NN model specialized in text tokenization.
 It produces 256-embedding vectors equivalent to 64 UTF-32-BE bytes.
