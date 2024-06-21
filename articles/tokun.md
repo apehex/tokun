@@ -6,7 +6,7 @@
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
 
-These algortihms follow the human intuition of language to convert text to numbers.
+These algorithms follow the human intuition of language to convert text to numbers.
 But neural networks have ways to store and process data unlike any interpretable algorithm. 
 
 We will show that a model can be trained to produce a much more efficient text encoding.
