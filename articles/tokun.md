@@ -2,7 +2,7 @@
 
 > `tokun` took tokens to t-can
 
-<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="32%">
+<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
 Current tokenizers have notorious issues that are bringing the LLMs down.
 
@@ -53,7 +53,7 @@ This process has several stages: encoding, tokenization and embedding.
 
 For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`):
 
-<img src=".images/tiktoken/gpt-4o.png" width="75%"/>
+<img src=".images/tiktoken/gpt-4o.png" width="75%" style="margin: auto;"/>
 
 The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
 Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
@@ -232,7 +232,7 @@ As we'll see in [the results](#features), these choices seem to fit best.
 The encoder is a CNN, with stacked dilated convolutions similar the the [WaveNet model][arxiv-wavenet].
 In the case of a stack of 2 tokenization blocks, the encoding process is:
 
-<img src=".images/4/encoder-blocks.png" width="75%"/>
+<img src=".images/4/encoder-blocks.png" width="75%" style="margin: auto;"/>
 
 Each block layer merges the sequence axis chunk by chunk, by a factor $G_i$:
 
@@ -372,7 +372,7 @@ This ensures that text inputs with similar content, like "hotdog" and "hot-dog",
 
 This can be visualized [in tensorboard][tensorboard-projector] with the [algorithm t-SNE][wiki-tsne] or [UMAP][wiki-dimensionality-reduction]:
 
-<img src=".images/16/tsne.languages.4x16.gif" width="75%"/>
+<img src=".images/16/tsne.languages.4x16.gif" width="75%" style="margin: auto;"/>
 
 Languages from different Unicode planes are clearly separated:
 the Unicode space is very structured and the proximity of codepoints is meaningful.
@@ -451,7 +451,7 @@ print(tokun.pipeline.postprocess(MODEL._decoder(embeddings + 0.2 * noise)))
 
 The stability of decoding on the neighborhood of each embedding is more apparent on a UMAP graph:
 
-<img src=".images/16/neighbors.4x16.gif" width="75%"/>
+<img src=".images/16/neighbors.4x16.gif" width="75%" style="margin: auto;"/>
 
 It is actually a good property that a whole set of vectors encode the same text.
 If the model had a 1:1 match it would be very brittle and the host LLM would be unable to predict the exact vector.
