@@ -6,14 +6,13 @@
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
 
-`tokun` is a NN model specialized in text tokenization.
-It produces 256-embedding vectors equivalent to 64 UTF-32-BE bytes.
+`tokun` is a model specialized in text embedding.
+It is **lossless** while providing **high input compression**.
 
-IE each `tokun` embedding can be thought of as a token of length 16 characters.
+`tokun` produces vectors of dimension 256 equivalent to 64 UTF-32-BE bytes.
+IE each embedding can be thought of as a *token of length 16 characters*.
 
 But these vectors are more than basic IDs, they keep meaningful information on their constituting parts.
-
-The architecture, dataviz, ambition and results are detailed in the [articles](../articles).
 
 ## Features
 
@@ -30,80 +29,126 @@ Regular tokens are unrelated IDs, while `tokun` has the following properties:
 
 ## Installation
 
-For now, the model is only available here, [on Github](../tokun/).
+In all cases, the model requires the code from the package `tokun`:
 
-You can simply clone the repository: in particular, it will download [the weights](../models/).
+```shell
+pip install tokun
+```
+
+### From Hugging Face
+
+Login to Hugging Face:
+
+```shell
+huggingface-cli login
+```
+
+Download the repository:
+
+```python
+import huggingface_hub as hh
+
+api = hh.HfApi()
+api.snapshot_download(repo_id='apehex/tokun', local_dir='tokun/')
+```
+
+Import the tokenizer and model:
+
+```python
+tokenizer = tokun.huggingface.ByteTokenizer()
+model = hh.from_pretrained_keras('tokun/variants/4x16/')
+```
+
+### With Base Tensorflow / Keras
+
+You can directly load the weights [from the repository](../models/).
+
+For the most performant variant of the model, `4x16`: 
+
+```python
+import tensorflow as tf
+import tokun.model
+import urllib.request
+
+urllib.request.urlretrieve('https://github.com/apehex/tokun/raw/main/models/4x16/1/6.3.keras', 'model.keras')
+model = tf.keras.models.load_model('model.keras')
+```
 
 ## Usage
 
-The model can be loaded from the exported weights:
+Since it is small (between 1 and 2M parameters depending on the variant), the model can also be [trained on Google Colab][notebook-file-tokun-train].
+
+We will be encoding and decoding the following sample:
 
 ```python
-import os
-import tensorflow as tf
-
-import tokun.meta # default values for the hyper parameters
-import tokun.model # required to register the Keras classes
-import tokun.pipeline # pre and post-processing
-
-# META ########################################################################
-
-ATTENTION = True
-NORMALIZATION = True
-
-N_TOKEN_DIM = [4, 4] # G, for each block
-
-# DERIVED #####################################################################
-
-LABEL = '8.5'
-VERSION = tokun.meta.version(groups=N_TOKEN_DIM, attention=ATTENTION, normalization=NORMALIZATION)
-
-# IMPORT ######################################################################
-
-PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
-
-MODEL = tf.keras.models.load_model(PATH_IMPORT)
+__s = """Une unité lexicale ou token lexical ou plus simplement token est un couple composé d'un nom et d'une valeur optionnelle (e.g. 135677)."""
 ```
 
-Since it is small (between 1 and 2M parameters depending on the exact configuration), the model can also be [trained on Google Colab][notebook-file-tokun-train].
+### With Hugging Face
 
-### Tokenization
-
-Once the model loaded, a text strings `__s` can be encoded with:
-
-```python
-__x = tokun.pipeline.preprocess(text=__s, groups=N_TOKEN_DIM, flatten=True)
-__e = MODEL._encoder(__x) # final embedding = input for another model
-```
-
-### Detokenization
-
-An embedding tensor `__e` (or prediction) can be reversed into Unicode text with:
+The sequence dimension is fixed to 512 because exporting the Keras model requires to specify the input shape.
+So the sample is padded to `16 * 512` characters or `64 * 512` bytes.
 
 ```python
-__p = MODEL._decoder(__e)
+# encode with UTF-32
+__x = tokenizer.batch_encode_plus(batch_text_or_text_pairs=[__s], padding='max_length', max_length=64 * 512, add_special_tokens=False)
+__x = tf.convert_to_tensor(__x['input_ids'])
+# tokenize
+__e = model.layers[1](__x) # encoder
+# these embeddings would be the input of a LLM
+__o = llm(__e) # replace with your LLM
+# detokenize
+__p = model.layers[2](__o) # decoder
+# interpret probabilities as byte indexes
 __y = tokun.pipeline.postprocess(__p)
 ```
 
-## Resources
+```python
+print(len(__s))
+# 252
+print(__x.shape) # 16 * 512 characters = 64 * 512 bytes
+# (1, 32768)
+print(__e.shape) # 512 embeddings
+# (1, 512, 256)
+print(__p.shape) # back to x shape
+# (1, 32768, 256)
+```
 
-### Models
+> Note: the base Tensorflow implementation operates on any sequence dimension (see below)
 
-The most common variations have been trained and exported to the [models subdirectory](../models/).
-
-The main variant of the model is `tokun-16`.
-
-Its hyper-parameters are:
+### With Base Tensorflow / Keras
 
 ```python
-ATTENTION = True # whether the blocks include an attention layer
-NORMALIZATION = True # whether the blocks include a normalization layer
-
-N_TOKEN_DIM = [4, 4, 4] # G, the size of the token groups, for each block
-N_ENCODING_DIM = 256 # U, then dimension of a single byte as a one-hot vector
-N_EMBEDDING_DIM = N_ENCODING_DIM # E, the dimension of each group
-N_LATENT_DIM = N_EMBEDDING_DIM # L, the dimension of the resulting embedding
+__x = tokun.pipeline.preprocess(text=__s, groups=[4, 16], expand=[1], flatten=True)
+__e = model._encoder(__x) # final embedding = input for another model
+# these embeddings would be the input of a LLM
+__o = llm(__e) # replace with your LLM
+# detokenize
+__p = MODEL._decoder(__o)
+# interpret probabilities as byte indexes
+__y = tokun.pipeline.postprocess(__p)
 ```
+
+The OG version doesn't fix the sequence dimension:
+
+```python
+print(len(__s))
+# 252
+print(__x.shape) # 4 * 252 = 1008 padded to 1024 bytes
+# (1, 1024)
+print(__e.shape) # 252 / 16 = 1024 / 64 = 16
+# (1, 16, 256)
+print(__p.shape) # back to x shape
+# (1, 1024, 256)
+```
+
+## Training and evaluation data
+
+`tokun` was **trained on random sequences** of UTF-32-BE bytes, so that it covers the first 4 planes of Unicode.
+
+Validation was also performed on the 7 languages of [MLQA][github-mlqa] to make sure the model keeps its accuracy on regular text.
+
+## Resources
 
 ### Notebooks
 
@@ -119,6 +164,13 @@ Older / simpler model iterations:
 - `tokun-16`: [File][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16]
 
 ### Articles
+
+Main article:
+
+- on [Github][article-file-tokun]
+- on [Hugging Face][article-hugging-face]
+
+Notes on each iteration:
 
 - `tokun-1`: [Github][article-file-tokun-1]
 - `tokun-4`: [Github][article-file-tokun-4]
@@ -136,12 +188,11 @@ This project was inspired by a video from Andrej Karpathy, ["Let's build the GPT
 
 Licensed under the [aGPLv3](LICENSE.md).
 
+[article-file-tokun]: ../articles/tokun.md
 [article-file-tokun-1]: ../articles/tokun.1.md
 [article-file-tokun-4]: ../articles/tokun.4.md
 [article-file-tokun-16]: ../articles/tokun.16.md
-[article-medium-tokun-1]: ../articles/tokun.1.md
-[article-medium-tokun-4]: ../articles/tokun.4.md
-[article-medium-tokun-16]: ../articles/tokun.16.md
+[article-hugging-face]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [article-notion-tokun-1]: https://apehex.notion.site/Tokun-1-e03c438a39fe49fcb2ce303eb63b2e73
 [article-notion-tokun-4]: https://apehex.notion.site/Tokun-4-c8b4a3bd1270485a908287869553e9f2
 [article-notion-tokun-16]: https://apehex.notion.site/Tokun-16-ecf35d5207ab401d85d3aa21d0b09538
