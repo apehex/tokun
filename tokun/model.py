@@ -17,7 +17,7 @@ class Encoder(tf.keras.models.Model):
         hidden_dim: int,
         latent_dim: int,
         activation: str='gelu',
-        sequence_axis: int=0,
+        sequence_axis: int=1,
         feature_axis: int=-1,
         **kwargs
     ) -> None:
@@ -81,7 +81,7 @@ class Decoder(tf.keras.models.Model):
         hidden_dim: int,
         latent_dim: int,
         activation: str='gelu',
-        sequence_axis: int=0,
+        sequence_axis: int=1,
         feature_axis: int=-1,
         **kwargs
     ) -> None:
@@ -140,7 +140,7 @@ class AutoEncoder(tf.keras.models.Model):
         hidden_dim: int,
         latent_dim: int,
         activation: str='gelu',
-        sequence_axis: int=0,
+        sequence_axis: int=1,
         feature_axis: int=-1,
         **kwargs
     ) -> None:
