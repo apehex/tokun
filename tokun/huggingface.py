@@ -1,3 +1,5 @@
+import json
+
 import transformers
 
 # UTF-32-BE TOKENIZATION ######################################################
@@ -40,8 +42,7 @@ class ByteTokenizer(transformers.PreTrainedTokenizer):
     def get_vocab(self) -> dict:
         return {chr(__i): __i for __i in range(self._vocab_size)}
 
-    def save_vocabulary(self, save_directory: str, **kwargs) -> None:
-        import json
+    def save_vocabulary(self, save_directory: str, **kwargs) -> tuple:
         __prefix = kwargs.get('filename_prefix', '')
         __path = "{}/{}vocab.json".format(save_directory, __prefix if __prefix else '')
         with open(__path, "w") as __file:
