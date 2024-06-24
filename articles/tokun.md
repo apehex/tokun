@@ -511,7 +511,7 @@ And [more detailed articles][tokun-articles] on the iterations of the model on G
 [tokun-articles]: https://github.com/apehex/tokun/tree/main/articles
 [tokun-colab]: https://colab.research.google.com/github/apehex/tokun/blob/main/notebooks/tokun.model.ipynb
 [tokun-github]: https://github.com/apehex/tokun
-[tokun-hf]: https://github.com/apehex/tokun
+[tokun-hf]: https://huggingface.co/apehex/tokun
 [tokun-notebooks]: https://github.com/apehex/tokun/tree/main/notebooks
 
 [wiki-dimensionality-reduction]: https://en.wikipedia.org/wiki/Nonlinear_dimensionality_reduction
