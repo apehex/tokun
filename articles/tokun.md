@@ -9,14 +9,14 @@ Current tokenizers have notorious issues that are bringing the LLMs down.
 These algorithms follow the human intuition of language to convert text to numbers.
 But neural networks have ways to store and process data unlike any interpretable algorithm. 
 
-We will show that a model can be trained to produce a much more efficient text encoding.
+Actually, a model can be trained to produce much more efficient text encodings.
 
-Interestingly, this process is different from training a model to understand language:
+And this process is different from training a model to understand language:
 
 - the proposed model has a different architecture from transformers
 - the best training data is **not** human text but random bytes
 
-Input text will be split in chunks of 16 Unicode characters, regardless of the content.
+The model will split input text in chunks of 16 Unicode characters, regardless of the content.
 
 Obfuscated code, raw HEX or brainf\*ck programming language are all compressed by a factor 16:
 
@@ -26,7 +26,9 @@ Obfuscated code, raw HEX or brainf\*ck programming language are all compressed b
 | `0x60806040523480`    | `1561001057600080`    | `fd5b506000805460` |
 | `++++++++[>++++[>`    | `++>+++>+++>+<<<<`    | `-]>+>+>->>+[<]<-` |
 
-None of these combinations of characters would ever be made into tokens by traditional tokenizers, especially not of length 16.
+None of these combinations of characters would ever be made into tokens by traditional tokenizers, especially not of length 16:
+
+<img src=".images/tiktoken/obfuscated.png" width="100%" style="margin: auto;"/>
 
 ## Intuition
 
@@ -67,8 +69,15 @@ The trick is to interprete each ID as an index in an array of 200k elements:
 
 This operation is called "one-hot encoding".
 
-It turns the orginal prompt in a `(32, 199998)` tensor:
-32 ones for each token and 6399904 zeroes.
+This index is then used to retrieve the corresponding embedding from the first layer of a LLM.
+
+The (sequence of) embeddings are the actual input of the neural network.
+This is what I propose to improve in this article.
+
+The process of transforming text into embeddings will be called "encoding".
+Tokenization is one technique to encode text.
+
+We will see that a dedicated neural network can be trained to encode text on its own.
 
 ## Relation With Performances
 
@@ -99,18 +108,14 @@ The number of parameters is roughly a balance between efficiency and quality.
 Since tokens are unrelated to each other, LLMs have to see each variation to build relevant embeddings.
 Having been trained on `"hot dog"` does not transfer to `"hotdog"`.
 
-The model would not link the two and fail to understand puns that play with ambiguity.
-Unless a similar context for the two wordings happens in the training data, which is a lot to ask.
+If tokens / embeddings were to natively hold the information of each character the two would differ only by a space.
+LLMs would not need to be trained on each variation, they would understand the nuances natively.
 
-Since `tokun` embeddings hold the information of each character, the two representations will differ only by a space.
-LLMs will not need to be trained on each variation, they would understand the nuances natively.
-
-Although I cannot quantify the magnitude, this will lower the volume of data required to build meaningful embeddings (in pretraining).
+Although I cannot quantify the magnitude, this would lower the volume of data required to build meaningful embeddings (in pretraining).
 
 ## Limitations Of Current Tokenizers
 
-This simple example already brings out a number of quirks.
-For example, the input tensor is *very* large and mostly zero??
+The previous examples already bring out a number of quirks.
 
 As Andrej Karpathy [pointed out][youtube-karpathy-tokenizer], there are many more:
 
@@ -143,19 +148,29 @@ Obviously I asked `ChatGPT` if he / it / they wanted to add something:
 - [ ] efficiency: some tokenizers can be slow to encode and decode large texts
 - [ ] handling of compound words: `"hotdog"` is unrelated to `"hot dog"`
 
-`tokun` addresses most of these shortcomings.
+The model `tokun` addresses most of these shortcomings.
 
-The serie is heavily focused on western languages, due to personal knowledge.
+The article is heavily focused on western languages, due to personal knowledge.
 Still the concepts were tested on Asian and Middle-Eastern languages.
 
 ## Proposition
 
 Instead of building vocabularies outside of LLMs, the idea is to train a NN to transform any character sequence into a vector embedding.
 
-The model will learn to compress and decompress text at the same time, *from the raw Unicode bytes*.
+The model will learn to compress and decompress text at the same time, *from the raw Unicode bytes*:
 
-Compared to current techniques, both axes will be reduced by several orders:
-eventually, the example prompt of 134 characters would be represented as a `(9, 256)` tensor, just the length of "Une unité".
+<img src=".images/vae.png" width="100%" style="margin: auto;"/>
+
+Then a LLM can take advantage of this encoding
+
+<img src=".images/llm.png" width="100%" style="margin: auto;"/>
+
+Compared to current techniques, the input axes will be reduced by several orders.
+
+For example, the prompt of 134 characters would be represented:
+
+- as a vector of shape `(32, 199_998)` by the tokenizer `o200k`
+- as a vector of shape `(9, 256)` by `tokun`
 
 ## UTF-32 <=> "Better" UTF-8
 
