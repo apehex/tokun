@@ -154,14 +154,14 @@ Validation was also performed on the 7 languages of [MLQA][github-mlqa] to make 
 
 Final model:
 
-- train: [File][notebook-file-tokun-train] / [Colab][notebook-colab-tokun-train]
-- demo: [File][notebook-file-tokun-demo] / [Colab][notebook-colab-tokun-demo]
+- train: [file][notebook-file-tokun-train] / [Colab][notebook-colab-tokun-train]
+- demo: [file][notebook-file-tokun-demo] / [Colab][notebook-colab-tokun-demo]
 
 Older / simpler model iterations:
 
-- `tokun-1`: [File][notebook-file-tokun-1] / [Colab][notebook-colab-tokun-1]
-- `tokun-4`: [File][notebook-file-tokun-4] / [Colab][notebook-colab-tokun-4]
-- `tokun-16`: [File][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16]
+- `tokun-1`: [file][notebook-file-tokun-1] / [Colab][notebook-colab-tokun-1]
+- `tokun-4`: [file][notebook-file-tokun-4] / [Colab][notebook-colab-tokun-4]
+- `tokun-16`: [file][notebook-file-tokun-16] / [Colab][notebook-colab-tokun-16]
 
 ### Articles
 
