@@ -161,16 +161,16 @@ The model will learn to compress and decompress text at the same time, *from the
 
 <img src=".images/vae.png" width="100%" style="margin: auto;"/>
 
-Then a LLM can take advantage of this encoding
+Then a LLM can use this encoding and predict the next embedding, which is then translated into each individual byte:
 
 <img src=".images/llm.png" width="100%" style="margin: auto;"/>
 
 Compared to current techniques, the input axes will be reduced by several orders.
 
-For example, the prompt of 134 characters would be represented:
+For example, the prompt of 134 characters from the previous section would be represented as:
 
-- as a vector of shape `(32, 199_998)` by the tokenizer `o200k`
-- as a vector of shape `(9, 256)` by `tokun`
+- a vector of shape `(32, 199_998)` by the tokenizer `o200k`
+- a vector of shape `(9, 256)` by `tokun`
 
 ## UTF-32 <=> "Better" UTF-8
 
