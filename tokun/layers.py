@@ -16,7 +16,6 @@ class TokenizeBlock(tf.keras.layers.Layer):
         feature_axis: int=-1,
         token_dim: int=4,
         embedding_dim: int=256,
-        hidden_dim: int=1024,
         latent_dim: int=256,
         activation: str='gelu',
         epsilon: float=1e-6,
@@ -29,7 +28,6 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'feature_axis': feature_axis,
             'token_dim': token_dim,
             'embedding_dim': embedding_dim,
-            'hidden_dim': hidden_dim,
             'latent_dim': latent_dim,
             'activation': activation,
             'epsilon': epsilon,}
@@ -60,7 +58,6 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         feature_axis: int=-1,
         token_dim: int=4,
         embedding_dim: int=256,
-        hidden_dim: int=1024,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
@@ -72,7 +69,6 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'feature_axis': feature_axis,
             'token_dim': token_dim,
             'embedding_dim': embedding_dim,
-            'hidden_dim': hidden_dim,
             'activation': activation,
             'epsilon': epsilon,}
         # layers
