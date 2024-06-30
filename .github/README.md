@@ -56,22 +56,22 @@ Import the tokenizer and model:
 
 ```python
 tokenizer = tokun.huggingface.ByteTokenizer()
-model = hh.from_pretrained_keras('tokun/variants/4x16/')
+model = hh.from_pretrained_keras('tokun/variants/16x4/')
 ```
 
 ### With Base Tensorflow / Keras
 
 You can directly load the weights [from the repository](../models/).
 
-For the most performant variant of the model, `4x16`: 
+For the most performant variant of the model, `16x4`:
 
 ```python
 import tensorflow as tf
 import tokun.model
 import urllib.request
 
-urllib.request.urlretrieve('https://github.com/apehex/tokun/raw/main/models/4x16/1/6.3.keras', 'model.keras')
-model = tf.keras.models.load_model('model.keras')
+urllib.request.urlretrieve('https://github.com/apehex/tokun/raw/main/models/16x4/1/7.7.keras', 'model.keras')
+model = tf.keras.models.load_model('model.keras', compile=False)
 ```
 
 ## Usage
