@@ -21,7 +21,7 @@ import tokun.pipeline
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [4, 4] # G, for each block
+N_TOKEN_DIM = [16, 4] # G, for each block
 
 N_BATCH_DIM = 128 # number of samples per batch
 N_SAMPLE_DIM = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
@@ -34,11 +34,15 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 # IMPORT ######################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '8.5'
+LABEL = '7.7'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
-MODEL = keras.models.load_model(PATH_IMPORT)
+MODEL = keras.models.load_model(PATH_IMPORT, compile=False)
+MODEL.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+    loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+    metrics=['accuracy'])
 
 # DATA ########################################################################
 

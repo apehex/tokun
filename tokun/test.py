@@ -14,7 +14,7 @@ import tokun.pipeline
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [4, 4] # G, for each block
+N_TOKEN_DIM = [16, 4] # G, for each block
 
 # DERIVED #####################################################################
 
@@ -23,11 +23,15 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 # IMPORT ######################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '8.5'
+LABEL = '7.7'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
-MODEL = keras.models.load_model(PATH_IMPORT)
+MODEL = keras.models.load_model(PATH_IMPORT, compile=False)
+MODEL.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+    loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+    metrics=['accuracy'])
 
 # SAMPLES #####################################################################
 
