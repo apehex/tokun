@@ -11,12 +11,31 @@ import tensorflow_datasets as tfds
 
 import mlable.data
 import mlable.metrics
-import mlable.optimizers
 
 import tokun.data
 import tokun.meta
 import tokun.model
 import tokun.pipeline
+
+# DEVICES #####################################################################
+
+tf.debugging.set_log_device_placement(False)
+
+CPU = tf.config.list_logical_devices('CPU')
+GPU = tf.config.list_logical_devices('GPU')
+TPU = tf.config.list_logical_devices('TPU')
+
+if TPU:
+    RESOLVER = tf.distribute.cluster_resolver.TPUClusterResolver()
+    tf.config.experimental_connect_to_cluster(RESOLVER)
+    tf.tpu.experimental.initialize_tpu_system(RESOLVER)
+    DISTRIBUTION_STRATEGY = tf.distribute.TPUStrategy(RESOLVER)
+elif GPU:
+    DISTRIBUTION_STRATEGY = tf.distribute.MirroredStrategy(GPU)
+else:
+    DISTRIBUTION_STRATEGY = tf.distribute.MirroredStrategy(CPU)
+
+print(DISTRIBUTION_STRATEGY)
 
 # TOGGLE ######################################################################
 
@@ -106,39 +125,48 @@ RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, pipeline=OPERATIONS, repl
 DATASET_TRAIN = RANDOM_TRAIN if RANDOM else MLQA_TRAIN['ar'].concatenate(MLQA_TRAIN['en']).concatenate(MLQA_TRAIN['es']).concatenate(MLQA_TRAIN['de']).concatenate(MLQA_TRAIN['hi']).concatenate(MLQA_TRAIN['vi']).concatenate(MLQA_TRAIN['zh'])
 DATASET_TEST = MLQA_TEST['ar'].concatenate(MLQA_TEST['en']).concatenate(MLQA_TEST['es']).concatenate(MLQA_TEST['de']).concatenate(MLQA_TEST['hi']).concatenate(MLQA_TEST['vi']).concatenate(MLQA_TEST['zh'])
 
-# INIT ########################################################################
+# INSPECT #####################################################################
 
-if IMPORT and os.path.isfile(PATH_IMPORT):
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
-else:
-    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
+print(RANDOM_TRAIN.element_spec)
+print(RANDOM_TEST.element_spec)
 
-# COMPILE #####################################################################
+print(DATASET_TRAIN.element_spec)
+print(DATASET_TEST.element_spec)
 
-# metrics
-byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
-character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
-token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+print('train: {:,}'.format(DATASET_TRAIN.cardinality().numpy()))
+print('test:  {:,}'.format(DATASET_TEST.cardinality().numpy()))
 
-# compilation
-MODEL.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
-    loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
-    metrics=[byte_accuracy, character_accuracy, token_accuracy])
+# COMPILE ########################################################################
+
+with DISTRIBUTION_STRATEGY.scope():
+    # metrics
+    byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
+    character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
+    token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    # weights
+    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
+    if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    # compile
+    MODEL.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
 
-tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
-cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-
 if TRAINING:
-    HISTORY = MODEL.fit(
-        x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
-        batch_size=None,
-        epochs=N_EPOCHS,
-        validation_split=None,
-        validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
-        validation_freq=list(range(1, N_EPOCHS + 1)),
-        class_weight=CLASS_WEIGHTS,
-        verbose=1,
-        callbacks=[lr_callback, cp_callback, tb_callback])
+    with DISTRIBUTION_STRATEGY.scope():
+        # callbacks
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
+        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
+        # fit model
+        TRAINING_HISTORY = MODEL.fit(
+            x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
+            batch_size=None,
+            epochs=N_EPOCHS,
+            validation_split=None,
+            validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
+            validation_freq=list(range(1, N_EPOCHS + 1, 1)),
+            class_weight=CLASS_WEIGHTS,
+            verbose=1,
+            callbacks=[cp_callback, tb_callback])
