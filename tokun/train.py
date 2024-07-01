@@ -37,11 +37,11 @@ N_LATENT_DIM = N_EMBEDDING_DIM # L
 N_BATCH_DIM = 128 # number of samples per batch
 N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
 
-N_EPOCHS = 16
-N_EPOCHS_RAMPUP = 0
-N_EPOCHS_SUSTAIN = 0
+N_EPOCHS = 8
 
-R_MIN, R_MAX, R_EXP = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
+R_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
+
+CLASS_WEIGHTS = {__c: 0.3 if __c == 0 else 1. for __c in range(N_ENCODING_DIM)} # there are 3 times more 0s than other bytes
 
 # DERIVED #####################################################################
 
@@ -122,7 +122,7 @@ token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1]
 
 # compilation
 MODEL.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=R_MAX),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
     metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
@@ -130,7 +130,6 @@ MODEL.compile(
 
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
 cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-lr_callback = tf.keras.callbacks.LearningRateScheduler(functools.partial(mlable.optimizers.learning_rate_hokusai, lr_min=R_MIN, lr_max=R_MAX, lr_exp=R_EXP, rampup=N_EPOCHS_RAMPUP, sustain=N_EPOCHS_SUSTAIN), verbose=True)
 
 if TRAINING:
     HISTORY = MODEL.fit(
@@ -140,5 +139,6 @@ if TRAINING:
         validation_split=None,
         validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
         validation_freq=list(range(1, N_EPOCHS + 1)),
+        class_weight=CLASS_WEIGHTS,
         verbose=1,
         callbacks=[lr_callback, cp_callback, tb_callback])
