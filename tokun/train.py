@@ -10,6 +10,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import mlable.data
+import mlable.metrics
 import mlable.optimizers
 
 import tokun.data
@@ -31,7 +32,6 @@ N_FEATURE_AXIS = -1
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
-N_HIDDEN_DIM = 4 * N_EMBEDDING_DIM # H
 N_LATENT_DIM = N_EMBEDDING_DIM # L
 
 N_BATCH_DIM = 128 # number of samples per batch
@@ -50,7 +50,7 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/4x4x4/relu/True/True/3.8.keras')
+PATH_IMPORT = os.path.join('models/16x4/1/7.7.keras')
 
 # LOG #########################################################################
 
@@ -66,7 +66,7 @@ LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 
-RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 10, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
+RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 14, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
 RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
 
 # PREPROCESS MLQA #############################################################
@@ -109,16 +109,22 @@ DATASET_TEST = MLQA_TEST['ar'].concatenate(MLQA_TEST['en']).concatenate(MLQA_TES
 # INIT ########################################################################
 
 if IMPORT and os.path.isfile(PATH_IMPORT):
-    MODEL = tf.keras.models.load_model(PATH_IMPORT)
+    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
 else:
-    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, hidden_dim=N_HIDDEN_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
+    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS,token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
 
 # COMPILE #####################################################################
 
+# metrics
+byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
+character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
+token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+
+# compilation
 MODEL.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=R_MAX),
     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
-    metrics=['accuracy'])
+    metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
 
@@ -134,5 +140,5 @@ if TRAINING:
         validation_split=None,
         validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
         validation_freq=list(range(1, N_EPOCHS + 1)),
-        verbose=2,
+        verbose=1,
         callbacks=[lr_callback, cp_callback, tb_callback])
