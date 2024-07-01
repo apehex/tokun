@@ -6,10 +6,32 @@ import os
 import keras
 import tensorflow as tf
 
+import mlable.metrics
+
 import tokun.evaluation
 import tokun.meta
 import tokun.model
 import tokun.pipeline
+
+# DEVICES #####################################################################
+
+tf.debugging.set_log_device_placement(False)
+
+CPU = tf.config.list_logical_devices('CPU')
+GPU = tf.config.list_logical_devices('GPU')
+TPU = tf.config.list_logical_devices('TPU')
+
+if TPU:
+    RESOLVER = tf.distribute.cluster_resolver.TPUClusterResolver()
+    tf.config.experimental_connect_to_cluster(RESOLVER)
+    tf.tpu.experimental.initialize_tpu_system(RESOLVER)
+    DISTRIBUTION_STRATEGY = tf.distribute.TPUStrategy(RESOLVER)
+elif GPU:
+    DISTRIBUTION_STRATEGY = tf.distribute.MirroredStrategy(GPU)
+else:
+    DISTRIBUTION_STRATEGY = tf.distribute.MirroredStrategy(CPU)
+
+print(DISTRIBUTION_STRATEGY)
 
 # META ########################################################################
 
@@ -20,18 +42,27 @@ N_TOKEN_DIM = [16, 4] # G, for each block
 
 N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
 
-# IMPORT ######################################################################
+# IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
 LABEL = '7.7'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
-MODEL = keras.models.load_model(PATH_IMPORT, compile=False)
-MODEL.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-    loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
-    metrics=['accuracy'])
+# INIT MODEL ##################################################################
+
+with DISTRIBUTION_STRATEGY.scope():
+    # metrics
+    byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
+    character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
+    token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    # weights and config
+    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    # compilation
+    MODEL.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SAMPLES #####################################################################
 
