@@ -20,6 +20,6 @@ class CategoricalCrossentropyFromEmbeddings(tf.keras.losses.CategoricalCrossentr
         return __config
 
     @classmethod
-    def from_config(cls, config: dict) -> CategoricalCrossentropyFromEmbeddings:
+    def from_config(cls, config: dict) -> tf.keras.losses.Loss:
         __decoder = config.pop('decoder')
         return cls(decoder=__decoder, **config)
