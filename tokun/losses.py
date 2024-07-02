@@ -10,9 +10,22 @@ class CategoricalCrossentropyFromEmbeddings(tf.keras.losses.CategoricalCrossentr
         self._decoder = decoder
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        # decode
         __yt = self._decoder(y_true)
         __yp = self._decoder(y_pred)
-        return super(CategoricalCrossentropyFromEmbeddings, self).call(y_true=__yt, y_pred=__yp)
+        # decompression factor
+        __dim = int(tf.size(__yt) / tf.size(y_true))
+        # expanded loss
+        __loss = super(CategoricalCrossentropyFromEmbeddings, self).call(y_true=__yt, y_pred=__yp)
+        # expanded shape
+        __shape = list(__loss.shape)
+        # group by token
+        __shape[-1] = __shape[-1] // __dim
+        __shape.append(__dim)
+        # reshape
+        __loss = tf.reshape(__loss, shape=__shape)
+        # reduce so that the loss shape matches the input shapes
+        return tf.reduce_sum(__loss, axis=-1)
 
     def get_config(self) -> dict:
         __config = super(CategoricalCrossentropyFromEmbeddings, self).get_config()
