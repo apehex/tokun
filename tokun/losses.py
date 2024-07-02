@@ -25,7 +25,7 @@ class CategoricalCrossentropyFromEmbeddings(tf.keras.losses.CategoricalCrossentr
         # reshape
         __loss = tf.reshape(__loss, shape=__shape)
         # reduce so that the loss shape matches the input shapes
-        return tf.reduce_sum(__loss, axis=-1)
+        return tf.reduce_mean(__loss, axis=-1)
 
     def get_config(self) -> dict:
         __config = super(CategoricalCrossentropyFromEmbeddings, self).get_config()
