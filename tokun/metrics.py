@@ -11,7 +11,7 @@ class CategoricalGroupAccuracyFromEmbeddings(mlable.metrics.CategoricalGroupAccu
         # decoder
         self._decoder = decoder
 
-    def update_state(y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: tf.Tensor=None) -> None:
+    def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: tf.Tensor=None) -> None:
         __yt = self._decoder(y_true)
         __yp = self._decoder(y_pred)
         super(CategoricalGroupAccuracyFromEmbeddings, self).update_state(y_true=__yt, y_pred=__yp, sample_weight=sample_weight)
