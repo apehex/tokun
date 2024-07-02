@@ -22,6 +22,6 @@ class CategoricalGroupAccuracyFromEmbeddings(mlable.metrics.CategoricalGroupAccu
         return __config
 
     @classmethod
-    def from_config(cls, config: dict) -> CategoricalGroupAccuracyFromEmbeddings:
+    def from_config(cls, config: dict) -> tf.keras.metrics.Metric:
         __decoder = config.pop('decoder')
         return cls(decoder=__decoder, **config)
