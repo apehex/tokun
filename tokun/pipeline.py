@@ -17,27 +17,13 @@ CODE_US = b'\x1f'
 
 # ENCODE ######################################################################
 
-def _encode_scalar(text: str, token_size: int) -> tf.Tensor:
-    # encode the string
-    __bytes = list(text.encode('utf-32-be'))
-    # pad until the encodeed text has length multiple of the token length
-    __padding = (-len(__bytes) % token_size) * [0]
-    # concat data and padding
-    return tf.convert_to_tensor(value=__bytes + __padding, dtype=tf.dtypes.int32) # uint8 is not allowed
-
-def _encode_tensor(data: tf.Tensor, token_size: int, sample_size: int=64) -> tf.Tensor:
+def encode(data: tf.Tensor, token_size: int, sample_size: int) -> tf.Tensor:
     # factor 4 because of the UTF-32 encoding
     __dim = math.ceil(4 * sample_size / token_size) * token_size
     # Decode bytes from UTF-8
     __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
     # Decode byte strings to arrays of integers
     return tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
-
-def encode(data: any, token_size: int, sample_size: int=64) -> tf.Tensor:
-    if isinstance(data, str):
-        return _encode_scalar(text=data, token_size=token_size)
-    else:
-        return _encode_tensor(data=data, token_size=token_size, sample_size=sample_size)
 
 # RESHAPE #####################################################################
 
@@ -78,8 +64,10 @@ def decode(tokens: tf.Tensor) -> str:
 def preprocess(text: str, groups: list, expand: list=[], flatten: bool=True) -> tf.Tensor:
     # total length of the token
     __token_size = math.prod(groups)
+    # as tensor
+    __data = tf.convert_to_tensor(text, dtype=tf.dtypes.string)
     # list of bytes
-    __bytes = encode(data=text, token_size=__token_size)
+    __bytes = encode(data=__data, token_size=__token_size, sample_size=len(text))
     # partition or flatten
     return reshape(data=__bytes, groups=groups, expand=expand, flatten=flatten)
 
