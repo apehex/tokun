@@ -17,6 +17,10 @@ import tokun.meta
 import tokun.model
 import tokun.pipeline
 
+# MIXED PRECISION #############################################################
+
+tf.keras.mixed_precision.set_global_policy('mixed_float16') # mixed_bfloat16 on TPUs
+
 # DEVICES #####################################################################
 
 tf.debugging.set_log_device_placement(False)
