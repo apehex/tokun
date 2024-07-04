@@ -16,7 +16,6 @@ class TokenizeBlock(tf.keras.layers.Layer):
         feature_axis: int=-1,
         token_dim: int=4,
         embedding_dim: int=256,
-        latent_dim: int=256,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
@@ -28,13 +27,12 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'feature_axis': feature_axis,
             'token_dim': token_dim,
             'embedding_dim': embedding_dim,
-            'latent_dim': latent_dim,
             'activation': activation,
             'epsilon': epsilon,}
         # layers
         self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
         self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=False, name='reshaping') # (B, S * G, E) => (B, S, G * E)
-        self._dense = tf.keras.layers.Dense(units=latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
+        self._dense = tf.keras.layers.Dense(units=embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(self._divide(self._normalize(inputs)))

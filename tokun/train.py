@@ -55,7 +55,6 @@ N_FEATURE_AXIS = -1
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
-N_LATENT_DIM = N_EMBEDDING_DIM # L
 
 N_BATCH_DIM = 128 # number of samples per batch
 N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
@@ -148,7 +147,7 @@ with DISTRIBUTION_STRATEGY.scope():
     character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
     token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights
-    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, latent_dim=N_LATENT_DIM, activation='gelu')
+    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, activation='gelu')
     if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
     # compile
     MODEL.compile(
