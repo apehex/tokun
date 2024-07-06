@@ -42,7 +42,7 @@ print(DISTRIBUTION_STRATEGY)
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [16, 4] # G, for each block
+N_TOKEN_DIM = [4, 16] # G, for each block
 
 N_BATCH_DIM = 128 # number of samples per batch
 N_SAMPLE_DIM = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
@@ -92,7 +92,7 @@ PIPELINE = [
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding for the targets => (4 * S, E) int (bool)
-    ((lambda x: (x, tf.one_hot(x, depth=N_ENCODING_DIM, axis=-1))), True)]
+    ((lambda x: (x, tf.one_hot(x, depth=256, axis=-1))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
@@ -118,7 +118,7 @@ for __lang, __dataset in MLQA_TEST.items():
 # unique (G ^ i)-tokens
 for __lang, __sample in SAMPLES.items():
     for __size in TOKENS:
-        TOKENS[__size][__lang] = tokun.pipeline.chunk(sequence=tokun.pipeline.postprocess(__sample[0]), size=__size // 4, repeats=False)
+        TOKENS[__size][__lang] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__sample[0]), size=__size // 4, repeats=False)
 
 # unique tokens, for all languages
 for __size in TOKENS:
@@ -129,7 +129,7 @@ for __size in TOKENS:
 for __depth, __size in enumerate(N_TOKEN_SIZES):
     for __lang, __tokens in TOKENS[__size].items():
         # re-encode without token repeats
-        __input = tokun.pipeline.preprocess(text=''.join(__tokens), groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
+        __input = tokun.pipeline.preprocess(text=''.join(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
         # UTF-32 embedding
         __embedding = MODEL._encoder._encoder.layers[0](__input)
         # iterative CNN tokenization
@@ -151,7 +151,7 @@ for __lang, __tokens in TOKENS[__unit].items():
     __std = tf.math.reduce_std(EMBEDDINGS[__unit][__lang], axis=0, keepdims=True)
     __radius = 2. * tf.reduce_mean(__std).numpy()
     # choose a single token
-    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
+    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
     # encode it
     __e = MODEL._encoder(__t)
     # add noise to generate random neighbors

@@ -1,6 +1,7 @@
 """Apply the model to various samples."""
 
 import itertools
+import math
 import os
 
 import keras
@@ -36,7 +37,7 @@ print(DISTRIBUTION_STRATEGY)
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [16, 4] # G, for each block
+N_TOKEN_DIM = [4, 16] # G, for each block
 
 # DERIVED #####################################################################
 
@@ -75,7 +76,7 @@ SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 
 
 # TEST ########################################################################
 
-__x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
+__x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
 
 print(SAMPLES[0])
 print(__y)
@@ -86,7 +87,7 @@ print(tokun.evaluation.compare(SAMPLES[0], __y))
 __std = tf.math.reduce_std(__e, axis=0)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
-__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', groups=N_TOKEN_DIM, expand=N_SEQUENCE_AXIS * [1], flatten=True)
+__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
 
 print(tokun.pipeline.postprocess(MODEL._decoder(__e)))
 print(tokun.pipeline.postprocess(MODEL._decoder(__e + 1.6 * __std)))
