@@ -72,7 +72,7 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/16x4/1/7.7.keras')
+PATH_IMPORT = os.path.join('models/4x16/1/7.7.keras')
 
 # LOG #########################################################################
 
