@@ -2,7 +2,7 @@
 
 > `to-kun` took tokens to t-can
 
-<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
+<img src="header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
 
