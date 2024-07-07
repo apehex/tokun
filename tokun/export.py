@@ -11,7 +11,6 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import mlable.data
-import mlable.io
 import mlable.metrics
 
 import tokun.evaluation
@@ -170,6 +169,6 @@ EMBEDDINGS['local']['all'] = tf.concat(values=EMBEDDINGS['local']['all'], axis=0
 # EXPORT ######################################################################
 
 for __size in TOKENS:
-    mlable.io.write(data=[__c + ' ' + mlable.io.label(__c) for __c in TOKENS[__size]['all']], path='./metadata.' + str(__size) + '.label.tsv', tsv=False)
-    mlable.io.write(data=TOKENS[__size]['all'], path='./metadata.' + str(__size) + '.tsv', tsv=False)
-    mlable.io.write(data=EMBEDDINGS[__size]['all'].numpy(), path='./embeddings.' + str(__size) + '.tsv', tsv=True)
+    mlable.data.write(data=[__c + ' ' + mlable.data.label(__c) for __c in TOKENS[__size]['all']], path='./metadata.' + str(__size) + '.label.tsv', tsv=False)
+    mlable.data.write(data=TOKENS[__size]['all'], path='./metadata.' + str(__size) + '.tsv', tsv=False)
+    mlable.data.write(data=EMBEDDINGS[__size]['all'].numpy(), path='./embeddings.' + str(__size) + '.tsv', tsv=True)
