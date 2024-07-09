@@ -1,3 +1,4 @@
+import keras as ks
 import tensorflow as tf
 
 import mlable.metrics
@@ -5,7 +6,7 @@ import mlable.metrics
 # GROUP ACCURACY ##############################################################
 
 class CategoricalGroupAccuracyFromEmbeddings(mlable.metrics.CategoricalGroupAccuracy):
-    def __init__(self, decoder: callable, group: int=4, name: str='categorical_group_accuracy_from_embeddings', dtype: tf.dtypes.DType=tf.dtypes.float32, **kwargs) -> None:
+    def __init__(self, decoder: callable, group: int=4, name: str='categorical_group_accuracy_from_embeddings', dtype: tf.dtypes.DType='float32', **kwargs) -> None:
         # init
         super(CategoricalGroupAccuracyFromEmbeddings, self).__init__(group=group, name=name, dtype=dtype, **kwargs)
         # decoder
@@ -22,6 +23,6 @@ class CategoricalGroupAccuracyFromEmbeddings(mlable.metrics.CategoricalGroupAccu
         return __config
 
     @classmethod
-    def from_config(cls, config: dict) -> tf.keras.metrics.Metric:
+    def from_config(cls, config: dict) -> ks.metrics.Metric:
         __decoder = config.pop('decoder')
         return cls(decoder=__decoder, **config)

@@ -1,11 +1,19 @@
 """Train tokun from scratch or from a checkpoint."""
 
+# SETUP ENV ###################################################################
+
+import os
+
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
+# LOAD DEPS ###################################################################
+
 import datetime
 import functools
 import itertools
 import math
-import os
 
+import keras as ks
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
@@ -19,7 +27,7 @@ import tokun.pipeline
 
 # MIXED PRECISION #############################################################
 
-tf.keras.mixed_precision.set_global_policy('mixed_float16') # mixed_bfloat16 on TPUs
+ks.config.set_dtype_policy("mixed_bfloat16") # mixed_bfloat16 on TPUs
 
 # DEVICES #####################################################################
 
@@ -52,7 +60,7 @@ RANDOM = True
 N_SEQUENCE_AXIS = 1
 N_FEATURE_AXIS = -1
 
-N_TOKEN_DIM = [4, 4, 4] # G, for each block
+N_TOKEN_DIM = [4, 16] # G, for each block
 N_ENCODING_DIM = 256 # U
 N_EMBEDDING_DIM = N_ENCODING_DIM # E
 
@@ -72,7 +80,7 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/4x16/1/7.7.keras')
+PATH_IMPORT = os.path.join('models/4x16/1/7.3.keras')
 
 # LOG #########################################################################
 
@@ -148,11 +156,11 @@ with DISTRIBUTION_STRATEGY.scope():
     token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights
     MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, activation='gelu')
-    if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = ks.models.load_model(PATH_IMPORT, compile=False)
     # compile
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        optimizer=ks.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
+        loss=ks.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
@@ -160,8 +168,8 @@ with DISTRIBUTION_STRATEGY.scope():
 if TRAINING:
     with DISTRIBUTION_STRATEGY.scope():
         # callbacks
-        cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
+        cp_callback = ks.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
+        tb_callback = ks.callbacks.TensorBoard(log_dir=PATH_LOG)
         # fit model
         TRAINING_HISTORY = MODEL.fit(
             x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),

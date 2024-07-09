@@ -1,10 +1,17 @@
 """Apply the model to various samples."""
 
-import itertools
-import math
+# SETUP ENV ###################################################################
+
 import os
 
-import keras
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
+# LOAD DEPS ###################################################################
+
+import itertools
+import math
+
+import keras as ks
 import tensorflow as tf
 
 import mlable.metrics
@@ -46,7 +53,7 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 # IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '7.7'
+LABEL = '7.3'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -58,19 +65,19 @@ with DISTRIBUTION_STRATEGY.scope():
     character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
     token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights and config
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = ks.models.load_model(PATH_IMPORT, compile=False)
     # compilation
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        optimizer=ks.optimizers.Adam(learning_rate=0.0001),
+        loss=ks.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='cce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SAMPLES #####################################################################
 
 SAMPLES = [
     """위키백과, 우리 모두의 백과사전.\nt-분포 확률적 임베딩(t-SNE)은 데이터의 차원 축소에 사용되는 기계 학습 알고리즘 중 하나로, 2002년 샘 로이스Sam Rowise와 제프리 힌튼에 의해 개발되었다.[1] t-SNE는 비선형 차원 축소 기법으로, 고차원 데이터를 특히 2, 3차원 등으로 줄여 가시화하는데에 유용하게 사용된다. 구체적으로 t-SNE는 비슷한 데이터는 근접한 2, 3차원의 지점으로, 다른 데이터는 멀리 떨어진 지점으로 맵핑한다.""",
-    """class AutoEncoder(tf.keras.models.Model):\n    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n        super(AutoEncoder, self).__init__(**kwargs)\n        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._decoder(self._encoder(x))""",
-    """class AutoEncoder(tf.keras.models.Model):\n  def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n    super(AutoEncoder, self).__init__(**kwargs)\n    self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n    self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n  def call(self, x: tf.Tensor) -> tf.Tensor:\n    return self._decoder(self._encoder(x))"""]
+    """class AutoEncoder(ks.models.Model):\n    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n        super(AutoEncoder, self).__init__(**kwargs)\n        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._decoder(self._encoder(x))""",
+    """class AutoEncoder(ks.models.Model):\n  def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n    super(AutoEncoder, self).__init__(**kwargs)\n    self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n    self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n  def call(self, x: tf.Tensor) -> tf.Tensor:\n    return self._decoder(self._encoder(x))"""]
 
 SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 4)])
 
@@ -84,8 +91,8 @@ print(tokun.evaluation.compare(SAMPLES[0], __y))
 
 # ROBUSTNESS ##################################################################
 
-__std = tf.math.reduce_std(__e, axis=0)
-__noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+__std = ks.ops.std(__e, axis=1)
+__noise = ks.random.normal(shape=(256,), mean=0., stddev=ks.ops.mean(__std).numpy())
 
 __x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
 

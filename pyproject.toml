@@ -1,20 +1,19 @@
 [tool.poetry]
 name = "tokun"
-version = "0.9.3"
+version = "0.9.3a0"
 description = "NN model specialized in text embedding."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.12"
-mlable = ">=0.6"
-tensorflow = ">=2.15"
+keras = ">=3.4"
+tensorflow = ">=2.16"
 tensorflow-datasets = ">=4.9"
+mlable = {path = "../mlable/", develop = true} # mlable = ">=0.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
-transformers = ">=4.42"
-huggingface-hub = {extras = ["cli"], version = ">=0.23"}
 
 [build-system]
 requires = ["poetry-core"]

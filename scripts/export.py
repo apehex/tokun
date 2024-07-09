@@ -1,12 +1,20 @@
 """Compute tokens and embeddings on MLQA."""
 
+# SETUP ENV ###################################################################
+
+import os
+
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
+# LOAD DEPS ###################################################################
+
 import datetime
 import functools
 import itertools
 import math
-import os
 import random
 
+import keras as ks
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
@@ -54,7 +62,7 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 # IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '7.7'
+LABEL = '7.3'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -66,11 +74,11 @@ with DISTRIBUTION_STRATEGY.scope():
     character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
     token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights and config
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = ks.saving.load_model(PATH_IMPORT, compile=False)
     # compilation
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        optimizer=ks.optimizers.Adam(learning_rate=0.0001),
+        loss=ks.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='cce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # DATA ########################################################################
@@ -135,7 +143,7 @@ for __depth, __size in enumerate(N_TOKEN_SIZES):
         for __i in range(__depth + 1):
             __embedding = MODEL._encoder._encoder.layers[__i + 1](__embedding)
         # remove the (tokenized) padding
-        EMBEDDINGS[__size][__lang] = tf.squeeze(__embedding)[:len(__tokens)]
+        EMBEDDINGS[__size][__lang] = ks.ops.squeeze(__embedding)[:len(__tokens)]
 
 # NEIGHBORHOODS ###############################################################
 
@@ -147,8 +155,8 @@ EMBEDDINGS['local'] = {'all': []}
 
 for __lang, __tokens in TOKENS[__unit].items():
     # stats on the embeddings for the current language
-    __std = tf.math.reduce_std(EMBEDDINGS[__unit][__lang], axis=0, keepdims=True)
-    __radius = 2. * tf.reduce_mean(__std).numpy()
+    __std = ks.ops.std(EMBEDDINGS[__unit][__lang], axis=1, keepdims=True)
+    __radius = 2. ** (1 - math.log(__unit, 4)) * ks.ops.mean(__std).numpy()
     # choose a single token
     __t = tokun.pipeline.preprocess(text=random.choice(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
     # encode it
@@ -161,10 +169,10 @@ for __lang, __tokens in TOKENS[__unit].items():
     __m = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__d), size=__unit // 4, repeats=True)
     # save
     TOKENS['local']['all'].extend(__m)
-    EMBEDDINGS['local']['all'].append(tf.squeeze(__n))
+    EMBEDDINGS['local']['all'].append(ks.ops.squeeze(__n))
 
 # merge all the embedding tensors
-EMBEDDINGS['local']['all'] = tf.concat(values=EMBEDDINGS['local']['all'], axis=0)
+EMBEDDINGS['local']['all'] = ks.ops.concatenate(xs=EMBEDDINGS['local']['all'], axis=0)
 
 # EXPORT ######################################################################
 

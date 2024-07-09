@@ -1,15 +1,14 @@
 """Encoding and decoding blocks of tokun."""
 
-import keras
+import keras as ks
 import tensorflow as tf
 
 import mlable.layers.reshaping
-import mlable.layers.transformer
 
 # ENCODING BLOCKS #############################################################
 
-@keras.saving.register_keras_serializable(package='blocks')
-class TokenizeBlock(tf.keras.layers.Layer):
+@ks.saving.register_keras_serializable(package='blocks')
+class TokenizeBlock(ks.layers.Layer):
     def __init__(
         self,
         sequence_axis: int=0,
@@ -30,9 +29,9 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
+        self._normalize = ks.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
         self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=False, name='reshaping') # (B, S * G, E) => (B, S, G * E)
-        self._dense = tf.keras.layers.Dense(units=embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
+        self._dense = ks.layers.Dense(units=embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(self._divide(self._normalize(inputs)))
@@ -43,13 +42,13 @@ class TokenizeBlock(tf.keras.layers.Layer):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)
 
 # DECODING BLOCKS #############################################################
 
-@keras.saving.register_keras_serializable(package='blocks')
-class DetokenizeBlock(tf.keras.layers.Layer):
+@ks.saving.register_keras_serializable(package='blocks')
+class DetokenizeBlock(ks.layers.Layer):
     def __init__(
         self,
         sequence_axis: int=0,
@@ -70,9 +69,9 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, S, L) => (B, S, G * E), typically L = E
+        self._dense = ks.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, S, L) => (B, S, G * E), typically L = E
         self._divide = mlable.layers.reshaping.Divide(input_axis=feature_axis, output_axis=sequence_axis, insert=False, factor=token_dim, name='reshaping') # (B, S, G * E) => (B, S * G, E)
-        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
+        self._normalize = ks.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._normalize(self._divide(self._dense(inputs)))
@@ -83,13 +82,13 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)
 
 # HEAD ########################################################################
 
-@keras.saving.register_keras_serializable(package='blocks')
-class HeadBlock(tf.keras.layers.Layer):
+@ks.saving.register_keras_serializable(package='blocks')
+class HeadBlock(ks.layers.Layer):
     def __init__(
         self,
         feature_axis: int=-1,
@@ -100,8 +99,8 @@ class HeadBlock(tf.keras.layers.Layer):
         # config
         self._config = {'feature_axis': feature_axis, 'encoding_dim': encoding_dim}
         # layers
-        self._dense = tf.keras.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
-        self._softmax = tf.keras.layers.Softmax(axis=feature_axis, name='softmax') # (..., G, U)
+        self._dense = ks.layers.Dense(units=encoding_dim, activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
+        self._softmax = ks.layers.Softmax(axis=feature_axis, name='softmax') # (..., G, U)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._softmax(self._dense(inputs))
@@ -112,5 +111,5 @@ class HeadBlock(tf.keras.layers.Layer):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)

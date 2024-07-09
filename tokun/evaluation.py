@@ -21,4 +21,4 @@ def intersection(left: str, right: str) -> float:
 # ROBUSTNESS ##################################################################
 
 def neighbors(point: tf.Tensor, radius: float, count: int) -> tf.Tensor:
-    return point + tf.random.uniform(shape=(count, point.shape[-1]), minval=-radius, maxval=radius, dtype=point.dtype)
+    return point + ks.random.uniform(shape=(count, point.shape[-1]), minval=-radius, maxval=radius, dtype=point.dtype)

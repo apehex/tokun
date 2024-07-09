@@ -1,17 +1,23 @@
 """Publish tokun to Hugging Face."""
 
+# SETUP ENV ###################################################################
+
+import os
+
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
+# LOAD DEPS ###################################################################
+
 import itertools
 import math
-import os
 import tempfile
-import urllib.request
 
 import huggingface_hub as hh
 import keras as ks
 import tensorflow as tf
 import transformers as ht
 
-import mlable.io
+import mlable.data
 import mlable.metrics
 
 import tokun.evaluation
@@ -45,7 +51,7 @@ print(DISTRIBUTION_STRATEGY)
 N_SEQUENCE_AXIS = 1
 N_FEATURE_AXIS = -1
 
-N_TOKEN_DIM = [4, 16] # G, for each block
+N_TOKEN_DIM = [16, 4] # G, for each block
 N_SEQUENCE_DIM = 512
 
 # DERIVED #####################################################################
@@ -70,21 +76,21 @@ with DISTRIBUTION_STRATEGY.scope():
     character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
     token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights and config
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = ks.saving.load_model(PATH_IMPORT, compile=False)
     # compilation
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        optimizer=ks.optimizers.Adam(learning_rate=0.0001),
+        loss=ks.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='cce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SPECIFY IO ##################################################################
 
-__inputs = tf.keras.layers.Input(shape=(math.prod(N_TOKEN_DIM) * N_SEQUENCE_DIM,), dtype=tf.int32)
+__inputs = ks.layers.Input(shape=(math.prod(N_TOKEN_DIM) * N_SEQUENCE_DIM,), dtype=tf.int32)
 
 __outputs = MODEL._encoder(__inputs)
 __outputs = MODEL._decoder(__outputs)
 
-TOKUN = tf.keras.models.Model(__inputs, __outputs)
+TOKUN = ks.models.Model(__inputs, __outputs, name='tokun')
 
 # SAMPLE ######################################################################
 
@@ -101,7 +107,7 @@ __e = TOKUN.layers[1](__x) # encoder
 __p = TOKUN.layers[2](__e) # decoder
 __y = tokun.pipeline.postprocess(__p)
 
-# CHECK #######################################################################
+# INSPECT #####################################################################
 
 print(MODEL.summary())
 print(TOKUN.summary())
@@ -133,7 +139,7 @@ API.upload_folder(repo_id='apehex/tokun', folder_path=PATH_TOKENIZER, path_in_re
 hh.save_pretrained_keras(model=TOKUN, save_directory=PATH_MODEL, config=TOKUN.get_config())
 API.upload_folder(repo_id='apehex/tokun', folder_path=PATH_MODEL, path_in_repo=PATH_EXPORT)
 
-# TEST ########################################################################
+# CHECK #######################################################################
 
 API.snapshot_download(repo_id='apehex/tokun', local_dir=PATH_TEST)
 __TOKENIZER = tokun.huggingface.ByteTokenizer()

@@ -1,14 +1,14 @@
 """Piece together the actual VAE CNN model for tokun."""
 
-import keras
+import keras as ks
 import tensorflow as tf
 
 import tokun.layers
 
 # ENCODER #####################################################################
 
-@keras.saving.register_keras_serializable(package='models')
-class Encoder(tf.keras.models.Model):
+@ks.saving.register_keras_serializable(package='models')
+class Encoder(ks.models.Model):
     def __init__(
         self,
         token_dim: list,
@@ -34,7 +34,7 @@ class Encoder(tf.keras.models.Model):
         # layers
         __layers = [
             # (B * G ^ D, U) => (B * G ^ D, E)
-            tf.keras.layers.Embedding(
+            ks.layers.Embedding(
                 input_dim=encoding_dim,
                 output_dim=embedding_dim,
                 embeddings_initializer='glorot_uniform',
@@ -49,7 +49,7 @@ class Encoder(tf.keras.models.Model):
                 name='tokenize-{}_{}'.format(__g, __i))
             for __i, __g in enumerate(__token_dim)]
         # model
-        self._encoder = tf.keras.Sequential(__layers)
+        self._encoder = ks.Sequential(__layers)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._encoder(x)
@@ -60,13 +60,13 @@ class Encoder(tf.keras.models.Model):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)
 
 # DECODER #####################################################################
 
-@keras.saving.register_keras_serializable(package='models')
-class Decoder(tf.keras.models.Model):
+@ks.saving.register_keras_serializable(package='models')
+class Decoder(ks.models.Model):
     def __init__(
         self,
         token_dim: list,
@@ -103,7 +103,7 @@ class Decoder(tf.keras.models.Model):
             # (B * G ^ D, E) => (B * G ^ D, U)
             tokun.layers.HeadBlock(feature_axis=feature_axis, encoding_dim=encoding_dim, name='project-head')]
         # model
-        self._decoder = tf.keras.Sequential(__layers) 
+        self._decoder = ks.Sequential(__layers) 
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return self._decoder(x)
@@ -114,13 +114,13 @@ class Decoder(tf.keras.models.Model):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)
 
 # VAE #########################################################################
 
-@keras.saving.register_keras_serializable(package='models')
-class AutoEncoder(tf.keras.models.Model):
+@ks.saving.register_keras_serializable(package='models')
+class AutoEncoder(ks.models.Model):
     def __init__(
         self,
         token_dim: list,
@@ -146,5 +146,5 @@ class AutoEncoder(tf.keras.models.Model):
         return __config
 
     @classmethod
-    def from_config(cls, config) -> tf.keras.layers.Layer:
+    def from_config(cls, config) -> ks.layers.Layer:
         return cls(**config)

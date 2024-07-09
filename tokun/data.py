@@ -23,4 +23,4 @@ def random_dataset(size: int, sample_size: int, lower_plane: int=0, upper_plane:
             yield random_sample(sample_size=sample_size, lower_plane=lower_plane, upper_plane=upper_plane)
     return tf.data.Dataset.from_generator(
         generator=__generator,
-        output_signature=tf.TensorSpec(shape=(4 * sample_size,), dtype=tf.int32))
+        output_signature=tf.TensorSpec(shape=(4 * sample_size,), dtype='int32'))

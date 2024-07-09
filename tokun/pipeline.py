@@ -4,6 +4,7 @@ import functools
 import itertools
 import math
 
+import keras as ks
 import tensorflow as tf
 
 # UNICODE #####################################################################
@@ -51,7 +52,7 @@ def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
 # DECODE ######################################################################
 
 def interpret(output: tf.Tensor) -> tf.Tensor:
-    return tf.argmax(input=output, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
+    return tf.argmax(input=output, axis=-1, output_type='int32') # uint8 is not allowed
 
 def decode(tokens: tf.Tensor) -> str:
     __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
@@ -61,7 +62,7 @@ def decode(tokens: tf.Tensor) -> str:
 
 def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
     # as tensor
-    __data = tf.convert_to_tensor(text, dtype=tf.dtypes.string)
+    __data = tf.convert_to_tensor(text, dtype='string')
     # list of bytes
     __bytes = encode(data=__data, token_size=token_size, sample_size=len(text))
     # partition or flatten
@@ -82,7 +83,7 @@ def postprocess(output: tf.Tensor, onehot: bool=True) -> str:
 
 # SAMPLING ####################################################################
 
-def sample(model: tf.keras.models.Model, text: str, **kwargs) -> tuple:
+def sample(model: ks.models.Model, text: str, **kwargs) -> tuple:
     __x = preprocess(text=text, **kwargs)
     __e = model._encoder(__x)
     __p = model._decoder(__e)
