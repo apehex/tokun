@@ -6,13 +6,15 @@ authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
 
 [tool.poetry.dependencies]
-mlable = ">=0.5"
 python = ">=3.10, <3.12"
+mlable = ">=0.6"
 tensorflow = ">=2.15"
 tensorflow-datasets = ">=4.9"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
+transformers = ">=4.42"
+huggingface-hub = {extras = ["cli"], version = ">=0.23"}
 
 [build-system]
 requires = ["poetry-core"]
