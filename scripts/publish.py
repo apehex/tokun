@@ -121,6 +121,8 @@ PATH_MODEL = os.path.join(PATH_TEMP, 'model/')
 PATH_TEST = os.path.join(PATH_TEMP, 'test/')
 PATH_TOKENIZER = os.path.join(PATH_TEMP, 'tokenizer/')
 
+print(PATH_TEMP)
+
 # TOKENIZER ###################################################################
 
 TOKENIZER.save_pretrained(save_directory=PATH_TOKENIZER)
