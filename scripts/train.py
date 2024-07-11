@@ -152,7 +152,7 @@ with DISTRIBUTION_STRATEGY.scope():
     # compile
     MODEL.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='cce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
@@ -161,7 +161,7 @@ if TRAINING:
     with DISTRIBUTION_STRATEGY.scope():
         # callbacks
         cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG)
+        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG, histogram_freq=1, embeddings_freq=0, profile_batch=(16, 32), write_graph=False, write_images=True)
         # fit model
         TRAINING_HISTORY = MODEL.fit(
             x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
