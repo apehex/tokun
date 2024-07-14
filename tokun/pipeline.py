@@ -17,13 +17,28 @@ CODE_US = b'\x1f'
 
 # ENCODE ######################################################################
 
-def encode(data: tf.Tensor, token_size: int, sample_size: int) -> tf.Tensor:
+def encode(data: tf.Tensor, token_size: int, sample_size: int, dtype: tf.dtypes.DType=tf.dtypes.int32) -> tf.Tensor:
     # factor 4 because of the UTF-32 encoding
     __dim = math.ceil(4 * sample_size / token_size) * token_size
-    # Decode bytes from UTF-8
+    # decode bytes from UTF-8
     __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
-    # Decode byte strings to arrays of integers
-    return tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
+    # decode byte strings to arrays of byte integers
+    __bytes = tf.io.decode_raw(__bytes, out_type=tf.uint8, fixed_length=__dim) # (B, 4 * S)
+    # cast to int32 as uint8 is not std
+    return tf.cast(__bytes, dtype=dtype)
+
+# BINARIZE ####################################################################
+
+def binarize(data: tf.Tensor, depth: int=8, dtype: tf.dtypes.DType=None, flatten: bool=True) -> tf.Tensor:
+    __dtype = dtype or data.dtype
+    # big endian: most significant bit first
+    __mask = tf.bitwise.left_shift(tf.ones((), dtype=__dtype), tf.convert_to_tensor(range(depth)[::-1], dtype=__dtype))
+    # select each bit from the original data
+    __bits = tf.bitwise.bitwise_and(tf.expand_dims(data, -1), __mask)
+    # format
+    __bits = tf.cast(tf.not_equal(__bits, 0), dtype=__dtype)
+    # reshape
+    return tf.reshape(__bits, shape=(-1,)) if flatten else __bits
 
 # RESHAPE #####################################################################
 
