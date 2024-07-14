@@ -106,7 +106,7 @@ class HeadBlock(tf.keras.layers.Layer):
         self._dense = tf.keras.layers.Dense(units=__encoding_dim, activation=__activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return tf.squeeze(self._dense(inputs))
+        return self._dense(inputs)
 
     def get_config(self) -> dict:
         __config = super(HeadBlock, self).get_config()
