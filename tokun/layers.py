@@ -92,18 +92,15 @@ class DetokenizeBlock(tf.keras.layers.Layer):
 class HeadBlock(tf.keras.layers.Layer):
     def __init__(
         self,
-        feature_axis: int=-1,
         encoding_dim: int=256,
+        activation: str='softmax',
         **kwargs
     ) -> None:
         super(HeadBlock, self).__init__(**kwargs)
         # config
-        self._config = {'feature_axis': feature_axis, 'encoding_dim': encoding_dim}
-        # binary vs byte classification (2 or 256 classes)
-        __encoding_dim = encoding_dim if encoding_dim > 2 else 1
-        __activation = 'softmax' if encoding_dim > 2 else 'sigmoid'
+        self._config = {'encoding_dim': encoding_dim, 'activation': activation}
         # layers
-        self._dense = tf.keras.layers.Dense(units=__encoding_dim, activation=__activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
+        self._dense = tf.keras.layers.Dense(units=encoding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(inputs)
