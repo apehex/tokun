@@ -6,6 +6,9 @@ import math
 
 import tensorflow as tf
 
+import mlable.ops
+import mlable.utils
+
 # UNICODE #####################################################################
 
 CODE_STX = b'\x02'
@@ -63,14 +66,36 @@ def reshape(data: tf.Tensor, expand: list=[]) -> tf.Tensor:
 def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
     return tf.convert_to_tensor([ticks * b'\x00']) + data
 
+# INTERPRET PROBABILITIES #####################################################
+
+def _interpret_categorical(prediction: tf.Tensor) -> tf.Tensor:
+    return tf.argmax(input=prediction, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
+
+def _interpret_binary(prediction: tf.Tensor, threshold: float=0.5) -> tf.Tensor:
+    # meta
+    __threshold = tf.cast(threshold, prediction.dtype)
+    # binary tensor
+    __bits = tf.cast(prediction > __threshold, dtype=tf.dtypes.int32)
+    # expand to match the input rank
+    return mlable.ops.reduce_base(tensor=__bits, base=2, axis=-1, keepdims=False)
+
+def interpret(prediction: tf.Tensor, threshold: float=0.5, binary: bool=False) -> tf.Tensor:
+    return _interpret_binary(prediction=prediction, threshold=threshold) if binary else _interpret_categorical(prediction=prediction)
+
 # DECODE ######################################################################
 
-def interpret(output: tf.Tensor) -> tf.Tensor:
-    return tf.argmax(input=output, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
-
-def decode(tokens: tf.Tensor) -> str:
-    __b = tf.reshape(tensor=tokens, shape=(-1,)).numpy().tolist()
-    return bytes(__b).decode(encoding='utf-32-be', errors='replace')
+def decode(data: tf.Tensor) -> str:
+    # make sure the dtype is large enough for UTF-32 codepoints
+    __data = tf.cast(data, dtype=tf.dtypes.int32)
+    # group the bytes 4 by 4
+    __shape = mlable.utils.divide_shape(shape=__data.shape, input_axis=-2, output_axis=-1, factor=4, insert=True)
+    __bytes = tf.reshape(tensor=__data, shape=__shape)
+    # compute the UTF-32-BE codepoints
+    __codes = mlable.ops.reduce_base(tensor=__bytes, base=256, axis=-1, keepdims=False)
+    # actually decode
+    __utf32 = tf.strings.unicode_encode(__codes, output_encoding='UTF-32-BE')
+    # convert to standard UTF-8
+    return tf.strings.unicode_transcode(input=__utf32, input_encoding='UTF-32-BE', output_encoding='UTF-8')
 
 # > ###########################################################################
 
@@ -87,11 +112,11 @@ def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
 def unpad(text: str) -> str:
     return text.strip('\x00')
 
-def postprocess(output: tf.Tensor, onehot: bool=True) -> str:
+def postprocess(prediction: tf.Tensor, binary: bool=False, from_probabilities: bool=True) -> str:
     # from one-hot to UTF-32 bytes
-    __output = interpret(output=output) if onehot else output
+    __output = interpret(prediction=prediction, binary=binary) if from_probabilities else prediction
     # flatten the groups of 4 bytes
-    __output = decode(tokens=__output)
+    __output = decode(data=__output)
     # remove the padding
     return unpad(text=__output)
 
