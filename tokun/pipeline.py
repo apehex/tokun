@@ -32,16 +32,18 @@ def encode(data: tf.Tensor, token_size: int, sample_size: int, dtype: tf.dtypes.
 
 # BINARIZE ####################################################################
 
-def binarize(data: tf.Tensor, depth: int=8, dtype: tf.dtypes.DType=None, flatten: bool=True) -> tf.Tensor:
+def binarize(data: tf.Tensor, depth: int=8, dtype: tf.dtypes.DType=None) -> tf.Tensor:
     __dtype = dtype or data.dtype
     # big endian: most significant bit first
-    __mask = tf.bitwise.left_shift(tf.ones((), dtype=tf.dtypes.int32), tf.convert_to_tensor(range(depth)[::-1], dtype=tf.dtypes.int32))
+    __exp = tf.convert_to_tensor(range(depth)[::-1], dtype=tf.dtypes.int32)
+    __base = tf.bitwise.left_shift(tf.ones((), dtype=tf.dtypes.int32), __exp)
+    # match input rank
+    __shape = len(list(data.shape)) * [1] + [depth]
+    __base = tf.reshape(__base, shape=__shape)
     # select each bit from the original data
-    __bits = tf.bitwise.bitwise_and(tf.expand_dims(data, -1), __mask)
+    __bits = tf.bitwise.bitwise_and(tf.expand_dims(data, -1), __base)
     # format
-    __bits = tf.cast(tf.not_equal(__bits, 0), dtype=__dtype)
-    # reshape
-    return tf.reshape(__bits, shape=(-1,)) if flatten else __bits
+    return tf.cast(tf.not_equal(__bits, 0), dtype=__dtype)
 
 # RESHAPE #####################################################################
 
