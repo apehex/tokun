@@ -77,7 +77,7 @@ def _interpret_binary(prediction: tf.Tensor, threshold: float=0.5) -> tf.Tensor:
     # binary tensor
     __bits = tf.cast(prediction > __threshold, dtype=tf.dtypes.int32)
     # expand to match the input rank
-    return mlable.ops.reduce_base(tensor=__bits, base=2, axis=-1, keepdims=False)
+    return mlable.ops.reduce_base(data=__bits, base=2, axis=-1, keepdims=False)
 
 def interpret(prediction: tf.Tensor, threshold: float=0.5, binary: bool=False) -> tf.Tensor:
     return _interpret_binary(prediction=prediction, threshold=threshold) if binary else _interpret_categorical(prediction=prediction)
@@ -91,7 +91,7 @@ def decode(data: tf.Tensor) -> str:
     __shape = mlable.utils.divide_shape(shape=__data.shape, input_axis=-2, output_axis=-1, factor=4, insert=True)
     __bytes = tf.reshape(tensor=__data, shape=__shape)
     # compute the UTF-32-BE codepoints
-    __codes = mlable.ops.reduce_base(tensor=__bytes, base=256, axis=-1, keepdims=False)
+    __codes = mlable.ops.reduce_base(data=__bytes, base=256, axis=-1, keepdims=False)
     # actually decode
     __utf32 = tf.strings.unicode_encode(__codes, output_encoding='UTF-32-BE')
     # convert to standard UTF-8
