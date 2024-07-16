@@ -114,9 +114,9 @@ def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
 def unpad(text: str) -> str:
     return text.strip('\x00')
 
-def postprocess(prediction: tf.Tensor, binary: bool=False, from_probabilities: bool=True) -> str:
+def postprocess(prediction: tf.Tensor, binary: bool=False) -> str:
     # from one-hot to UTF-32 bytes
-    __output = interpret(prediction=prediction, binary=binary) if from_probabilities else prediction
+    __output = interpret(prediction=prediction, binary=binary)
     # flatten the groups of 4 bytes
     __output = decode(data=__output)
     # remove the padding
