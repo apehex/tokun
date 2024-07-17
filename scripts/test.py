@@ -46,7 +46,7 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 # IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '7.7'
+LABEL = '7.3'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -78,13 +78,13 @@ SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 
 
 __x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
 
+print(tokun.evaluation.compare(SAMPLES[0], __y))
 print(SAMPLES[0])
 print(__y)
-print(tokun.evaluation.compare(SAMPLES[0], __y))
 
 # ROBUSTNESS ##################################################################
 
-__std = tf.math.reduce_std(__e, axis=0)
+__std = tf.math.reduce_std(__e, axis=1)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
 __x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])

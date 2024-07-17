@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "tokun"
-version = "0.10.3"
+version = "0.10.4"
 description = "NN model specialized in text embedding."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.12"
-mlable = ">=0.6"
+mlable = ">=0.7"
 tensorflow = ">=2.15"
 tensorflow-datasets = ">=4.9"
 
