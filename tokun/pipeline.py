@@ -88,9 +88,7 @@ def postprocess(prediction: tf.Tensor, binary: bool=False, random: bool=False) -
     # from one-hot to UTF-32 bytes
     __output = mlable.sampling.binary(prediction=prediction, threshold=0.5, random=random) if binary else mlable.sampling.categorical(prediction=prediction, random=random)
     # flatten the groups of 4 bytes
-    __output = decode(data=__output)
-    # remove the padding
-    return unpad(text=__output)
+    return decode(data=__output)
 
 # SAMPLING ####################################################################
 
