@@ -7,6 +7,7 @@ import math
 import tensorflow as tf
 
 import mlable.ops
+import mlable.sampling
 import mlable.utils
 
 # UNICODE #####################################################################
@@ -30,21 +31,6 @@ def encode(data: tf.Tensor, token_size: int, sample_size: int, dtype: tf.dtypes.
     # cast to int32 as uint8 is not std
     return tf.cast(__bytes, dtype=dtype)
 
-# BINARIZE ####################################################################
-
-def binarize(data: tf.Tensor, depth: int=8, dtype: tf.dtypes.DType=None) -> tf.Tensor:
-    __dtype = dtype or data.dtype
-    # big endian: most significant bit first
-    __exp = tf.convert_to_tensor(range(depth)[::-1], dtype=tf.dtypes.int32)
-    __base = tf.bitwise.left_shift(tf.ones((), dtype=tf.dtypes.int32), __exp)
-    # match input rank
-    __shape = len(list(data.shape)) * [1] + [depth]
-    __base = tf.reshape(__base, shape=__shape)
-    # select each bit from the original data
-    __bits = tf.bitwise.bitwise_and(tf.expand_dims(data, -1), __base)
-    # format
-    return tf.cast(tf.not_equal(__bits, 0), dtype=__dtype)
-
 # RESHAPE #####################################################################
 
 def chunk(seq: list, size: int, repeats: bool=True) -> list:
@@ -67,22 +53,6 @@ def reshape(data: tf.Tensor, expand: list=[]) -> tf.Tensor:
 
 def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
     return tf.convert_to_tensor([ticks * b'\x00']) + data
-
-# INTERPRET PROBABILITIES #####################################################
-
-def _interpret_categorical(prediction: tf.Tensor) -> tf.Tensor:
-    return tf.argmax(input=prediction, axis=-1, output_type=tf.dtypes.int32) # uint8 is not allowed
-
-def _interpret_binary(prediction: tf.Tensor, threshold: float=0.5) -> tf.Tensor:
-    # meta
-    __threshold = tf.cast(threshold, prediction.dtype)
-    # binary tensor
-    __bits = tf.cast(prediction > __threshold, dtype=tf.dtypes.int32)
-    # expand to match the input rank
-    return mlable.ops.reduce_base(data=__bits, base=2, axis=-1, keepdims=False)
-
-def interpret(prediction: tf.Tensor, threshold: float=0.5, binary: bool=False) -> tf.Tensor:
-    return _interpret_binary(prediction=prediction, threshold=threshold) if binary else _interpret_categorical(prediction=prediction)
 
 # DECODE ######################################################################
 
@@ -114,9 +84,9 @@ def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
 def unpad(text: str) -> str:
     return text.strip('\x00')
 
-def postprocess(prediction: tf.Tensor, binary: bool=False) -> str:
+def postprocess(prediction: tf.Tensor, binary: bool=False, random: bool=False) -> str:
     # from one-hot to UTF-32 bytes
-    __output = interpret(prediction=prediction, binary=binary)
+    __output = mlable.sampling.binary(prediction=prediction, threshold=0.5, random=random) if binary else mlable.sampling.categorical(prediction=prediction, random=random)
     # flatten the groups of 4 bytes
     __output = decode(data=__output)
     # remove the padding
