@@ -95,8 +95,8 @@ def postprocess(prediction: tf.Tensor, binary: bool=False, random: bool=False) -
 # SAMPLING ####################################################################
 
 def sample(model: tf.keras.models.Model, text: str, **kwargs) -> tuple:
-    __x = preprocess(text=text, **kwargs)
+    __x = preprocess(text=text, token_size=kwargs.get('token_size', 16), expand=kwargs.get('expand', [1]))
     __e = model._encoder(__x)
     __p = model._decoder(__e)
-    __y = postprocess(__p)
+    __y = postprocess(__p, binary=kwargs.get('binary', False), random=kwargs.get('random', False))
     return (__x, __e, __p, __y)
