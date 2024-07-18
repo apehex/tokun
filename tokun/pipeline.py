@@ -84,6 +84,10 @@ def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
 def unpad(text: str) -> str:
     return text.strip('\x00')
 
+def unpack(data: tf.Tensor) -> list:
+    __data = data.numpy().tolist()
+    return [__s.decode('utf-8') for __s in __data]
+
 def postprocess(prediction: tf.Tensor, binary: bool=False, random: bool=False) -> str:
     # from one-hot to UTF-32 bytes
     __output = mlable.sampling.binary(prediction=prediction, threshold=0.5, random=random) if binary else mlable.sampling.categorical(prediction=prediction, random=random)
@@ -97,4 +101,5 @@ def sample(model: tf.keras.models.Model, text: str, **kwargs) -> tuple:
     __e = model._encoder(__x)
     __p = model._decoder(__e)
     __y = postprocess(__p, binary=kwargs.get('binary', False), random=kwargs.get('random', False))
-    return (__x, __e, __p, __y)
+    __o = unpack(__y)
+    return (__x, __e, __p, __y, __o)
