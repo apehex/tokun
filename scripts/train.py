@@ -46,24 +46,30 @@ print(DISTRIBUTION_STRATEGY)
 IMPORT = False
 TRAINING = True
 RANDOM = True
+BINARY = True
 
-# META ########################################################################
+# MODEL PARAMETERS ############################################################
 
 N_SEQUENCE_AXIS = 1
 N_FEATURE_AXIS = -1
 
 N_TOKEN_DIM = [4, 4, 4] # G, for each block
-N_ENCODING_DIM = 256 # U
-N_EMBEDDING_DIM = N_ENCODING_DIM # E
+N_INPUT_DIM = 256 # U_i (bytes)
+N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
+N_EMBEDDING_DIM = 256 # E
 
-N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 256 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
+OUTPUT = 'binary' if BINARY else 'categorical'
+
+# TRAINING PARAMETERS #########################################################
 
 N_EPOCHS = 8
 
+N_BATCH_DIM = 128 # number of samples per batch
+N_SAMPLE_DIM = 256 # number of characters per sample (=> 4 * N_SAMPLE_DIM integers per sample)
+
 R_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
 
-CLASS_WEIGHTS = {__c: 0.3 if __c == 0 else 1. for __c in range(N_ENCODING_DIM)} # there are 3 times more 0s than other bytes
+CLASS_WEIGHTS = {__c: 0.3 if __c == 0 else 1. for __c in range(N_INPUT_DIM)} # there are 3 times more 0s than other bytes
 
 # DERIVED #####################################################################
 
@@ -72,11 +78,11 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/4x16/1/7.7.keras')
+PATH_IMPORT = os.path.join('models/256x8/4x16/1/8.5.keras')
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
+VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
@@ -91,19 +97,25 @@ MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=Fal
 RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 14, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
 RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
 
+# OUTPUT ENCODING #############################################################
+
+_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
+_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
+_encode_output = _encode_binary if BINARY else _encode_categorical
+
 # PREPROCESS MLQA #############################################################
 
 PIPELINE = [
     # join the features
-    ((lambda x: tf.strings.join(inputs=[x['context'], x['question'], x['answers']['text']], separator='\x1d')), True),
+    ((lambda __x: tf.strings.join(inputs=[__x['context'], __x['question'], __x['answers']['text']], separator='\x1d')), True),
     # offset by 1 to 15 character => (1,) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (4 * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
-    # one-hot encoding for the targets => (4 * S, E) int (bool)
-    ((lambda x: (x, tf.one_hot(x, depth=N_ENCODING_DIM, axis=-1))), True)]
+    # encode classes on 8 bits for the 256 possibilities / byte
+    ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
@@ -115,8 +127,8 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=
 PIPELINE = [
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
-    # one-hot encoding for the targets => (4 * S, E) int (bool)
-    ((lambda x: (x, tf.one_hot(x, depth=N_ENCODING_DIM, axis=-1))), True)]
+    # encode classes on 8 bits for the 256 possibilities / byte
+    ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
@@ -139,20 +151,25 @@ print(DATASET_TEST.element_spec)
 print('train: {:,}'.format(DATASET_TRAIN.cardinality().numpy()))
 print('test:  {:,}'.format(DATASET_TEST.cardinality().numpy()))
 
+# METRICS #####################################################################
+
+_Accuracy = mlable.metrics.BinaryGroupAccuracy if BINARY else mlable.metrics.CategoricalGroupAccuracy
+_Loss = tf.keras.losses.BinaryCrossentropy if BINARY else tf.keras.losses.CategoricalCrossentropy
+
 # COMPILE ########################################################################
 
 with DISTRIBUTION_STRATEGY.scope():
     # metrics
-    byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
-    character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
-    token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
+    character_accuracy = _Accuracy(group=4, name='character_accuracy')
+    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights
-    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, encoding_dim=N_ENCODING_DIM, embedding_dim=N_EMBEDDING_DIM, activation='gelu')
+    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM, embedding_dim=N_EMBEDDING_DIM, activation='gelu', output=OUTPUT)
     if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
     # compile
     MODEL.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='cce_loss'),
+        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
