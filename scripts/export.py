@@ -38,13 +38,25 @@ else:
 
 print(DISTRIBUTION_STRATEGY)
 
+# TOGGLE ######################################################################
+
+BINARY = True
+
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
+N_FEATURE_AXIS = -1
+
 N_TOKEN_DIM = [4, 16] # G, for each block
+N_INPUT_DIM = 256 # U_i (bytes)
+N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
+
+OUTPUT = 'binary' if BINARY else 'categorical'
+
+# TRAINING PARAMETERS #########################################################
 
 N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 128 # number of characters per sample (=> N_TOKEN_DIM * N_SAMPLE_DIM integers per sample)
+N_SAMPLE_DIM = 256 # number of characters per sample (=> 4 * N_SAMPLE_DIM integers per sample)
 
 # DERIVED #####################################################################
 
@@ -53,24 +65,29 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 
 # IMPORT MODEL ################################################################
 
-VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '7.7'
+VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM)
+LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
-# INIT MODEL ##################################################################
+# METRICS #####################################################################
+
+_Accuracy = mlable.metrics.BinaryGroupAccuracy if BINARY else mlable.metrics.CategoricalGroupAccuracy
+_Loss = tf.keras.losses.BinaryCrossentropy if BINARY else tf.keras.losses.CategoricalCrossentropy
+
+# COMPILE ########################################################################
 
 with DISTRIBUTION_STRATEGY.scope():
     # metrics
-    byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
-    character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
-    token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
+    character_accuracy = _Accuracy(group=4, name='character_accuracy')
+    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights and config
     MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
     # compilation
     MODEL.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # DATA ########################################################################
@@ -78,6 +95,12 @@ with DISTRIBUTION_STRATEGY.scope():
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+
+# OUTPUT ENCODING #############################################################
+
+_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
+_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
+_encode_output = _encode_binary if BINARY else _encode_categorical
 
 # PREPROCESS ##################################################################
 
@@ -91,7 +114,7 @@ PIPELINE = [
     # reshape => (4 * S,) int
     (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
     # one-hot encoding for the targets => (4 * S, E) int (bool)
-    ((lambda x: (x, tf.one_hot(x, depth=256, axis=-1))), True)]
+    ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
@@ -117,7 +140,12 @@ for __lang, __dataset in MLQA_TEST.items():
 # unique (G ^ i)-tokens
 for __lang, __sample in SAMPLES.items():
     for __size in TOKENS:
-        TOKENS[__size][__lang] = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__sample[0]), size=__size // 4, repeats=False)
+        # concatenate all the samples in a batch
+        __all = tokun.pipeline.postprocess(__sample[0], binary=BINARY, random=False)
+        __all = tokun.pipeline.unpack(__all)
+        __all = ''.join(__all)
+        # save all the unique chunks
+        TOKENS[__size][__lang] = tokun.pipeline.chunk(seq=__all, size=__size // 4, repeats=False)
 
 # unique tokens, for all languages
 for __size in TOKENS:
@@ -134,6 +162,8 @@ for __depth, __size in enumerate(N_TOKEN_SIZES):
         # iterative CNN tokenization
         for __i in range(__depth + 1):
             __embedding = MODEL._encoder._encoder.layers[__i + 1](__embedding)
+        # mixed precision: bfloat16 => float32
+        __embedding = tf.cast(__embedding, dtype=tf.dtypes.float32)
         # remove the (tokenized) padding
         EMBEDDINGS[__size][__lang] = tf.squeeze(__embedding)[:len(__tokens)]
 
@@ -152,13 +182,16 @@ for __lang, __tokens in TOKENS[__unit].items():
     # choose a single token
     __t = tokun.pipeline.preprocess(text=random.choice(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
     # encode it
-    __e = MODEL._encoder(__t)
+    __e = tf.cast(MODEL._encoder(__t), dtype=tf.dtypes.float32)
     # add noise to generate random neighbors
     __n = tokun.evaluation.neighbors(point=__e, radius=__radius, count=__count)
     # decode the noisy embeddings
     __d = MODEL._decoder(__n)
     # postprocess
-    __m = tokun.pipeline.chunk(seq=tokun.pipeline.postprocess(__d), size=__unit // 4, repeats=True)
+    __r = tokun.pipeline.postprocess(__d, binary=BINARY, random=False)
+    __r = ''.join(tokun.pipeline.unpack(__r))
+    # chunk
+    __m = tokun.pipeline.chunk(seq=__r, size=__unit // 4, repeats=True)
     # save
     TOKENS['local']['all'].extend(__m)
     EMBEDDINGS['local']['all'].append(tf.squeeze(__n))

@@ -34,10 +34,18 @@ else:
 
 print(DISTRIBUTION_STRATEGY)
 
+# TOGGLE ######################################################################
+
+BINARY = True
+
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
 N_TOKEN_DIM = [4, 16] # G, for each block
+N_INPUT_DIM = 256 # U_i (bytes)
+N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
+
+OUTPUT = 'binary' if BINARY else 'categorical'
 
 # DERIVED #####################################################################
 
@@ -45,24 +53,29 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 
 # IMPORT MODEL ################################################################
 
-VERSION = tokun.meta.version(units=N_TOKEN_DIM, axis=N_SEQUENCE_AXIS)
-LABEL = '7.3'
+VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM)
+LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
+
+# METRICS #####################################################################
+
+_Accuracy = mlable.metrics.BinaryGroupAccuracy if BINARY else mlable.metrics.CategoricalGroupAccuracy
+_Loss = tf.keras.losses.BinaryCrossentropy if BINARY else tf.keras.losses.CategoricalCrossentropy
 
 # INIT MODEL ##################################################################
 
 with DISTRIBUTION_STRATEGY.scope():
     # metrics
-    byte_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=1, name='byte_accuracy')
-    character_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=4, name='character_accuracy')
-    token_accuracy = mlable.metrics.CategoricalGroupAccuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
+    character_accuracy = _Accuracy(group=4, name='character_accuracy')
+    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
     # weights and config
     MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
     # compilation
     MODEL.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False, label_smoothing=0., axis=-1, reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE, name='loss'),
+        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SAMPLES #####################################################################
@@ -76,19 +89,19 @@ SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 
 
 # TEST ########################################################################
 
-__x, __e, __p, __y = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
+__x, __e, __p, __y, __o = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1], binary=BINARY, random=False)
 
-print(tokun.evaluation.compare(SAMPLES[0], __y))
+print(tokun.evaluation.compare(SAMPLES[0], __o[0]))
 print(SAMPLES[0])
-print(__y)
+print(__o[0])
 
 # ROBUSTNESS ##################################################################
 
 __std = tf.math.reduce_std(__e, axis=1)
 __noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
-__x, __e, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
+__x, __e, _, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1], binary=BINARY, random=False)
 
 print(tokun.pipeline.postprocess(MODEL._decoder(__e)))
-print(tokun.pipeline.postprocess(MODEL._decoder(__e + 1.6 * __std)))
-print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __noise)))
+print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __std)))
+print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.4 * __noise)))
