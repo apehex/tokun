@@ -47,7 +47,7 @@ BINARY = True
 N_SEQUENCE_AXIS = 1
 N_FEATURE_AXIS = -1
 
-N_TOKEN_DIM = [4, 16] # G, for each block
+N_TOKEN_DIM = [4, 4, 4] # G, for each block
 N_INPUT_DIM = 256 # U_i (bytes)
 N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
 
@@ -66,9 +66,10 @@ N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4,
 # IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM)
-LABEL = '8.5'
+LABEL = '6.4'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
+PATH_EXPORT = os.path.join('embeddings/', *VERSION)
 
 # METRICS #####################################################################
 
@@ -202,6 +203,6 @@ EMBEDDINGS['local']['all'] = tf.concat(values=EMBEDDINGS['local']['all'], axis=0
 # EXPORT ######################################################################
 
 for __size in TOKENS:
-    mlable.data.write(data=[__c + ' ' + mlable.data.label(__c) for __c in TOKENS[__size]['all']], path='./metadata.' + str(__size) + '.label.tsv', tsv=False)
-    mlable.data.write(data=TOKENS[__size]['all'], path='./metadata.' + str(__size) + '.tsv', tsv=False)
-    mlable.data.write(data=EMBEDDINGS[__size]['all'].numpy(), path='./embeddings.' + str(__size) + '.tsv', tsv=True)
+    mlable.data.write(data=[__c + ' ' + mlable.data.label(__c) for __c in TOKENS[__size]['all']][:8192], path=os.path.join(PATH_EXPORT, f'./metadata.{__size}.label.tsv'), tsv=False)
+    mlable.data.write(data=TOKENS[__size]['all'][:8192], path=os.path.join(PATH_EXPORT, f'./metadata.{__size}.tsv'), tsv=False)
+    mlable.data.write(data=EMBEDDINGS[__size]['all'].numpy()[:8192], path=os.path.join(PATH_EXPORT, f'./embeddings.{__size}.tsv'), tsv=True)
