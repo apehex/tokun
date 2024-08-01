@@ -67,7 +67,7 @@ N_EPOCHS = 8
 N_BATCH_DIM = 128 # number of samples per batch
 N_SAMPLE_DIM = 256 # number of characters per sample (=> 4 * N_SAMPLE_DIM integers per sample)
 
-R_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
+R_0, B_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
 
 CLASS_WEIGHTS = {__c: 0.3 if __c == 0 else 1. for __c in range(N_INPUT_DIM)} # there are 3 times more 0s than other bytes
 
@@ -168,7 +168,7 @@ with DISTRIBUTION_STRATEGY.scope():
     if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
     # compile
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=R_0, beta_1=B_1, beta_2=B_2),
+        optimizer=tf.keras.optimizers.AdamW(learning_rate=R_0, weight_decay=B_0, beta_1=B_1, beta_2=B_2, clipnorm=1.0),
         loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
