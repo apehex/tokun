@@ -107,38 +107,41 @@ _encode_output = _encode_binary if BINARY else _encode_categorical
 
 PIPELINE = [
     # join the features
-    ((lambda __x: tf.strings.join(inputs=[__x['context'], __x['question'], __x['answers']['text']], separator='\x1d')), True),
+    ((lambda __x: tf.strings.join(inputs=[__x['context'], __x['question']], separator='\x1d')), True),
     # offset by 1 to 15 character => (1,) bytes
     *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # encode => (4 * S,) int
+    # encode => (B, 4 * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
-    # reshape => (4 * S,) int
-    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
+    # reshape => (B, 4 * S,) int
+    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, 4 * N_SAMPLE_DIM,)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # PREPROCESS RANDOM ###########################################################
 
 PIPELINE = [
-    # reshape => (4 * S,) int
-    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
+    # reshape => (B, 4 * S,) int
+    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, 4 * N_SAMPLE_DIM,)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN, pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST, pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE)
 
 # COMBINE DATASETS ############################################################
 
-DATASET_TRAIN = RANDOM_TRAIN if RANDOM else MLQA_TRAIN['ar'].concatenate(MLQA_TRAIN['en']).concatenate(MLQA_TRAIN['es']).concatenate(MLQA_TRAIN['de']).concatenate(MLQA_TRAIN['hi']).concatenate(MLQA_TRAIN['vi']).concatenate(MLQA_TRAIN['zh'])
-DATASET_TEST = MLQA_TEST['ar'].concatenate(MLQA_TEST['en']).concatenate(MLQA_TEST['es']).concatenate(MLQA_TEST['de']).concatenate(MLQA_TEST['hi']).concatenate(MLQA_TEST['vi']).concatenate(MLQA_TEST['zh'])
+MLQA_TRAIN_ALL = functools.reduce(lambda __l, __r: __l.concatenate(__r), MLQA_TRAIN.values())
+MLQA_TEST_ALL = functools.reduce(lambda __l, __r: __l.concatenate(__r), MLQA_TEST.values())
+
+DATASET_TRAIN = RANDOM_TRAIN if RANDOM else MLQA_TRAIN_ALL
+DATASET_TEST = MLQA_TEST_ALL
 
 # INSPECT #####################################################################
 
@@ -181,11 +184,11 @@ if TRAINING:
         tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG, histogram_freq=1, embeddings_freq=0, profile_batch=(16, 32), write_graph=False, write_images=True)
         # fit model
         TRAINING_HISTORY = MODEL.fit(
-            x=DATASET_TRAIN.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
+            x=DATASET_TRAIN.prefetch(tf.data.AUTOTUNE),
             batch_size=None,
             epochs=N_EPOCHS,
             validation_split=None,
-            validation_data=DATASET_TEST.batch(N_BATCH_DIM).prefetch(tf.data.AUTOTUNE),
+            validation_data=DATASET_TEST.prefetch(tf.data.AUTOTUNE),
             validation_freq=list(range(1, N_EPOCHS + 1, 1)),
             class_weight=CLASS_WEIGHTS,
             verbose=1,
