@@ -71,6 +71,37 @@ LABEL = '6.4'
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 PATH_EXPORT = os.path.join('embeddings/', *VERSION)
 
+# DATA ########################################################################
+
+LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+
+# OUTPUT ENCODING #############################################################
+
+_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
+_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
+_encode_output = _encode_binary if BINARY else _encode_categorical
+
+# PREPROCESS ##################################################################
+
+PIPELINE = [
+    # join the features
+    ((lambda x: tf.strings.join(inputs=[x['context'], x['question']], separator='\x1d')), True),
+    # offset by 1 to 15 character => (1,) bytes
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    # encode => (4 * S,) int
+    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    # reshape => (4 * S,) int
+    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
+    # one-hot encoding for the targets => (4 * S, E) int (bool)
+    ((lambda __x: (__x, _encode_output(__x))), True)]
+
+OPERATIONS, REPLACE = zip(*PIPELINE)
+
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+
 # METRICS #####################################################################
 
 _Accuracy = mlable.metrics.BinaryGroupAccuracy if BINARY else mlable.metrics.CategoricalGroupAccuracy
@@ -90,37 +121,6 @@ with DISTRIBUTION_STRATEGY.scope():
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
         loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
-
-# DATA ########################################################################
-
-LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
-MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
-
-# OUTPUT ENCODING #############################################################
-
-_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
-_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
-_encode_output = _encode_binary if BINARY else _encode_categorical
-
-# PREPROCESS ##################################################################
-
-PIPELINE = [
-    # join the features
-    ((lambda x: tf.strings.join(inputs=[x['context'], x['question'], x['answers']['text']], separator='\x1d')), True),
-    # offset by 1 to 15 character => (1,) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # encode => (4 * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
-    # reshape => (4 * S,) int
-    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
-    # one-hot encoding for the targets => (4 * S, E) int (bool)
-    ((lambda __x: (__x, _encode_output(__x))), True)]
-
-OPERATIONS, REPLACE = zip(*PIPELINE)
-
-MLQA_TRAIN = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: mlable.data.process(dataset=__d, pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # SAMPLES #####################################################################
 
