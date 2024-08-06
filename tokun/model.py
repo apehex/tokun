@@ -1,5 +1,7 @@
 """Piece together the actual VAE CNN model for tokun."""
 
+import functools
+
 import keras
 import tensorflow as tf
 
@@ -32,7 +34,7 @@ class Encoder(tf.keras.models.Model):
         # successive dimensions of the merging units
         __token_dim = [token_dim] if isinstance(token_dim, int) else token_dim
         # layers
-        __layers = [
+        self._layers = [
             # (B * G ^ D, U) => (B * G ^ D, E)
             tf.keras.layers.Embedding(
                 input_dim=encoding_dim,
@@ -48,11 +50,9 @@ class Encoder(tf.keras.models.Model):
                 activation=activation,
                 name='tokenize-{}_{}'.format(__g, __i))
             for __i, __g in enumerate(__token_dim)]
-        # model
-        self._encoder = tf.keras.Sequential(__layers)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        return self._encoder(x)
+        return functools.reduce(lambda __x, __l: __l(__x), self._layers, x)
 
     def get_config(self) -> dict:
         __config = super(Encoder, self).get_config()
@@ -94,7 +94,7 @@ class Decoder(tf.keras.models.Model):
         # binary vs categorical probabilities
         __activation = 'softmax' if output == 'categorical' else 'sigmoid'
         # layers
-        __layers = [
+        self._layers = [
             # (B * G ^ i, E) => (B * G ^ (i+1), E)
             tokun.layers.DetokenizeBlock(
                 sequence_axis=sequence_axis,
@@ -106,11 +106,9 @@ class Decoder(tf.keras.models.Model):
             for __i, __g in enumerate(__token_dim)] + [
             # (B * G ^ D, E) => (B * G ^ D, U)
             tokun.layers.HeadBlock(encoding_dim=encoding_dim, activation=__activation, name='project-head')]
-        # model
-        self._decoder = tf.keras.Sequential(__layers) 
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        return self._decoder(x)
+        return functools.reduce(lambda __x, __l: __l(__x), self._layers, x)
 
     def get_config(self) -> dict:
         __config = super(Decoder, self).get_config()
