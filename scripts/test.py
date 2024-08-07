@@ -44,6 +44,7 @@ N_SEQUENCE_AXIS = 1
 N_TOKEN_DIM = [4, 16] # G, for each block
 N_INPUT_DIM = 256 # U_i (bytes)
 N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
+N_EMBEDDING_DIM = 256 # E
 
 OUTPUT = 'binary' if BINARY else 'categorical'
 
@@ -53,7 +54,7 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 
 # IMPORT MODEL ################################################################
 
-VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM)
+VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
 LABEL = '8.5'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
