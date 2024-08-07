@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tokun"
-version = "0.11.0"
+version = "0.11.1"
 description = "NN model specialized in text embedding."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"

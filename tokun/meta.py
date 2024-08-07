@@ -7,5 +7,5 @@ def rates(pretrained: bool=False, normalization: bool=True, base: float=0.001) -
         0.9, # beta_1 => decay for the first moment
         0.99) # beta_2 => decay for the second moment
 
-def version(token_units: list, sequence_axis: int=1, input_dim: int=256, output_dim: int=256) -> list:
-    return ['{}x{}'.format(input_dim, output_dim), 'x'.join(str(__u) for __u in token_units), str(sequence_axis)]
+def version(token_units: list, sequence_axis: int=1, input_dim: int=256, embed_dim: int=256, output_dim: int=256) -> list:
+    return ['{}x{}x{}'.format(input_dim, embed_dim, output_dim), 'x'.join(str(__u) for __u in token_units), str(sequence_axis)]
