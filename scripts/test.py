@@ -41,10 +41,10 @@ BINARY = True
 # META ########################################################################
 
 N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [4, 16] # G, for each block
+N_TOKEN_DIM = [4, 4, 16] # G, for each block
 N_INPUT_DIM = 256 # U_i (bytes)
 N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
-N_EMBEDDING_DIM = 256 # E
+N_EMBEDDING_DIM = 4 * 256 # E
 
 OUTPUT = 'binary' if BINARY else 'categorical'
 
@@ -55,7 +55,7 @@ N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in
 # IMPORT MODEL ################################################################
 
 VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
-LABEL = '8.5'
+LABEL = '6.3'
 
 PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
 
@@ -99,10 +99,10 @@ print(__o[0])
 # ROBUSTNESS ##################################################################
 
 __std = tf.math.reduce_std(__e, axis=1)
-__noise = tf.random.normal(shape=(256,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+__noise = tf.random.normal(shape=(N_EMBEDDING_DIM,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
 __x, __e, _, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1], binary=BINARY, random=False)
 
-print(tokun.pipeline.postprocess(MODEL._decoder(__e)))
-print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __std)))
-print(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.4 * __noise)))
+print(tokun.pipeline.unpack(tokun.pipeline.postprocess(MODEL._decoder(__e), binary=True, random=False)))
+print(tokun.pipeline.unpack(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __std), binary=True, random=False)))
+print(tokun.pipeline.unpack(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.4 * __noise), binary=True, random=False)))
