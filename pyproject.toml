@@ -9,12 +9,12 @@ readme = ".github/README.md"
 python = ">=3.10, <3.12"
 mlable = ">=0.7"
 tensorflow = ">=2.15"
-tensorflow-datasets = ">=4.9"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 
 [tool.poetry.group.dev.dependencies]
+tensorflow-datasets = ">=4.9"
 transformers = ">=4.42"
 huggingface-hub = {extras = ["cli"], version = ">=0.23"}
 
