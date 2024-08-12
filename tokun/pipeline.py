@@ -56,7 +56,7 @@ def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
 
 # DECODE ######################################################################
 
-def decode(data: tf.Tensor) -> str:
+def decode(data: tf.Tensor) -> tf.Tensor:
     # make sure the dtype is large enough for UTF-32 codepoints
     __data = tf.cast(data, dtype=tf.dtypes.int32)
     # group the bytes 4 by 4
