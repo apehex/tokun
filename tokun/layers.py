@@ -30,7 +30,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
+        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=False, scale=False, name='normalization') # normalize each token unit independently
         self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=False, name='reshaping') # (B, S * G, E) => (B, S, G * E)
         self._dense = tf.keras.layers.Dense(units=embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
 
@@ -72,7 +72,7 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         # layers
         self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, S, L) => (B, S, G * E), typically L = E
         self._divide = mlable.layers.reshaping.Divide(input_axis=feature_axis, output_axis=sequence_axis, insert=False, factor=token_dim, name='reshaping') # (B, S, G * E) => (B, S * G, E)
-        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=True, scale=True, name='normalization') # normalize each token unit independently
+        self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=False, scale=False, name='normalization') # normalize each token unit independently
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._normalize(self._divide(self._dense(inputs)))
