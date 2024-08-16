@@ -82,7 +82,7 @@ PATH_IMPORT = os.path.join('models/256x8/4x16/1/8.5.keras')
 
 # LOG #########################################################################
 
-VERSION = tokun.meta.version(token_units=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
+VERSION = tokun.meta.version(token_dim=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
 DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
