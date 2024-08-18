@@ -57,7 +57,7 @@ OUTPUT = 'binary' if BINARY else 'categorical'
 # TRAINING PARAMETERS #########################################################
 
 N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 256 # number of characters per sample (=> 4 * N_SAMPLE_DIM integers per sample)
+N_SAMPLE_DIM = 4 * 256 # number of bytes per sample
 
 # DERIVED #####################################################################
 
@@ -94,7 +94,7 @@ PIPELINE = [
     # encode => (4 * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (4 * S,) int
-    (functools.partial(tf.reshape, shape=(4 * N_SAMPLE_DIM,)), True),
+    (functools.partial(tf.reshape, shape=(N_SAMPLE_DIM,)), True),
     # one-hot encoding for the targets => (4 * S, E) int (bool)
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
