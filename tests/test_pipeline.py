@@ -10,7 +10,7 @@ import tokun.pipeline
 class EncodeDecodeTest(tf.test.TestCase):
     def setUp(self):
         super(EncodeDecodeTest, self).setUp()
-        self._config = {'token_size': 16, 'sample_size': 1024}
+        self._config = {'token_size': 16, 'sample_size': 4 * 1024}
         # specify encoding parameters
         self._encode = functools.partial(tokun.pipeline.encode, token_size=self._config['token_size'], sample_size=self._config['sample_size'], dtype=tf.int32)
         # load the data
@@ -24,7 +24,7 @@ class EncodeDecodeTest(tf.test.TestCase):
 
     def test_dataset_specs(self):
         # >
-        self.assertEqual(self._dataset_encoded.element_spec.shape, (4 * self._config['sample_size'],))
+        self.assertEqual(self._dataset_encoded.element_spec.shape, (self._config['sample_size'],))
         self.assertEqual(self._dataset_encoded.element_spec.dtype, tf.int32)
         # <
         self.assertEqual(self._dataset_decoded.element_spec.shape, ())
@@ -40,7 +40,7 @@ class EncodeDecodeTest(tf.test.TestCase):
             __o = __o.numpy().strip(b'\x00')
             __d = __d.numpy().strip(b'\x00')
             # check
-            self.assertEqual(__o[:self._config['sample_size']], __d[:self._config['sample_size']])
+            self.assertEqual(__o[:self._config['sample_size'] // 4], __d[:self._config['sample_size'] // 4])
 
     def test_specific_values(self):
         __s = 'Hello world!'

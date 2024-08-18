@@ -65,7 +65,7 @@ OUTPUT = 'binary' if BINARY else 'categorical'
 N_EPOCHS = 8
 
 N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 256 # number of characters per sample (=> 4 * N_SAMPLE_DIM integers per sample)
+N_SAMPLE_DIM = 4 * 256 # number of bytes per sample
 
 R_0, B_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
 
@@ -94,8 +94,8 @@ LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
 
-RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 14, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
-RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM, lower_plane=0, upper_plane=0x40000)
+RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 14, sample_size=N_SAMPLE_DIM // 4, lower_plane=0, upper_plane=0x40000)
+RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM // 4, lower_plane=0, upper_plane=0x40000)
 
 # OUTPUT ENCODING #############################################################
 
@@ -113,7 +113,7 @@ PIPELINE = [
     # encode => (B, 4 * S,) int
     (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
     # reshape => (B, 4 * S,) int
-    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, 4 * N_SAMPLE_DIM,)), True),
+    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, N_SAMPLE_DIM,)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
@@ -126,7 +126,7 @@ MLQA_TEST = {__l: mlable.data.process(dataset=__d.batch(N_BATCH_DIM, drop_remain
 
 PIPELINE = [
     # reshape => (B, 4 * S,) int
-    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, 4 * N_SAMPLE_DIM,)), True),
+    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, N_SAMPLE_DIM,)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 

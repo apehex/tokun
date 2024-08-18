@@ -23,7 +23,7 @@ CODE_US = b'\x1f'
 
 def encode(data: tf.Tensor, token_size: int, sample_size: int, dtype: tf.dtypes.DType=tf.dtypes.int32) -> tf.Tensor:
     # factor 4 because of the UTF-32 encoding
-    __dim = math.ceil(4 * sample_size / token_size) * token_size
+    __dim = math.ceil(sample_size / token_size) * token_size
     # decode bytes from UTF-8
     __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
     # decode byte strings to arrays of byte integers
@@ -75,7 +75,7 @@ def preprocess(text: str, token_size: int, expand: list=[]) -> tf.Tensor:
     # as tensor
     __data = tf.convert_to_tensor(text, dtype=tf.dtypes.string)
     # list of bytes
-    __bytes = encode(data=__data, token_size=token_size, sample_size=len(text))
+    __bytes = encode(data=__data, token_size=token_size, sample_size=4 * len(text))
     # partition or flatten
     return reshape(data=__bytes, expand=expand)
 
