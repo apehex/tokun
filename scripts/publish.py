@@ -55,8 +55,6 @@ N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
 N_EMBEDDING_DIM = 256 # E
 N_SEQUENCE_DIM = 512
 
-OUTPUT = 'binary' if BINARY else 'categorical'
-
 # DERIVED #####################################################################
 
 N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes

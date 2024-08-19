@@ -40,24 +40,33 @@ BINARY = True
 
 # META ########################################################################
 
-N_SEQUENCE_AXIS = 1
-N_TOKEN_DIM = [4, 4, 16] # G, for each block
-N_INPUT_DIM = 256 # U_i (bytes)
-N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
-N_EMBEDDING_DIM = 4 * 256 # E
+TOKUN_CONFIG = {
+    'token_dim': [4, 4, 4],
+    'input_dim': 256,
+    'embed_dim': 256,
+    'output_dim': 8 if BINARY else 256,
+    'sequence_axis': 1}
 
-OUTPUT = 'binary' if BINARY else 'categorical'
+META_CONFIG = {
+    'version': tokun.meta.version(**TOKUN_CONFIG),
+    'label': '6.1',}
 
-# DERIVED #####################################################################
+IO_CONFIG = {
+    'path': os.path.join('models/', *META_CONFIG['version'], '{}.keras'.format(META_CONFIG['label'])),}
 
-N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
+OPTIMIZER_CONFIG = {
+    'learning_rate': 0.0001,
+    'weight_decay': 0.1,
+    'beta_1': 0.9,
+    'beta_2': 0.99,
+    'clipnorm': 1.0,}
 
-# IMPORT MODEL ################################################################
-
-VERSION = tokun.meta.version(token_dim=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
-LABEL = '6.3'
-
-PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
+LOSS_CONFIG = {
+    'from_logits': False,
+    'label_smoothing': 0.,
+    'axis': -1,
+    'reduction': 'sum_over_batch_size',
+    'name': 'ce_loss',}
 
 # METRICS #####################################################################
 
@@ -70,13 +79,13 @@ with DISTRIBUTION_STRATEGY.scope():
     # metrics
     byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
     character_accuracy = _Accuracy(group=4, name='character_accuracy')
-    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    token_accuracy = _Accuracy(group=math.prod(TOKUN_CONFIG['token_dim']), name='token_accuracy')
     # weights and config
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = tf.keras.models.load_model(IO_CONFIG['path'], compile=False)
     # compilation
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
+        optimizer=tf.keras.optimizers.Adam(**OPTIMIZER_CONFIG),
+        loss=_Loss(**LOSS_CONFIG),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SAMPLES #####################################################################
@@ -86,11 +95,11 @@ SAMPLES = [
     """class AutoEncoder(tf.keras.models.Model):\n    def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n        super(AutoEncoder, self).__init__(**kwargs)\n        self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n        self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n    def call(self, x: tf.Tensor) -> tf.Tensor:\n        return self._decoder(self._encoder(x))""",
     """class AutoEncoder(tf.keras.models.Model):\n  def __init__(self, token_dim: int, encoding_dim: int, embedding_dim: int, batch_dim: int=None, **kwargs) -> None:\n    super(AutoEncoder, self).__init__(**kwargs)\n    self._encoder = Encoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n    self._decoder = Decoder(token_dim=token_dim, encoding_dim=encoding_dim, embedding_dim=embedding_dim, batch_dim=batch_dim)\n\n  def call(self, x: tf.Tensor) -> tf.Tensor:\n    return self._decoder(self._encoder(x))"""]
 
-SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(N_TOKEN_SIZES[-1] // 4)])
+SAMPLES.extend([__i * chr(0) + SAMPLES[1] for __i in range(math.prod(TOKUN_CONFIG['token_dim']) // 4)])
 
 # TEST ########################################################################
 
-__x, __e, __p, __y, __o = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1], binary=BINARY, random=False)
+__x, __e, __p, __y, __o = tokun.pipeline.sample(model=MODEL, text=SAMPLES[0], token_size=math.prod(TOKUN_CONFIG['token_dim']), expand=[1], binary=BINARY, random=False)
 
 print(tokun.evaluation.compare(SAMPLES[0], __o[0]))
 print(SAMPLES[0])
@@ -99,9 +108,9 @@ print(__o[0])
 # ROBUSTNESS ##################################################################
 
 __std = tf.math.reduce_std(__e, axis=1)
-__noise = tf.random.normal(shape=(N_EMBEDDING_DIM,), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
+__noise = tf.random.normal(shape=(TOKUN_CONFIG['embed_dim'],), mean=0., stddev=tf.math.reduce_mean(__std).numpy())
 
-__x, __e, _, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1], binary=BINARY, random=False)
+__x, __e, _, _, _ = tokun.pipeline.sample(model=MODEL, text='tokun to can tok', token_size=math.prod(TOKUN_CONFIG['token_dim']), expand=[1], binary=BINARY, random=False)
 
 print(tokun.pipeline.unpack(tokun.pipeline.postprocess(MODEL._decoder(__e), binary=True, random=False)))
 print(tokun.pipeline.unpack(tokun.pipeline.postprocess(MODEL._decoder(__e + 0.8 * __std), binary=True, random=False)))
