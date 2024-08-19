@@ -42,46 +42,75 @@ print(DISTRIBUTION_STRATEGY)
 
 BINARY = True
 
+# MODEL PARAMETERS ############################################################
+
+TOKUN_CONFIG = {
+    'token_dim': [4, 4, 4],
+    'input_dim': 256,
+    'embed_dim': 256,
+    'output_dim': 8 if BINARY else 256,
+    'sequence_axis': 1}
+
 # META ########################################################################
 
-N_SEQUENCE_AXIS = 1
-N_FEATURE_AXIS = -1
+META_CONFIG = {
+    'version': tokun.meta.version(**TOKUN_CONFIG),
+    'label': '6.1',}
 
-N_TOKEN_DIM = [4, 4, 4] # G, for each block
-N_INPUT_DIM = 256 # U_i (bytes)
-N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
-N_EMBEDDING_DIM = 256 # E
+IO_CONFIG = {
+    'model_path': os.path.join('models/', *META_CONFIG['version'], '{}.keras'.format(META_CONFIG['label'])),
+    'embed_path': os.path.join('embeddings/', *META_CONFIG['version']),}
 
-OUTPUT = 'binary' if BINARY else 'categorical'
+# DATA PARAMETERS #############################################################
+
+BATCH_CONFIG = {
+    'batch_size': 128,
+    'drop_remainder': True,
+    'num_parallel_calls': tf.data.AUTOTUNE,}
+
+PIPELINE_CONFIG = {
+    'sample_dim': 4 * 512,
+    'token_dim': math.prod(TOKUN_CONFIG['token_dim']),
+    'offset_ticks': [2 ** __i for __i in range(int(math.log(math.prod(TOKUN_CONFIG['token_dim']) // 4, 2)))]} # in characters
+
+MLQA_CONFIG = {
+    'as_supervised': False,
+    'shuffle_files': True,
+    'batch_size': None,
+    'data_dir': '~/.cache/tensorflow/',}
 
 # TRAINING PARAMETERS #########################################################
 
-N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 4 * 256 # number of bytes per sample
+OPTIMIZER_CONFIG = {
+    'learning_rate': 0.0001,
+    'weight_decay': 0.1,
+    'beta_1': 0.9,
+    'beta_2': 0.99,
+    'clipnorm': 1.0,}
 
-# DERIVED #####################################################################
+LOSS_CONFIG = {
+    'from_logits': False,
+    'label_smoothing': 0.,
+    'axis': -1,
+    'reduction': 'sum_over_batch_size',
+    'name': 'ce_loss',}
 
-N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
-N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4, 2)))] # in characters
+# EXPORTING PARAMETERS ########################################################
 
-# IMPORT MODEL ################################################################
-
-VERSION = tokun.meta.version(token_dim=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
-LABEL = '6.4'
-
-PATH_IMPORT = os.path.join('models/', *VERSION, '{}.keras'.format(LABEL))
-PATH_EXPORT = os.path.join('embeddings/', *VERSION)
+EXPORT_CONFIG = {
+    'token_sizes': list(itertools.accumulate(TOKUN_CONFIG['token_dim'], lambda x, y: x * y)),}
 
 # DATA ########################################################################
 
 LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
-MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
+
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', **MLQA_CONFIG) for __l in LANG}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', **MLQA_CONFIG) for __l in LANG}
 
 # OUTPUT ENCODING #############################################################
 
-_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
-_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
+_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=TOKUN_CONFIG['output_dim']), dtype=tf.float32)
+_encode_categorical = lambda __x: tf.one_hot(__x, depth=TOKUN_CONFIG['output_dim'], axis=-1)
 _encode_output = _encode_binary if BINARY else _encode_categorical
 
 # PREPROCESS ##################################################################
@@ -90,11 +119,11 @@ PIPELINE = [
     # join the features
     ((lambda x: tf.strings.join(inputs=[x['context'], x['question']], separator='\x1d')), True),
     # offset by 1 to 15 character => (1,) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in PIPELINE_CONFIG['offset_ticks']], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
     # encode => (4 * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    (functools.partial(tokun.pipeline.encode, token_size=PIPELINE_CONFIG['token_dim'], sample_size=PIPELINE_CONFIG['sample_dim']), True),
     # reshape => (4 * S,) int
-    (functools.partial(tf.reshape, shape=(N_SAMPLE_DIM,)), True),
+    (functools.partial(tf.reshape, shape=(PIPELINE_CONFIG['sample_dim'],)), True),
     # one-hot encoding for the targets => (4 * S, E) int (bool)
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
@@ -114,24 +143,24 @@ with DISTRIBUTION_STRATEGY.scope():
     # metrics
     byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
     character_accuracy = _Accuracy(group=4, name='character_accuracy')
-    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    token_accuracy = _Accuracy(group=math.prod(TOKUN_CONFIG['token_dim']), name='token_accuracy')
     # weights and config
-    MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = tf.keras.models.load_model(IO_CONFIG['model_path'], compile=False)
     # compilation
     MODEL.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
+        optimizer=tf.keras.optimizers.Adam(**OPTIMIZER_CONFIG),
+        loss=_Loss(**LOSS_CONFIG),
         metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # SAMPLES #####################################################################
 
 SAMPLES = {}
-TOKENS = {__i: {} for __i in N_TOKEN_SIZES} # in bytes
-EMBEDDINGS = {__i: {} for __i in N_TOKEN_SIZES} # in bytes
+TOKENS = {__i: {} for __i in EXPORT_CONFIG['token_sizes']} # in bytes
+EMBEDDINGS = {__i: {} for __i in EXPORT_CONFIG['token_sizes']} # in bytes
 
 for __lang, __dataset in MLQA_TEST.items():
     # compute predictions
-    __batch = iter(__dataset.batch(N_BATCH_DIM)) # iterate over batches of samples
+    __batch = iter(__dataset.batch(BATCH_CONFIG['batch_size'])) # iterate over batches of samples
     __inputs, __targets = next(__batch)
     __outputs = MODEL(__inputs)
     # sample predictions (inputs, outputs)
@@ -155,23 +184,23 @@ for __size in TOKENS:
 
 # EMBEDDINGS ##################################################################
 
-for __depth, __size in enumerate(N_TOKEN_SIZES):
+for __depth, __size in enumerate(EXPORT_CONFIG['token_sizes']):
     for __lang, __tokens in TOKENS[__size].items():
         # re-encode without token repeats
-        __input = tokun.pipeline.preprocess(text=''.join(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
+        __input = tokun.pipeline.preprocess(text=''.join(__tokens), token_size=PIPELINE_CONFIG['token_dim'], expand=[1])
         # UTF-32 embedding
-        __embedding = MODEL._encoder._encoder.layers[0](__input)
+        __embedding = MODEL._encoder._layers[0](__input)
         # iterative CNN tokenization
         for __i in range(__depth + 1):
-            __embedding = MODEL._encoder._encoder.layers[__i + 1](__embedding)
+            __embedding = MODEL._encoder._layers[__i + 1](__embedding)
         # mixed precision: bfloat16 => float32
-        __embedding = tf.cast(__embedding, dtype=tf.dtypes.float32)
+        __embedding = tf.cast(__embedding, dtype=tf.float32)
         # remove the (tokenized) padding
         EMBEDDINGS[__size][__lang] = tf.squeeze(__embedding)[:len(__tokens)]
 
 # NEIGHBORHOODS ###############################################################
 
-__unit = N_TOKEN_SIZES[-1]
+__unit = PIPELINE_CONFIG['token_dim']
 __count = 256
 
 TOKENS['local'] = {'all': []}
@@ -182,9 +211,9 @@ for __lang, __tokens in TOKENS[__unit].items():
     __std = tf.math.reduce_std(EMBEDDINGS[__unit][__lang], axis=0, keepdims=True)
     __radius = 2. * tf.reduce_mean(__std).numpy()
     # choose a single token
-    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), token_size=math.prod(N_TOKEN_DIM), expand=N_SEQUENCE_AXIS * [1])
+    __t = tokun.pipeline.preprocess(text=random.choice(__tokens), token_size=PIPELINE_CONFIG['token_dim'], expand=[1])
     # encode it
-    __e = tf.cast(MODEL._encoder(__t), dtype=tf.dtypes.float32)
+    __e = tf.cast(MODEL._encoder(__t), dtype=tf.float32)
     # add noise to generate random neighbors
     __n = tokun.evaluation.neighbors(point=__e, radius=__radius, count=__count)
     # decode the noisy embeddings
@@ -204,6 +233,6 @@ EMBEDDINGS['local']['all'] = tf.concat(values=EMBEDDINGS['local']['all'], axis=0
 # EXPORT ######################################################################
 
 for __size in TOKENS:
-    mlable.data.write(data=[__c + ' ' + mlable.data.label(__c) for __c in TOKENS[__size]['all']][:8192], path=os.path.join(PATH_EXPORT, f'./metadata.{__size}.label.tsv'), tsv=False)
-    mlable.data.write(data=TOKENS[__size]['all'][:8192], path=os.path.join(PATH_EXPORT, f'./metadata.{__size}.tsv'), tsv=False)
-    mlable.data.write(data=EMBEDDINGS[__size]['all'].numpy()[:8192], path=os.path.join(PATH_EXPORT, f'./embeddings.{__size}.tsv'), tsv=True)
+    mlable.data.write(data=[__c + ' ' + mlable.data.label(__c) for __c in TOKENS[__size]['all']][:8192], path=os.path.join(IO_CONFIG['embed_path'], f'./metadata.{__size}.label.tsv'), tsv=False)
+    mlable.data.write(data=TOKENS[__size]['all'][:8192], path=os.path.join(IO_CONFIG['embed_path'], f'./metadata.{__size}.tsv'), tsv=False)
+    mlable.data.write(data=EMBEDDINGS[__size]['all'].numpy()[:8192], path=os.path.join(IO_CONFIG['embed_path'], f'./embeddings.{__size}.tsv'), tsv=True)

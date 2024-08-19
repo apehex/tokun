@@ -5,6 +5,7 @@ import functools
 import itertools
 import math
 import os
+import urllib
 
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -44,96 +45,159 @@ print(DISTRIBUTION_STRATEGY)
 # TOGGLE ######################################################################
 
 IMPORT = False
+DOWNLOAD = False
 TRAINING = True
 RANDOM = True
 BINARY = True
 
 # MODEL PARAMETERS ############################################################
 
-N_SEQUENCE_AXIS = 1
-N_FEATURE_AXIS = -1
+TOKUN_CONFIG = {
+    'sequence_axis': 1,
+    'feature_axis': -1,
+    'token_dim': [4, 4, 4], # G, for each block
+    'input_dim': 256, # U_i (bytes)
+    'output_dim': 8 if BINARY else 256, # U_o (8 bits)
+    'embedding_dim': 256, # E
+    'output': 'binary' if BINARY else 'categorical',
+    'activation': 'sigmoid',}
 
-N_TOKEN_DIM = [4, 4, 4] # G, for each block
-N_INPUT_DIM = 256 # U_i (bytes)
-N_OUTPUT_DIM = 8 if BINARY else 256 # U_o (8 bits)
-N_EMBEDDING_DIM = 256 # E
+# DERIVED MODEL PARAMETERS ####################################################
 
-OUTPUT = 'binary' if BINARY else 'categorical'
+VERSION_CONFIG = {
+    'token_dim': TOKUN_CONFIG['token_dim'],
+    'input_dim': TOKUN_CONFIG['input_dim'],
+    'embed_dim': TOKUN_CONFIG['embedding_dim'],
+    'output_dim': TOKUN_CONFIG['output_dim'],
+    'sequence_axis': TOKUN_CONFIG['sequence_axis']}
+
+META_CONFIG = {
+    'version': tokun.meta.version(**VERSION_CONFIG),
+    'label': '6.1',}
+
+IO_CONFIG = {
+    'url': 'https://github.com/apehex/tokun/raw/main/models/{}/{}/{}/{}.keras'.format(*META_CONFIG['version'], META_CONFIG['label']),
+    'path': 'tokun.keras',}
+
+# DATA PARAMETERS #############################################################
+
+BATCH_CONFIG = {
+    'batch_size': 128,
+    'drop_remainder': True,
+    'num_parallel_calls': tf.data.AUTOTUNE,}
+
+PIPELINE_CONFIG = {
+    'sample_dim': 4 * 512,
+    'token_dim': math.prod(TOKUN_CONFIG['token_dim']),
+    'offset_ticks': [2 ** __i for __i in range(int(math.log(math.prod(TOKUN_CONFIG['token_dim']) // 4, 2)))]} # in characters
+
+MLQA_CONFIG = {
+    'as_supervised': False,
+    'shuffle_files': True,
+    'batch_size': None,
+    'data_dir': '~/.cache/tensorflow/',}
+
+RANDOM_CONFIG = {
+    'sample_size': PIPELINE_CONFIG['sample_dim'] // 4, # in characters
+    'lower_plane': 0,
+    'upper_plane': 0x40000,
+    'binary': False,}
 
 # TRAINING PARAMETERS #########################################################
 
-N_EPOCHS = 8
+OPTIMIZER_CONFIG = {
+    'learning_rate': 0.001 * (0.1 if IMPORT else 1.0) * 0.1,
+    'weight_decay': 0.1,
+    'beta_1': 0.9,
+    'beta_2': 0.99,
+    'clipnorm': 1.0,}
 
-N_BATCH_DIM = 128 # number of samples per batch
-N_SAMPLE_DIM = 4 * 256 # number of bytes per sample
+LOSS_CONFIG = {
+    'from_logits': False,
+    'label_smoothing': 0.,
+    'axis': -1,
+    'reduction': 'sum_over_batch_size',
+    'name': 'ce_loss',}
 
-R_0, B_0, B_1, B_2 = tokun.meta.rates(pretrained=IMPORT, normalization=True, base=0.001)
+CHECKPOINT_CONFIG = {
+    'filepath': IO_CONFIG['path'],
+    'monitor': 'val_loss',
+    'mode': 'auto',
+    'save_freq': 'epoch',
+    'save_best_only': False,
+    'save_weights_only': False,
+    'verbose': 1,}
 
-CLASS_WEIGHTS = {__c: 0.3 if __c == 0 else 1. for __c in range(N_INPUT_DIM)} # there are 3 times more 0s than other bytes
+TENSORBOARD_CONFIG = {
+    'log_dir': os.path.join('.logs/', *META_CONFIG['version'], datetime.datetime.now().strftime("%Y%m%d-%H%M%S")),
+    'histogram_freq': 1,
+    'embeddings_freq': 0,
+    'profile_batch': (128, 256),
+    'write_graph': False,
+    'write_images': True,}
 
-# DERIVED #####################################################################
-
-N_TOKEN_SIZES = list(itertools.accumulate(N_TOKEN_DIM, lambda x, y: x * y)) # in bytes
-N_OFFSET_TICKS = [2 ** __i for __i in range(int(math.log(N_TOKEN_SIZES[-1] // 4, 2)))] # in characters
+TRAINING_CONFIG = {
+    'epochs': 8,
+    'batch_size': None,
+    'validation_split': None,
+    'validation_freq': list(range(1, 9)),
+    'class_weight': {__c: 0.3 if __c == 0 else 1. for __c in range(TOKUN_CONFIG['input_dim'])}, # there are 3 times more 0s than other bytes
+    'verbose': 1,}
 
 # IMPORT ######################################################################
 
-PATH_IMPORT = os.path.join('models/256x8/4x16/1/8.5.keras')
+if IMPORT and DOWNLOAD:
+    urllib.request.urlretrieve(IO_CONFIG['url'], IO_CONFIG['path'])
 
-# LOG #########################################################################
+# RANDOM DATASET ##############################################################
 
-VERSION = tokun.meta.version(token_dim=N_TOKEN_DIM, sequence_axis=N_SEQUENCE_AXIS, input_dim=N_INPUT_DIM, embed_dim=N_EMBEDDING_DIM, output_dim=N_OUTPUT_DIM)
-DATETIME = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+RANDOM_TRAIN = tokun.data.random_dataset(size=BATCH_CONFIG['batch_size'] * 2**14, **RANDOM_CONFIG)
+RANDOM_TEST = tokun.data.random_dataset(size=BATCH_CONFIG['batch_size'] * 2**8, **RANDOM_CONFIG)
 
-PATH_LOG = os.path.join('.logs/', *VERSION, DATETIME)
-PATH_EXPORT = os.path.join('models/', *VERSION, DATETIME + '.keras')
+# MLQA DATASET ################################################################
 
-# DATA ########################################################################
+MLQA_LANGUAGES = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
 
-LANG = ['ar', 'de', 'en', 'es', 'hi', 'vi', 'zh']
-MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
-MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None) for __l in LANG}
-
-RANDOM_TRAIN = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 14, sample_size=N_SAMPLE_DIM // 4, lower_plane=0, upper_plane=0x40000)
-RANDOM_TEST = tokun.data.random_dataset(size=N_BATCH_DIM * 2 ** 8, sample_size=N_SAMPLE_DIM // 4, lower_plane=0, upper_plane=0x40000)
+MLQA_TRAIN = {__l: tfds.load('mlqa/' + __l, split='test', **MLQA_CONFIG) for __l in MLQA_LANGUAGES}
+MLQA_TEST = {__l: tfds.load('mlqa/' + __l, split='validation', **MLQA_CONFIG) for __l in MLQA_LANGUAGES}
 
 # OUTPUT ENCODING #############################################################
 
-_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, base=2, depth=N_OUTPUT_DIM), dtype=tf.dtypes.float32)
-_encode_categorical = lambda __x: tf.one_hot(__x, depth=N_OUTPUT_DIM, axis=-1)
+_encode_binary = lambda __x: tf.cast(mlable.ops.expand_base(__x, depth=TOKUN_CONFIG['output_dim'], base=2), dtype=tf.float32)
+_encode_categorical = lambda __x: tf.one_hot(__x, depth=TOKUN_CONFIG['output_dim'], axis=-1)
 _encode_output = _encode_binary if BINARY else _encode_categorical
 
 # PREPROCESS MLQA #############################################################
 
 PIPELINE = [
     # join the features
-    ((lambda __x: tf.strings.join(inputs=[__x['context'], __x['question']], separator='\x1d')), True),
-    # offset by 1 to 15 character => (1,) bytes
-    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in N_OFFSET_TICKS], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
-    # encode => (B, 4 * S,) int
-    (functools.partial(tokun.pipeline.encode, token_size=N_TOKEN_SIZES[-1], sample_size=N_SAMPLE_DIM), True),
+    ((lambda __x: tf.strings.join(inputs=[__x['context'], __x['question']], separator='\u001d')), True),
+    # offset by 1 to 15 character => (B,) scalar bytes
+    *[(functools.partial(tokun.pipeline.offset, ticks=__t), False) for __t in PIPELINE_CONFIG['offset_ticks']], # (offsets 0, ..., (2 ^ i) - 1) + (offsets 2 ^ i, ..., 2 ^ (i+1) - 1)
+    # encode => (B, 4 * S,) int (4 UTF-32 bytes per character)
+    (functools.partial(tokun.pipeline.encode, token_size=PIPELINE_CONFIG['token_dim'], sample_size=PIPELINE_CONFIG['sample_dim'], dtype=tf.int32), True),
     # reshape => (B, 4 * S,) int
-    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, N_SAMPLE_DIM,)), True),
+    (functools.partial(tf.reshape, shape=(BATCH_CONFIG['batch_size'], PIPELINE_CONFIG['sample_dim'],)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-MLQA_TRAIN = {__l: mlable.data.process(dataset=__d.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
-MLQA_TEST = {__l: mlable.data.process(dataset=__d.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
+MLQA_TRAIN = {__l: mlable.data.process(dataset=__d.batch(**BATCH_CONFIG), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TRAIN.items()}
+MLQA_TEST = {__l: mlable.data.process(dataset=__d.batch(**BATCH_CONFIG), pipeline=OPERATIONS, replace=REPLACE) for __l, __d in MLQA_TEST.items()}
 
 # PREPROCESS RANDOM ###########################################################
 
 PIPELINE = [
-    # reshape => (B, 4 * S,) int
-    (functools.partial(tf.reshape, shape=(N_BATCH_DIM, N_SAMPLE_DIM,)), True),
+    # reshape each sample => (B, 4 * S,) int
+    (functools.partial(tf.reshape, shape=(BATCH_CONFIG['batch_size'], PIPELINE_CONFIG['sample_dim'],)), True),
     # encode classes on 8 bits for the 256 possibilities / byte
     ((lambda __x: (__x, _encode_output(__x))), True)]
 
 OPERATIONS, REPLACE = zip(*PIPELINE)
 
-RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE)
-RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST.batch(N_BATCH_DIM, drop_remainder=True, num_parallel_calls=tf.data.AUTOTUNE), pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TRAIN = mlable.data.process(dataset=RANDOM_TRAIN.batch(**BATCH_CONFIG), pipeline=OPERATIONS, replace=REPLACE)
+RANDOM_TEST = mlable.data.process(dataset=RANDOM_TEST.batch(**BATCH_CONFIG), pipeline=OPERATIONS, replace=REPLACE)
 
 # COMBINE DATASETS ############################################################
 
@@ -165,31 +229,26 @@ with DISTRIBUTION_STRATEGY.scope():
     # metrics
     byte_accuracy = _Accuracy(group=1, name='byte_accuracy')
     character_accuracy = _Accuracy(group=4, name='character_accuracy')
-    token_accuracy = _Accuracy(group=N_TOKEN_SIZES[-1], name='token_accuracy')
+    token_accuracy = _Accuracy(group=PIPELINE_CONFIG['token_dim'], name='token_accuracy')
     # weights
-    MODEL = tokun.model.AutoEncoder(sequence_axis=N_SEQUENCE_AXIS, feature_axis=N_FEATURE_AXIS, token_dim=N_TOKEN_DIM, input_dim=N_INPUT_DIM, output_dim=N_OUTPUT_DIM, embedding_dim=N_EMBEDDING_DIM, activation='gelu', output=OUTPUT)
-    if IMPORT and os.path.isfile(PATH_IMPORT): MODEL = tf.keras.models.load_model(PATH_IMPORT, compile=False)
+    MODEL = tokun.model.AutoEncoder(**TOKUN_CONFIG)
+    if IMPORT and os.path.isfile(IO_CONFIG['path']): MODEL = tf.keras.models.load_model(IO_CONFIG['path'], compile=False)
     # compile
     MODEL.compile(
-        optimizer=tf.keras.optimizers.AdamW(learning_rate=R_0, weight_decay=B_0, beta_1=B_1, beta_2=B_2, clipnorm=1.0),
-        loss=_Loss(from_logits=False, label_smoothing=0., axis=-1, reduction='sum_over_batch_size', name='ce_loss'),
-        metrics=[byte_accuracy, character_accuracy, token_accuracy])
+        optimizer=tf.keras.optimizers.AdamW(**OPTIMIZER_CONFIG),
+        loss=_Loss(**LOSS_CONFIG),
+        weighted_metrics=[byte_accuracy, character_accuracy, token_accuracy])
 
 # TRAIN #######################################################################
 
 if TRAINING:
     with DISTRIBUTION_STRATEGY.scope():
         # callbacks
-        cp_callback = tf.keras.callbacks.ModelCheckpoint(PATH_EXPORT, monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', save_freq='epoch')
-        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=PATH_LOG, histogram_freq=1, embeddings_freq=0, profile_batch=(16, 32), write_graph=False, write_images=True)
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(**CHECKPOINT_CONFIG)
+        tb_callback = tf.keras.callbacks.TensorBoard(**TENSORBOARD_CONFIG)
         # fit model
         TRAINING_HISTORY = MODEL.fit(
             x=DATASET_TRAIN.prefetch(tf.data.AUTOTUNE),
-            batch_size=None,
-            epochs=N_EPOCHS,
-            validation_split=None,
             validation_data=DATASET_TEST.prefetch(tf.data.AUTOTUNE),
-            validation_freq=list(range(1, N_EPOCHS + 1, 1)),
-            class_weight=CLASS_WEIGHTS,
-            verbose=1,
-            callbacks=[cp_callback, tb_callback])
+            callbacks=[cp_callback, tb_callback],
+            **TRAINING_CONFIG)
