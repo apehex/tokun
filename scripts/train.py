@@ -151,8 +151,8 @@ if IMPORT and DOWNLOAD:
 
 # RANDOM DATASET ##############################################################
 
-RANDOM_TRAIN = tokun.data.random_dataset(size=BATCH_CONFIG['batch_size'] * 2**14, **RANDOM_CONFIG)
-RANDOM_TEST = tokun.data.random_dataset(size=BATCH_CONFIG['batch_size'] * 2**8, **RANDOM_CONFIG)
+RANDOM_TRAIN = tokun.data.random_dataset(sample_count=BATCH_CONFIG['batch_size'] * 2**14, **RANDOM_CONFIG)
+RANDOM_TEST = tokun.data.random_dataset(sample_count=BATCH_CONFIG['batch_size'] * 2**8, **RANDOM_CONFIG)
 
 # MLQA DATASET ################################################################
 

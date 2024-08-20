@@ -24,13 +24,13 @@ def random_sample(sample_size: int, lower_plane: int=0, upper_plane: int=0x40000
     __nested = [random_codepoint(lower_plane=lower_plane, upper_plane=upper_plane, binary=binary) for _ in range(sample_size)]
     return list(itertools.chain.from_iterable(__nested))
 
-def random_dataset(size: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x40000, binary: bool=False) -> tf.data.Dataset:
+def random_dataset(sample_count: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x40000, binary: bool=False, dtype: tf.dtypes.DType=tf.int32) -> tf.data.Dataset:
     __factor = 32 if binary else 4
     # sample generator
     def __generator() -> iter:
-        for _ in range(size):
+        for _ in range(sample_count):
             yield random_sample(sample_size=sample_size, lower_plane=lower_plane, upper_plane=upper_plane, binary=binary)
     # wrap into a dataset
     return tf.data.Dataset.from_generator(
         generator=__generator,
-        output_signature=tf.TensorSpec(shape=(__factor * sample_size,), dtype=tf.int32))
+        output_signature=tf.TensorSpec(shape=(__factor * sample_size,), dtype=dtype))
