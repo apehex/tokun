@@ -58,8 +58,7 @@ def codepoint(data: tf.Tensor) -> tf.Tensor:
     # make sure the dtype is large enough for UTF-32 codepoints
     __data = tf.cast(data, dtype=tf.dtypes.int32)
     # group the bytes 4 by 4
-    __shape = mlable.utils.divide_shape(shape=data.shape, input_axis=-2, output_axis=-1, factor=4, insert=True)
-    __bytes = tf.reshape(tensor=__data, shape=__shape)
+    __bytes = mlable.ops.divide(tensor=__data, input_axis=-2, output_axis=-1, factor=4, insert=True)
     # compute the UTF-32-BE codepoints
     return mlable.ops.reduce_base(data=__bytes, base=256, axis=-1, keepdims=False)
 
@@ -88,13 +87,14 @@ def unpack(data: tf.Tensor) -> list:
     __data = data.numpy().tolist()
     return [__s.decode('utf-8') for __s in __data]
 
-def postprocess(prediction: tf.Tensor, dtype: tf.dtypes.DType=tf.int32, binary: bool=True, random: bool=False) -> str:
+def postprocess(prediction: tf.Tensor, depth: int=256, binary: bool=True, random: bool=False) -> tf.Tensor:
     if binary: # values encoded as binary arrays
         __output = mlable.sampling.binary(prediction=prediction, threshold=0.5, random=random)
     else: # values without encoding
-        __output = tf.squeeze(tf.cast(tf.round(prediction), dtype), axis=-1)
+        __output = mlable.sampling.raw(prediction, factor=depth, dtype=tf.int32)
+        __output = mlable.ops.merge(__output, left_axis=-2, right_axis=-1, left=True)
     # merge the bytes into codepoints
-    if dtype == tf.uint8:
+    if depth == 256:
         __output = codepoint(data=__output)
     # decode the UTF-32-BE codepoints
     return decode(data=__output)
