@@ -8,7 +8,7 @@ import tensorflow as tf
 
 import mlable.ops
 import mlable.sampling
-import mlable.utils
+import mlable.shaping
 
 # UNICODE #####################################################################
 
@@ -58,7 +58,7 @@ def codepoint(data: tf.Tensor) -> tf.Tensor:
     # make sure the dtype is large enough for UTF-32 codepoints
     __data = tf.cast(data, dtype=tf.dtypes.int32)
     # group the bytes 4 by 4
-    __bytes = mlable.ops.divide(data=__data, input_axis=-2, output_axis=-1, factor=4, insert=True)
+    __bytes = mlable.shaping.divide(data=__data, input_axis=-2, output_axis=-1, factor=4, insert=True)
     # compute the UTF-32-BE codepoints
     return mlable.ops.reduce_base(data=__bytes, base=256, axis=-1, keepdims=False)
 
@@ -92,7 +92,7 @@ def postprocess(prediction: tf.Tensor, depth: int=256, binary: bool=True, random
         __output = mlable.sampling.binary(prediction=prediction, threshold=0.5, random=random)
     else: # values without encoding
         __output = mlable.sampling.raw(prediction, factor=depth, dtype=tf.int32)
-        __output = mlable.ops.merge(__output, left_axis=-2, right_axis=-1, left=True)
+        __output = mlable.shaping.merge(__output, left_axis=-2, right_axis=-1, left=True)
     # merge the bytes into codepoints
     if depth == 256:
         __output = codepoint(data=__output)
