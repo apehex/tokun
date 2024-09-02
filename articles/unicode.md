@@ -20,16 +20,15 @@ from encoding to embedding
 
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
-In the following sections, I have minimized the interface of [Tiktokenizer][tiktokenizer-gpt-4], but the data is still accurate.
-
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
 <img src=".images/tiktoken/russian.utf32.codes.png" width="75%" style="margin: auto;"/>
 
-## Intuition
+<img src=".images/tiktoken/russian.utf32.tokens.codes.png" width="75%" style="margin: auto;"/>
 
-western language
-interested on perspective other culture / continent
+<img src=".images/tiktoken/russian.utf32.tokens.bytes.png" width="75%" style="margin: auto;"/>
+
+## Intuition
 
 Russian translation of `In simple cases, the concepts of "lexeme" and "token" are identical`:
 
@@ -55,6 +54,13 @@ Russian translation of `In simple cases, the concepts of "lexeme" and "token" ar
 [0, 0, 4, 18, 0, 0, 0, 32, 0, 0, 4, 63, 0, 0, 4, 64, 0, 0, 4, 62, 0, 0, 4, 65, 0, 0, 4, 66, 0, 0, 4, 75, 0, 0, 4, 69, 0, 0, 0, 32, 0, 0, 4, 65, 0, 0, 4, 59, 0, 0, 4, 67, 0, 0, 4, 71, 0, 0, 4, 48, 0, 0, 4, 79, 0, 0, 4, 69, 0, 0, 0, 32, 0, 0, 4, 63, 0, 0, 4, 62, 0, 0, 4, 61, 0, 0, 4, 79, 0, 0, 4, 66, 0, 0, 4, 56, 0, 0, 4, 79, 0, 0, 0, 32, 0, 0, 0, 171, 0, 0, 4, 59, 0, 0, 4, 53, 0, 0, 4, 58, 0, 0, 4, 65, 0, 0, 4, 53, 0, 0, 4, 60, 0, 0, 4, 48, 0, 0, 0, 187, 0, 0, 0, 32, 0, 0, 4, 56, 0, 0, 0, 32, 0, 0, 0, 171, 0, 0, 4, 66, 0, 0, 4, 62, 0, 0, 4, 58, 0, 0, 4, 53, 0, 0, 4, 61, 0, 0, 0, 187, 0, 0, 0, 32, 0, 0, 4, 56, 0, 0, 4, 52, 0, 0, 4, 53, 0, 0, 4, 61, 0, 0, 4, 66, 0, 0, 4, 56, 0, 0, 4, 71, 0, 0, 4, 61, 0, 0, 4, 75, 0, 0, 0, 46]
 ```
 
+## Notice
+
+In the following sections, I have minimized the interface of [Tiktokenizer][tiktokenizer-gpt-4], but the data is still accurate.
+
+western language
+interested on perspective other culture / continent
+
 ## Language Basis
 
 - computer: sequence => codepoint => byte => bits
@@ -79,7 +85,18 @@ all examples: 16 characters = 16 UTF-32 codepoints = 64 UTF-32 bytes
 
 ### Features = Sequence Of Codepoints
 
+cons:
+
+- there are 262144 "basic" elements, similar to regular tokenizer vocabularies
+- single value with delta = 1 / 0x40000 = 3.8147e-06 => little separation between codepoints
+
 ### Features = Sequence Of Bytes
+
+### NOT binary
+
+the 256 byte values play a specific role, while the 0 and 1 have the same meaning.
+
+for example the byte "0" is padding.
 
 ### Features = Composite Embeddings
 
