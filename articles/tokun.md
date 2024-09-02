@@ -55,7 +55,7 @@ This process has several stages: encoding, tokenization and embedding.
 
 For now, consider the [end result from the tokenizer `o200k`][tiktokenizer-o200k] (used in `GPT-4o`):
 
-<img src=".images/tiktoken/gpt-4o.png" width="75%" style="margin: auto;"/>
+<img src=".images/tiktoken/french.gpt4o.png" width="75%" style="margin: auto;"/>
 
 The sentence is split into chunks called "tokens", which have a 1:1 match with an ID.
 Each tokenizer has its own vocabulary and `o200k` contains 200k identified tokens.
