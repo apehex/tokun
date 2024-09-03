@@ -12,15 +12,13 @@ in machine learning 3 worlds / visions are at odds: the computer, math and human
 
 tokenization bridges the gap from machine to tensors using human intuition, with algorithms like BPE.
 
-in my [previous article][], I proposed to train a model to translate / compress the encoding bytes into embeddings.
+in my [previous article][huggingface-tokenization-1], I proposed to train a model to translate / compress the encoding bytes into embeddings.
 
-Actually, none of this is necessary since any digital text has an optimal encoding.
+Actually, none of this is necessary since any digital text has already an encoding which can directly be used as embedding.
 
 from encoding to embedding
 
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
-
-<img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
 <img src=".images/tiktoken/russian.utf32.codes.png" width="75%" style="margin: auto;"/>
 
@@ -34,12 +32,6 @@ Russian translation of `In simple cases, the concepts of "lexeme" and "token" ar
 
 ```
 В простых случаях понятия «лексема» и «токен» идентичны.
-```
-
-20 tokens in GPT-4o:
-
-```
-[3540, 14063, 6172, 78267, 72435, 1691, 2415, 32555, 41118, 1924, 816, 2415, 338, 2533, 776, 1924, 131660, 94743, 1208, 13]
 ```
 
 56 UTF-32 codepoints:
@@ -56,10 +48,46 @@ Russian translation of `In simple cases, the concepts of "lexeme" and "token" ar
 
 ## Notice
 
+will start with specific issues and progressively build a new system. 
+
 In the following sections, I have minimized the interface of [Tiktokenizer][tiktokenizer-gpt-4], but the data is still accurate.
 
 western language
 interested on perspective other culture / continent
+
+## Tokenization And Ancient Languages
+
+essentially, tokenization merges forms monolithic 
+
+<img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
+
+20 tokens in GPT-4o:
+
+```
+[3540, 14063, 6172, 78267, 72435, 1691, 2415, 32555, 41118, 1924, 816, 2415, 338, 2533, 776, 1924, 131660, 94743, 1208, 13]
+```
+
+logographic
+
+compose from simpler elements
+=> alphabetic and syllabic
+
+more generally this is the concept of 
+
+## Objectives / Ideal
+
+- reduce the sequence length: faster processing, less resources
+- give "meaning"
+- avoid "meaningless" predictions and constrain to
+
+desired properties:
+
+- compression
+- proximity
+- composition
+- timeless: concepts and dates appear more / less frequently depending on the period
+
+start from "blabla" => target `[[]]`
 
 ## Language Basis
 
@@ -78,6 +106,40 @@ all these schemes take advantage of the rules of combinatorics
 
 tokenization = opposite!
 base elements are 
+
+## Representing The Predictions
+
+Suppose GPT-4o processed the following sentence:
+
+```
+This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
+```
+
+```
+2500, 6651, 885, 8583, 673, 316, 8400, 7557, 220, 667, 19, 57102, 17, 27794, 6340
+```
+
+output = probability of next token, by index
+softmax = one true
+
+binary error => close prediction
+but, close tokens are unrelated
+=> other input repr
+
+## Pros
+
+- standard: shared worldwide
+- international: all languages are covered
+- native: no training required
+- compression: smallest tensor size possible
+- fixed: all tokens have the same dimension, chosen freely
+- structured: Unicode has 
+- numbers: the encoding is correlated to actual number values
+- composition: embeddings now 
+
+## Cons
+
+- brittle: small changes
 
 ## Input Representation
 
@@ -104,25 +166,15 @@ for example the byte "0" is padding.
 - codepoint / 0x40000
 - byte sequence = embedding index => unrelated embeddings (rather than smooth function)
 
-## Output Representation
-
-## Pros
-
-- standard: shared worldwide
-- international: all languages are covered
-- native: no training required
-- compression: smallest tensor size possible
-- fixed: all tokens have the same dimension, chosen freely
-- structured: Unicode has 
-- numbers: the encoding is correlated to actual number values
-- composition: embeddings now 
-
-## Cons
-
-- brittle: small changes
-
 ## Next
+
+LLMs are still in the stone age
+
+why / how did tokenization last so long?
 
 compiler + llm using tokun embeddings
 
+better representation?
+
+[huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
