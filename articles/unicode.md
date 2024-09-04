@@ -18,6 +18,14 @@ Actually, none of this is necessary since any digital text has already an encodi
 
 from encoding to embedding
 
+TLDR => composite embeddings in the last section
+
+ INPUT = composite embeddings =
+- sequence compression by arbitrary factor
+- numeric proximity <=> semantic similarity
+
+OUTPUT = binary predictions leverage the numeric locality != categorical (softmax) predictions
+
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
 <img src=".images/tiktoken/russian.utf32.codes.png" width="75%" style="margin: auto;"/>
@@ -57,7 +65,7 @@ interested on perspective other culture / continent
 
 ## Tokenization And Ancient Languages
 
-essentially, tokenization merges forms monolithic 
+essentially, tokenization merges letters into monolithic tokens
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
@@ -67,12 +75,16 @@ essentially, tokenization merges forms monolithic
 [3540, 14063, 6172, 78267, 72435, 1691, 2415, 32555, 41118, 1924, 816, 2415, 338, 2533, 776, 1924, 131660, 94743, 1208, 13]
 ```
 
-logographic
+logographic = giving a different symbol for each word and number!..
 
 compose from simpler elements
 => alphabetic and syllabic
 
+Name 
+
 more generally this is the concept of 
+
+humans can't remember a million symbols and machines would like to avoid wasting resources on BS
 
 ## Objectives / Ideal
 
@@ -115,9 +127,34 @@ Suppose GPT-4o processed the following sentence:
 This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
 ```
 
-```
-2500, 6651, 885, 8583, 673, 316, 8400, 7557, 220, 667, 19, 57102, 17, 27794, 6340
-```
+For each position in the sequence, the model outputs a vector of probabilities for the next token.
+Given every before, the prediction for the token "201" might look like this:
+
+| Index         | 0     | ...   | 290   | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
+| Token         | "!"   | ...   | the   | ...   | 201   | ...   | 200   | ...   | 202   | ...   | " september"  | ...   | " cocos"  |
+| Target        | 0     | ...   | 0     | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
+| Prediction    | 0     | ...   | 0.15  | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
+
+This oone-hot vector has a dimension of 200k and is usually obtained with softmax
+
+instead, every number below 200k can be represented with just 18 bits.
+switching the activation from softmax to a sigmoid:
+
+| Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
+| Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
+
+the head layer would have a kernel of 
+more importantly, each bit prediction has a lot more 
+
+The binary vector above encodes the prediction "671": 
+With this output scheme, prediction errors are numerically closer (the model puts more emphasis on significant bits).
+
+unfortunately, the vocabulary of tokenizers are chaotic: numeric proximity is unrelated to semantic similarity.
+tokens surrounding "201" in o200k: " can", "п", "201", " me", " с", b"\xe0\xb3".
+
+error = close numeric prediction
+would like that numeric proximity <=> semantic similarity
 
 output = probability of next token, by index
 softmax = one true
@@ -143,9 +180,20 @@ but, close tokens are unrelated
 
 ## Input Representation
 
+unicode is very structured => position is strongly correlated with composition
+
+composition = form of similarity:
+
+- word type (gerundive, verbs, tense have markers)
+- declinations (plurals, etc)
+
 all examples: 16 characters = 16 UTF-32 codepoints = 64 UTF-32 bytes
 
 ### Features = Sequence Of Codepoints
+
+| PCA                       | UMAP                          |
+| ------------------------- | ----------------------------- |
+| ![][image-pca-codepoints] | ![][image-umap-codepoinnts]   |
 
 cons:
 
@@ -154,6 +202,10 @@ cons:
 
 ### Features = Sequence Of Bytes
 
+| PCA                  | UMAP                   |
+| -------------------- | ---------------------- |
+| ![][image-pca-bytes] | ![][image-umap-bytes]  |
+
 ### NOT binary
 
 the 256 byte values play a specific role, while the 0 and 1 have the same meaning.
@@ -161,6 +213,10 @@ the 256 byte values play a specific role, while the 0 and 1 have the same meanin
 for example the byte "0" is padding.
 
 ### Features = Composite Embeddings
+
+| PCA                       | UMAP                          |
+| ------------------------- | ----------------------------- |
+| ![][image-pca-composite]  | ![][image-umap-composite]     |
 
 - byte / 256
 - codepoint / 0x40000
@@ -177,4 +233,10 @@ compiler + llm using tokun embeddings
 better representation?
 
 [huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
+[image-pca-bytes]: .images/projector/bytes.pca.gif
+[image-umap-bytes]: .images/projector/bytes.umap.gif
+[image-pca-codepoints]: .images/projector/codes.pca.gif
+[image-umap-codepoints]: .images/projector/codes.umap.gif
+[image-pca-composite]: .images/projector/compo.pca.gif
+[image-umap-composite]: .images/projector/compo.umap.gif
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
