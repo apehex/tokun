@@ -18,9 +18,11 @@ Actually, none of this is necessary since any digital text has already an encodi
 
 from encoding to embedding
 
-TLDR => composite embeddings in the last section
+## TLDR
 
- INPUT = composite embeddings =
+=> composite embeddings in the last section
+
+INPUT = composite embeddings =
 - sequence compression by arbitrary factor
 - numeric proximity <=> semantic similarity
 
@@ -65,41 +67,78 @@ interested on perspective other culture / continent
 
 ## Tokenization And Ancient Languages
 
-essentially, tokenization merges letters into monolithic tokens
+essentially, tokenization merges individual characters (bytes) into monolithic tokens.
+here, the 56 cyrillic characters are grouped into 20 tokens:
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
-20 tokens in GPT-4o:
+LLMs are only aware of the index values on the right and lose the information on token composition.
+Our numbers are all composed of the same 10 digits; imagine having [a different symbol for each number][twitter-karpathy-emojis]!
 
-```
-[3540, 14063, 6172, 78267, 72435, 1691, 2415, 32555, 41118, 1924, 816, 2415, 338, 2533, 776, 1924, 131660, 94743, 1208, 13]
-```
-
-logographic = giving a different symbol for each word and number!..
+The early written languages like hieroglyphs
+They further developped
+Ancient languages like Egyptian had 
+Such schemes are called logographic languages
+most languages evolved from this stage
 
 compose from simpler elements
 => alphabetic and syllabic
 
-Name 
+Most modern languages have composition rules
 
 more generally this is the concept of 
 
 humans can't remember a million symbols and machines would like to avoid wasting resources on BS
+(mindful)
 
-## Objectives / Ideal
 
-- reduce the sequence length: faster processing, less resources
-- give "meaning"
-- avoid "meaningless" predictions and constrain to
 
-desired properties:
+## Representing The Predictions
 
-- compression
-- proximity
-- composition
-- timeless: concepts and dates appear more / less frequently depending on the period
+Suppose GPT-4o processed the following sentence:
 
-start from "blabla" => target `[[]]`
+```
+This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
+```
+
+For each position in the sequence, the model outputs a vector of probabilities for the next token.
+Given every before, the prediction for the token "201" might look like this:
+
+| Index         | 0     | ...   | 290   | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
+| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
+| Token         | "!"   | ...   | the   | ...   | 201   | ...   | 200   | ...   | 202   | ...   | " september"  | ...   | " cocos"  |
+| Target        | 0     | ...   | 0     | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
+| Prediction    | 0     | ...   | 0.15  | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
+
+This one-hot vector has a dimension of 200k and is usually obtained with softmax
+
+instead, every number below 200k can be represented with just 18 bits.
+switching the activation from softmax to a sigmoid:
+
+| Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
+| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
+
+the head layer would have a kernel of 
+more importantly, each bit prediction is informed by many more neurons
+embed = 4096 = >
+
+The binary vector above encodes the prediction "671": 
+With this output scheme, prediction errors are numerically closer (the model puts more emphasis on significant bits).
+
+unfortunately, the vocabulary of tokenizers are chaotic: numeric proximity is unrelated to semantic similarity.
+tokens surrounding "201" in o200k: " can", "п", "201", " me", " с", b"\xe0\xb3".
+
+error = close numeric prediction
+would like that numeric proximity <=> semantic similarity
+
+output = probability of next token, by index
+softmax = one true
+
+binary error => close prediction
+but, close tokens are unrelated
+=> other input repr
 
 ## Language Basis
 
@@ -119,65 +158,6 @@ all these schemes take advantage of the rules of combinatorics
 tokenization = opposite!
 base elements are 
 
-## Representing The Predictions
-
-Suppose GPT-4o processed the following sentence:
-
-```
-This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
-```
-
-For each position in the sequence, the model outputs a vector of probabilities for the next token.
-Given every before, the prediction for the token "201" might look like this:
-
-| Index         | 0     | ...   | 290   | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
-| Token         | "!"   | ...   | the   | ...   | 201   | ...   | 200   | ...   | 202   | ...   | " september"  | ...   | " cocos"  |
-| Target        | 0     | ...   | 0     | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
-| Prediction    | 0     | ...   | 0.15  | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
-
-This oone-hot vector has a dimension of 200k and is usually obtained with softmax
-
-instead, every number below 200k can be represented with just 18 bits.
-switching the activation from softmax to a sigmoid:
-
-| Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
-| Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-| Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
-
-the head layer would have a kernel of 
-more importantly, each bit prediction has a lot more 
-
-The binary vector above encodes the prediction "671": 
-With this output scheme, prediction errors are numerically closer (the model puts more emphasis on significant bits).
-
-unfortunately, the vocabulary of tokenizers are chaotic: numeric proximity is unrelated to semantic similarity.
-tokens surrounding "201" in o200k: " can", "п", "201", " me", " с", b"\xe0\xb3".
-
-error = close numeric prediction
-would like that numeric proximity <=> semantic similarity
-
-output = probability of next token, by index
-softmax = one true
-
-binary error => close prediction
-but, close tokens are unrelated
-=> other input repr
-
-## Pros
-
-- standard: shared worldwide
-- international: all languages are covered
-- native: no training required
-- compression: smallest tensor size possible
-- fixed: all tokens have the same dimension, chosen freely
-- structured: Unicode has 
-- numbers: the encoding is correlated to actual number values
-- composition: embeddings now 
-
-## Cons
-
-- brittle: small changes
-
 ## Input Representation
 
 unicode is very structured => position is strongly correlated with composition
@@ -191,14 +171,29 @@ all examples: 16 characters = 16 UTF-32 codepoints = 64 UTF-32 bytes
 
 ### Features = Sequence Of Codepoints
 
-| PCA                       | UMAP                          |
-| ------------------------- | ----------------------------- |
-| ![][image-pca-codepoints] | ![][image-umap-codepoinnts]   |
+| PCA                       | UMAP                         |
+| ------------------------- | ---------------------------- |
+| ![][image-pca-codepoints] | ![][image-umap-codepoints]   |
 
 cons:
 
 - there are 262144 "basic" elements, similar to regular tokenizer vocabularies
 - single value with delta = 1 / 0x40000 = 3.8147e-06 => little separation between codepoints
+
+#### Pros
+
+- standard: shared worldwide
+- international: all languages are covered
+- native: no training required
+- compression: smallest tensor size possible
+- fixed: all tokens have the same dimension, chosen freely
+- structured: Unicode has 
+- numbers: the encoding is correlated to actual number values
+- composition: embeddings now 
+
+#### Cons
+
+- brittle: small changes
 
 ### Features = Sequence Of Bytes
 
@@ -222,6 +217,19 @@ for example the byte "0" is padding.
 - codepoint / 0x40000
 - byte sequence = embedding index => unrelated embeddings (rather than smooth function)
 
+## Objectives / Ideal
+
+- reduce the sequence length: faster processing, less resources
+- give "meaning"
+- avoid "meaningless" predictions and constrain to
+
+desired properties:
+
+- compression
+- proximity
+- composition
+- timeless: concepts and dates appear more / less frequently depending on the period
+
 ## Next
 
 LLMs are still in the stone age
@@ -240,3 +248,4 @@ better representation?
 [image-pca-composite]: .images/projector/compo.pca.gif
 [image-umap-composite]: .images/projector/compo.umap.gif
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
+[twitter-karpathy-emojis]: https://x.com/karpathy/status/1816637781659254908
