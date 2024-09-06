@@ -1,62 +1,49 @@
-# This Title Is Already Tokenized
+# This Title Is Already Tokenized (Tokun Part 2)
 
-unicode is all you need
-ai encoding uses language from -1000
-from hieroglyphs to 
-back from the prehistoric ages
-this title is already tokenized
+<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
 > `tokun` took tokens to t-can
 
-in machine learning 3 worlds / visions are at odds: the computer, math and human sides.
+In machine learning 3 worlds / visions are at odds: the computer, math and human sides.
 
-tokenization bridges the gap from machine to tensors using human intuition, with algorithms like BPE.
+Tokenization bridges the gap from machine encoding to tensor embeddings using human intuition, with algorithms like BPE.
 
-in my [previous article][huggingface-tokenization-1], I proposed to train a model to translate / compress the encoding bytes into embeddings.
+In my [previous article][huggingface-tokenization-1], I proposed to train a model to translate / compress the encoding bytes into embeddings.
 
-Actually, none of this is necessary since any digital text has already an encoding which can directly be used as embedding.
-
-from encoding to embedding
+Actually, none of this is necessary: Unicode can be used as the basis for LLM embeddings.
 
 ## TLDR
 
 => composite embeddings in the last section
 
-INPUT = composite embeddings =
+out of the 3 input embeddings, composite embeddings achieve:
 - sequence compression by arbitrary factor
 - numeric proximity <=> semantic similarity
 
+- standard: shared worldwide
+- international: all languages are covered
+- native: no training required
+- compression: smallest tensor size possible
+- fixed: all tokens have the same dimension, chosen freely
+- structured: Unicode has 
+- numbers: the encoding is correlated to actual number values
+- composition: embeddings now 
+- timeless: the Unicode standard has little variations over time
+
 - arbitrary token length: hyper-parameter
 
+- reduce the sequence length: faster processing, less resources
+- give "meaning"
+- avoid "meaningless" predictions and constrain to
+
+desired properties:
+
+- compression
+- proximity
+- composition
+- timeless: concepts and dates appear more / less frequently depending on the period
+
 OUTPUT = binary predictions leverage the numeric locality != categorical (softmax) predictions
-
-<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
-
-<img src=".images/tiktoken/russian.utf32.codes.png" width="75%" style="margin: auto;"/>
-
-<img src=".images/tiktoken/russian.utf32.tokens.codes.png" width="75%" style="margin: auto;"/>
-
-<img src=".images/tiktoken/russian.utf32.tokens.bytes.png" width="75%" style="margin: auto;"/>
-
-## Intuition
-
-Russian translation of `In simple cases, the concepts of "lexeme" and "token" are identical`:
-
-```
-В простых случаях понятия «лексема» и «токен» идентичны.
-```
-
-56 UTF-32 codepoints:
-
-```
-[1042, 32, 1087, 1088, 1086, 1089, 1090, 1099, 1093, 32, 1089, 1083, 1091, 1095, 1072, 1103, 1093, 32, 1087, 1086, 1085, 1103, 1090, 1080, 1103, 32, 171, 1083, 1077, 1082, 1089, 1077, 1084, 1072, 187, 32, 1080, 32, 171, 1090, 1086, 1082, 1077, 1085, 187, 32, 1080, 1076, 1077, 1085, 1090, 1080, 1095, 1085, 1099, 46]
-```
-
-224 UTF-32-BE bytes:
-
-```
-[0, 0, 4, 18, 0, 0, 0, 32, 0, 0, 4, 63, 0, 0, 4, 64, 0, 0, 4, 62, 0, 0, 4, 65, 0, 0, 4, 66, 0, 0, 4, 75, 0, 0, 4, 69, 0, 0, 0, 32, 0, 0, 4, 65, 0, 0, 4, 59, 0, 0, 4, 67, 0, 0, 4, 71, 0, 0, 4, 48, 0, 0, 4, 79, 0, 0, 4, 69, 0, 0, 0, 32, 0, 0, 4, 63, 0, 0, 4, 62, 0, 0, 4, 61, 0, 0, 4, 79, 0, 0, 4, 66, 0, 0, 4, 56, 0, 0, 4, 79, 0, 0, 0, 32, 0, 0, 0, 171, 0, 0, 4, 59, 0, 0, 4, 53, 0, 0, 4, 58, 0, 0, 4, 65, 0, 0, 4, 53, 0, 0, 4, 60, 0, 0, 4, 48, 0, 0, 0, 187, 0, 0, 0, 32, 0, 0, 4, 56, 0, 0, 0, 32, 0, 0, 0, 171, 0, 0, 4, 66, 0, 0, 4, 62, 0, 0, 4, 58, 0, 0, 4, 53, 0, 0, 4, 61, 0, 0, 0, 187, 0, 0, 0, 32, 0, 0, 4, 56, 0, 0, 4, 52, 0, 0, 4, 53, 0, 0, 4, 61, 0, 0, 4, 66, 0, 0, 4, 56, 0, 0, 4, 71, 0, 0, 4, 61, 0, 0, 4, 75, 0, 0, 0, 46]
-```
 
 ## Notice
 
@@ -69,29 +56,29 @@ interested on perspective other culture / continent
 
 ## Tokenization And Ancient Languages
 
-essentially, tokenization merges individual characters (bytes) into monolithic tokens.
-here, the 56 cyrillic characters are grouped into 20 tokens:
+Essentially, tokenization merges individual characters (bytes) into monolithic chunks.
+Here, 56 cyrillic characters are grouped into 20 tokens:
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
 LLMs are only aware of the index values on the right and lose the information on token composition.
-Our numbers are all composed of the same 10 digits; imagine having [a different symbol for each number][twitter-karpathy-emojis]!
 
-The early written languages like hieroglyphs
-They further developped
-Ancient languages like Egyptian had 
-Such schemes are called logographic languages
-most languages evolved from this stage
+Imagine using a [unique symbol for every number and word variation][twitter-karpathy-emojis]!
 
-compose from simpler elements
-=> alphabetic and syllabic
+The early written languages like hieroglyphs started with such logograms, but they still had rebus rules to form nuanced meanings out of combinations of symbols.
 
-Most modern languages have composition rules
+For example the plural form is obtained by tripling a logogram or adding 3 bars next to it:
+"house" is "𓉐" and "houses" is "𓉐 𓏪".
 
-more generally this is the concept of 
+Meanwhile o200k has "house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
 
-humans can't remember a million symbols and machines would like to avoid wasting resources on BS
-(mindful)
+Most modern languages developped rules to derive new meanings from **combinations** of symbols.
+
+In particular, phonetic and positional systems allow to compose words and numbers.
+And the composition of a word gives many indications on its meaning.
+
+The Unicode standard indexed 149813 symbols from 161 scripts.
+It is an obvious basis to build embeddings.
 
 ## Representing The Predictions
 
@@ -110,10 +97,14 @@ Given every before, the prediction for the token "201" might look like this:
 | Target        | 0     | ...   | 0     | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
 | Prediction    | 0     | ...   | 0.15  | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
 
-This one-hot vector has a dimension of 200k and is usually obtained with softmax
+This one-hot vector has a dimension of 200k and is usually obtained with softmax.
 
-instead, every number below 200k can be represented with just 18 bits.
-switching the activation from softmax to a sigmoid:
+dot projection
+
+instead, every number below 200k can be represented with **just 18 bits**.
+the target index `667` for the next token "201" is `110110010100000000` in base 2.
+
+each bit can be predicted by an **independent probability** by switching the activation from softmax to a **sigmoid**:
 
 | Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
 | ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
@@ -127,7 +118,7 @@ embed = 4096 = >
 The binary vector above encodes the prediction "671": 
 With this output scheme, prediction errors are numerically closer (the model puts more emphasis on significant bits).
 
-unfortunately, the vocabulary of tokenizers are chaotic: numeric proximity is unrelated to semantic similarity.
+unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
 tokens surrounding "201" in o200k: " can", "п", "201", " me", " с", b"\xe0\xb3".
 
 error = close numeric prediction
@@ -169,7 +160,7 @@ composition = form of similarity:
 
 all examples: 16 characters = 16 UTF-32 codepoints = 64 UTF-32 bytes
 
-### Features = Sequence Of Codepoints
+### Codepoint Embeddings
 
 A first approximation for semantic similarity is composition.
 Indeed:
@@ -227,20 +218,10 @@ For more informations see:
 
 These normalized embeddings would serve as input tensor for a LLM which can then extend the embedding dimension for further processing.
 
-This scheme has already a lot of advantages:
+This scheme inherits from the properties of Unicode and has already most of the advantages [listed in the TLDR](#tldr).
 
-- standard: shared worldwide
-- international: all languages are covered
-- native: no training required
-- compression: smallest tensor size possible
-- fixed: all tokens have the same dimension, chosen freely
-- structured: Unicode has 
-- numbers: the encoding is correlated to actual number values
-- composition: embeddings now 
-- timeless: the Unicode standard has little variations over time
-
-The last point is made in contract with the current tokenizer training, where the tokens depend on the frequency of combinations of symbols.
-For example "2024" will not be as frequent in 20 years.
+The last point is made in contrast with the training of current tokenizer, where the tokens depend on the frequency of combinations of symbols.
+For example "2024" will not be as frequent in 20 years, new words and proper nouns will appear, etc.
 
 Still, there is a lot to improve too:
 
@@ -248,36 +229,15 @@ Still, there is a lot to improve too:
 - there are 262144 "basic" elements, similar to regular tokenizer vocabularies
 - linearity: the embeddings are regularly spaced even though certain codepoints have very different meanings from their neighbors
 
-### Features = Sequence Of Bytes
+### Byte Embeddings
 
-| Position  | Chunk         | UTF-32-BE                                                                         | Embeddings                                                                |
-| --------- | ------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 0         | `Mind`        | `(0,   0,   0,  77,   0,   0,   0, 105,   0,   0,   0, 110,   0, 0,   0, 100)`    | `(0 0 0 0.30078125 0 0 0 0.41015625 0 0 0 0.4296875 0 0 0 0.390625)`      |
-| 1         | `s ar`        | `(0,   0,   0, 115,   0,   0,   0,  32,   0,   0,   0,  97,   0, 0,   0, 114)`    | `(0 0 0 0.44921875 0 0 0 0.125 0 0 0 0.37890625 0 0 0 0.4453125)`         |
-| 2         | `en't`        | `(0,   0,   0, 101,   0,   0,   0, 110,   0,   0,   0,  39,   0, 0,   0, 116)`    | `(0 0 0 0.39453125 0 0 0 0.4296875 0 0 0 0.15234375 0 0 0 0.453125)`      |
-| 3         | ` rea`        | `(0,   0,   0,  32,   0,   0,   0, 114,   0,   0,   0, 101,   0, 0,   0,  97)`    | `(0 0 0 0.125 0 0 0 0.4453125 0 0 0 0.39453125 0 0 0 0.37890625)`         |
-| 4         | `d. S`        | `(0,   0,   0, 100,   0,   0,   0,  46,   0,   0,   0,  32,   0, 0,   0,  83)`    | `(0 0 0 0.390625 0 0 0 0.1796875 0 0 0 0.125 0 0 0 0.32421875)`           |
-| 5         | `ee, `        | `(0,   0,   0, 101,   0,   0,   0, 101,   0,   0,   0,  44,   0, 0,   0,  32)`    | `(0 0 0 0.39453125 0 0 0 0.39453125 0 0 0 0.171875 0 0 0 0.125)`          |
-| 6         | `you'`        | `(0,   0,   0, 121,   0,   0,   0, 111,   0,   0,   0, 117,   0, 0,   0,  39)`    | `(0 0 0 0.47265625 0 0 0 0.43359375 0 0 0 0.45703125 0 0 0 0.15234375)`   |
-| 7         | `ve s`        | `(0,   0,   0, 118,   0,   0,   0, 101,   0,   0,   0,  32,   0, 0,   0, 115)`    | `(0 0 0 0.4609375 0 0 0 0.39453125 0 0 0 0.125 0 0 0 0.44921875)`         |
-| 8         | `till`        | `(0,   0,   0, 116,   0,   0,   0, 105,   0,   0,   0, 108,   0, 0,   0, 108)`    | `(0 0 0 0.453125 0 0 0 0.41015625 0 0 0 0.421875 0 0 0 0.421875)`         |
-| 9         | ` got`        | `(0,   0,   0,  32,   0,   0,   0, 103,   0,   0,   0, 111,   0, 0,   0, 116)`    | `(0 0 0 0.125 0 0 0 0.40234375 0 0 0 0.43359375 0 0 0 0.453125)`          |
-| 10        | ` the`        | `(0,   0,   0,  32,   0,   0,   0, 116,   0,   0,   0, 104,   0, 0,   0, 101)`    | `(0 0 0 0.125 0 0 0 0.453125 0 0 0 0.40625 0 0 0 0.39453125)`             |
-| 11        | ` par`        | `(0,   0,   0,  32,   0,   0,   0, 112,   0,   0,   0,  97,   0, 0,   0, 114)`    | `(0 0 0 0.125 0 0 0 0.4375 0 0 0 0.37890625 0 0 0 0.4453125)`             |
-| 12        | `adig`        | `(0,   0,   0,  97,   0,   0,   0, 100,   0,   0,   0, 105,   0, 0,   0, 103)`    | `(0 0 0 0.37890625 0 0 0 0.390625 0 0 0 0.41015625 0 0 0 0.40234375)`     |
-| 13        | `ms p`        | `(0,   0,   0, 109,   0,   0,   0, 115,   0,   0,   0,  32,   0, 0,   0, 112)`    | `(0 0 0 0.42578125 0 0 0 0.44921875 0 0 0 0.125 0 0 0 0.4375)`            |
-| 14        | `rint`        | `(0,   0,   0, 114,   0,   0,   0, 105,   0,   0,   0, 110,   0, 0,   0, 116)`    | `(0 0 0 0.4453125 0 0 0 0.41015625 0 0 0 0.4296875 0 0 0 0.453125)`       |
-| 15        | ` gav`        | `(0,   0,   0,  32,   0,   0,   0, 103,   0,   0,   0,  97,   0, 0,   0, 118)`    | `(0 0 0 0.125 0 0 0 0.40234375 0 0 0 0.37890625 0 0 0 0.4609375)`         |
-| 16        | `e yo`        | `(0,   0,   0, 101,   0,   0,   0,  32,   0,   0,   0, 121,   0, 0,   0, 111)`    | `(0 0 0 0.39453125 0 0 0 0.125 0 0 0 0.47265625 0 0 0 0.43359375)`        |
-| 17        | `u, a`        | `(0,   0,   0, 117,   0,   0,   0,  44,   0,   0,   0,  32,   0, 0,   0,  97)`    | `(0 0 0 0.45703125 0 0 0 0.171875 0 0 0 0.125 0 0 0 0.37890625)`          |
-| 18        | `nd y`        | `(0,   0,   0, 110,   0,   0,   0, 100,   0,   0,   0,  32,   0, 0,   0, 121)`    | `(0 0 0 0.4296875 0 0 0 0.390625 0 0 0 0.125 0 0 0 0.47265625)`           |
-| 19        | `ou'r`        | `(0,   0,   0, 111,   0,   0,   0, 117,   0,   0,   0,  39,   0, 0,   0, 114)`    | `(0 0 0 0.43359375 0 0 0 0.45703125 0 0 0 0.15234375 0 0 0 0.4453125)`    |
-| 20        | `e ba`        | `(0,   0,   0, 101,   0,   0,   0,  32,   0,   0,   0,  98,   0, 0,   0,  97)`    | `(0 0 0 0.39453125 0 0 0 0.125 0 0 0 0.3828125 0 0 0 0.37890625)`         |
-| 21        | `rely`        | `(0,   0,   0, 114,   0,   0,   0, 101,   0,   0,   0, 108,   0, 0,   0, 121)`    | `(0 0 0 0.4453125 0 0 0 0.39453125 0 0 0 0.421875 0 0 0 0.47265625)`      |
-| 22        | ` pri`        | `(0,   0,   0,  32,   0,   0,   0, 112,   0,   0,   0, 114,   0, 0,   0, 105)`    | `(0 0 0 0.125 0 0 0 0.4375 0 0 0 0.4453125 0 0 0 0.41015625)`             |
-| 23        | `nt-l`        | `(0,   0,   0, 110,   0,   0,   0, 116,   0,   0,   0,  45,   0, 0,   0, 108)`    | `(0 0 0 0.4296875 0 0 0 0.453125 0 0 0 0.17578125 0 0 0 0.421875)`        |
-| 24        | `iter`        | `(0,   0,   0, 105,   0,   0,   0, 116,   0,   0,   0, 101,   0, 0,   0, 114)`    | `(0 0 0 0.41015625 0 0 0 0.453125 0 0 0 0.39453125 0 0 0 0.4453125)`      |
-| 25        | `ate.`        | `(0,   0,   0,  97,   0,   0,   0, 116,   0,   0,   0, 101,   0, 0,   0,  46)`    | `(0 0 0 0.37890625 0 0 0 0.453125 0 0 0 0.39453125 0 0 0 0.1796875)`      |
+| Position  | Chunk         | UTF-32-BE                                                     | Embeddings                                                                |
+| --------- | ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 0         | `Mind`        | `(0, 0, 0,  77, 0, 0, 0, 105, 0, 0, 0, 110, 0, 0, 0, 100)`    | `(0 0 0 0.30078125 0 0 0 0.41015625 0 0 0 0.4296875 0 0 0 0.390625)`      |
+| 1         | `s ar`        | `(0, 0, 0, 115, 0, 0, 0,  32, 0, 0, 0,  97, 0, 0, 0, 114)`    | `(0 0 0 0.44921875 0 0 0 0.125 0 0 0 0.37890625 0 0 0 0.4453125)`         |
+| 2         | `en't`        | `(0, 0, 0, 101, 0, 0, 0, 110, 0, 0, 0,  39, 0, 0, 0, 116)`    | `(0 0 0 0.39453125 0 0 0 0.4296875 0 0 0 0.15234375 0 0 0 0.453125)`      |
+| 3         | ` rea`        | `(0, 0, 0,  32, 0, 0, 0, 114, 0, 0, 0, 101, 0, 0, 0,  97)`    | `(0 0 0 0.125 0 0 0 0.4453125 0 0 0 0.39453125 0 0 0 0.37890625)`         |
+| ...       | ...           | ...                                                           | ...                                                                       |
 
 There are a lot of zeros because all the characters from the example come from the ASCII table, which is right at the start of the Unicode table.
 For example "Unicode" is "유니코드" in Korean which is encoded as `(0, 0, 199, 32, 0, 0, 178, 200, 0, 0, 207, 84, 0, 0, 180, 220)` in UTF-32-BE.
@@ -290,52 +250,69 @@ The structure of Unicode is even more apparent with these embeddings:
 | -------------------- | ---------------------- |
 | ![][image-pca-bytes] | ![][image-umap-bytes]  |
 
-Next = NOT binary
+This transformation solves 2 of the shortcomings of the previous method:
 
-the 256 byte values play a specific role, while the 0 and 1 have the same meaning.
+- embeddings are composed from 256 base elements rather than 200k
+- there is more separation between values
 
-for example the byte "0" is padding.
+Still, the embeddings are lineary distributed.
+It would be better to distinguish special values, in particular the null byte.
 
-### Features = Composite Embeddings
+Traditional embeddings are totally independent and arbitrary.
+Could this feature be mixed with base decomposition?
+
+### Composite Embeddings
 
 The previous embedding mapped each byte with its value divided by 256.
 
-Actually, the bytes can be interpreted as an index in a traditional embeeding layer.
-After concatening the embedding from each byte, a "token" embedding is formed.
+Actually, the integer bytes can be interpreted as an index in a traditional embedding layer.
+After concatening the embeddings from each byte, a "token" embedding is formed.
 
-Even with random vectors for each byte, the composite embedding keeps the information
+Even with random vectors for each byte, the merged embeddings keep the information on token composition:
 
 | PCA                       | UMAP                          |
 | ------------------------- | ----------------------------- |
 | ![][image-pca-composite]  | ![][image-umap-composite]     |
 
-This composite embedding can be implemented in a very simple layer.
+Now, the "token" length is a hyper-parameter of the model.
+The Gemma2-27B architecture could be tweaked like this:
+
+- the embed dimension `E` is kept at 4608
+- the token dimension `T` is set to 64 (bytes, which amount to 16 Unicode characters)
+- the byte dimension `C` is then 4608 / 64 = 72
+- the context dimension `S` and all other values remain the same
+
+Then an input tensor with a batch dimension `B` of 128 and sequence dimension of 16384 (4096 characters) would be:
+
+- first reshaped as `(128, 256, 64)`
+- and exit the composite embedding layer as a tensor of shape `(128, 256, 4608)`
+
+The LLM would process the input as a sequence of 256 embeddings, each representing 16 characters.
+
+And each of these embeddings is actually made from the concatenation of 64 byte embeddings.
+
+Now the LLM knows the composition of each token and can natively perform calculations, create and understand "out-of-vocabulary" words, etc.
+
+## Implementation
+
+The composite embeddings can be implemented in a very simple layer.
 For example, in Keras:
 
 ```python
-
+@keras.saving.register_keras_serializable(package='layers')
+class TokunEmbedding(keras.layers.Embedding):
+    def call(self, inputs: keras.Input) -> keras.Input:
+        # embed each element separately
+        __outputs = super(TokunEmbedding, self).call(inputs)
+        # concatenate the embeddings
+        return keras.ops.einsum('bste -> bs(te)', __outputs)
 ```
+
+The `einsum` operation could be replaced with a more generic "merge" operation independent of the rank of its input.
 
 This layer can then be trained and the embeddings for each byte can be adjusted by the model.
 
-It allows the model to set an independent meaning to each byte, contrary to the former schemes that were both linear. 
-
-- byte / 256
-- codepoint / 0x40000
-- byte sequence = embedding index => unrelated embeddings (rather than smooth function)
-
-## Objectives / Ideal
-
-- reduce the sequence length: faster processing, less resources
-- give "meaning"
-- avoid "meaningless" predictions and constrain to
-
-desired properties:
-
-- compression
-- proximity
-- composition
-- timeless: concepts and dates appear more / less frequently depending on the period
+It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
 
 ## Next
 
