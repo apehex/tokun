@@ -45,11 +45,22 @@ desired properties:
 
 OUTPUT = binary predictions leverage the numeric locality != categorical (softmax) predictions
 
+## TOC
+
+- [Tokenization And Ancient Language](#tokenization-and-ancient-languages)
+- [Binary Predictions](#binary-predictions)
+- [Language Basis](#language-basis)
+- [Unicode Embeddings](#codepoint-embeddings)
+    - [Codepoint Embeddings](#codepoint-embeddings)
+    - [Byte Embeddings](#byte-embeddings)
+- [Composite Embeddings](#composite-embeddings)
+- [Implementation](#implementation)
+- [Comparison With Tokenization](#comparison-with-tokenization)
+    - [Compression](#compression)
+    - [Errors](#errors)
+- [Next](#next)
+
 ## Notice
-
-will start with specific issues and progressively build a new system. 
-
-In the following sections, I have minimized the interface of [Tiktokenizer][tiktokenizer-gpt-4], but the data is still accurate.
 
 western language
 interested on perspective other culture / continent
@@ -80,7 +91,7 @@ And the composition of a word gives many indications on its meaning.
 The Unicode standard indexed 149813 symbols from 161 scripts.
 It is an obvious basis to build embeddings.
 
-## Representing The Predictions
+## Binary Predictions
 
 Suppose GPT-4o processed the following sentence:
 
@@ -149,7 +160,7 @@ all these schemes take advantage of the rules of combinatorics
 tokenization = opposite!
 base elements are 
 
-## Input Representation
+## Unicode Embeddings
 
 unicode is very structured => position is strongly correlated with composition
 
@@ -261,7 +272,7 @@ It would be better to distinguish special values, in particular the null byte.
 Traditional embeddings are totally independent and arbitrary.
 Could this feature be mixed with base decomposition?
 
-### Composite Embeddings
+## Composite Embeddings
 
 The previous embedding mapped each byte with its value divided by 256.
 
@@ -314,6 +325,17 @@ This layer can then be trained and the embeddings for each byte can be adjusted 
 
 It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
 
+## Comparison With Tokenization
+
+### Compression
+
+### Errors
+
+one advantage of tokenization = pick their predictions among a predefined vocabulary, which guarantees that each position has a meaningful (sub)word.
+
+on the contrary, these embeddings and prediction schemes can generate errors at the character level.
+in practice, it is not disturbing since our brain automatically corrects typos and interprets text in chunks.
+
 ## Next
 
 LLMs are still in the stone age
@@ -322,7 +344,9 @@ why / how did tokenization last so long?
 
 compiler + llm using tokun embeddings
 
-better representation?
+can these embedding and prediction techniques be further improved?
+
+
 
 [huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [image-pca-bytes]: .images/projector/bytes.pca.gif
