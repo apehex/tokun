@@ -16,11 +16,22 @@ Actually, none of this is necessary: Unicode can be used as the basis for LLM em
 
 => composite embeddings in the last section
 
+instead of building monolithic and unrelated embeddings:
+- split
+- embed the bytes
+- merge the byte embeddings into a token embedding
+
+embeddings built on the Unicode structure
+
+It's extremely surprising to me that this isn't the standard, considering:
+
 out of the 3 input embeddings, composite embeddings achieve:
 - sequence compression by arbitrary factor
 - numeric proximity <=> semantic similarity
 
-- standard: shared worldwide
+you will find a detailed explanation for each of these points [below](#comparison-with-tokenization).
+
+- standard: Unicode is shared worldwide, while vocabularies are specific to regions / models
 - international: all languages are covered
 - native: no training required
 - compression: smallest tensor size possible
@@ -44,6 +55,16 @@ desired properties:
 - timeless: concepts and dates appear more / less frequently depending on the period
 
 OUTPUT = binary predictions leverage the numeric locality != categorical (softmax) predictions
+
+instead of predicting an index out of 200k, predict the base 2 representation of the index
+
+<img src=".images/binary/predictions.png" width="100%" style="margin: auto;"/>
+
+more specifically, this scheme is especially suited to predict byte values: each can be represented in base 2 by a vector of **dimension 8**.
+
+suppose the token dimension is set to 16 characters, that's 64 bytes to predict per token or a vector of dimension 512.
+
+All in all,
 
 ## TOC
 
@@ -321,15 +342,51 @@ class TokunEmbedding(keras.layers.Embedding):
 
 The `einsum` operation could be replaced with a more generic "merge" operation independent of the rank of its input.
 
+The targets for the binary predictions are calculated by decomposing the inputs in base 2:
+
+```python
+
+```
+
+During inference, the predictions can be interpreted by doing the reverse operation:
+
+```python
+
+```
+
 This layer can then be trained and the embeddings for each byte can be adjusted by the model.
 
 It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
 
 ## Comparison With Tokenization
 
-### Compression
+The following hyper parameters are set for all the comparisons below:
 
-### Errors
+- batch dimension
+- context dimension
+- embedding dimension
+
+### Localization
+
+byte representations based on the unicode standard:
+
+### Training
+
+none
+
+### Overall Process
+
+### Compression Of Inputs, Outputs And Weights
+
+token dimension = choice
+
+- kernel size
+- input size
+- output size
+
+### Prediction Errors
+
+close numeric errors <=> close semantic error
 
 one advantage of tokenization = pick their predictions among a predefined vocabulary, which guarantees that each position has a meaningful (sub)word.
 
@@ -345,8 +402,6 @@ why / how did tokenization last so long?
 compiler + llm using tokun embeddings
 
 can these embedding and prediction techniques be further improved?
-
-
 
 [huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [image-pca-bytes]: .images/projector/bytes.pca.gif
