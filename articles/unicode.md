@@ -23,6 +23,8 @@ instead of building monolithic and unrelated embeddings:
 
 embeddings built on the Unicode structure
 
+<img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
+
 It's extremely surprising to me that this isn't the standard, considering:
 
 out of the 3 input embeddings, composite embeddings achieve:
@@ -123,15 +125,16 @@ This paper was based mainly on the attention mechanism developed by Bahdanau et 
 For each position in the sequence, the model outputs a vector of probabilities for the next token.
 Given every before, the prediction for the token "201" might look like this:
 
-| Index         | 0     | ...   | 290   | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
-| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
-| Token         | "!"   | ...   | the   | ...   | 201   | ...   | 200   | ...   | 202   | ...   | " september"  | ...   | " cocos"  |
-| Target        | 0     | ...   | 0     | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
-| Prediction    | 0     | ...   | 0.15  | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
+| Index         | 0     | ...   | 290       | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
+| ------------- | ----- | ----- | --------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
+| Token         | `!`   | ...   | ` the`    | ...   | `201` | ...   | `200` | ...   | `202` | ...   | ` september`  | ...   | ` cocos`  |
+| Target        | 0     | ...   | 0         | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
+| Prediction    | 0     | ...   | 0.15      | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
 
-This one-hot vector has a dimension of 200k and is usually obtained with softmax.
+This one-hot vector has a dimension of 200k and is usually obtained with either:
 
-dot projection
+- a softmax
+- dot projection
 
 instead, every number below 200k can be represented with **just 18 bits**.
 the target index `667` for the next token "201" is `110110010100000000` in base 2.
