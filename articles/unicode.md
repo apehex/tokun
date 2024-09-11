@@ -14,6 +14,18 @@ Actually, none of this is necessary: Unicode can be used as the basis for LLM em
 
 ## TLDR
 
+90%
+
+With only 26 letters and 10 digits, it is possible to compose 3,760,620,109,779,061 "words"
+
+The expressive power of a basis is exponentially greater than a collection of elements.
+
+similarly = generative set of base elements to compose all others
+
+This article proposes to rethink the first and last layers of LLMs in an effort to rationalize
+
+the unit of encoding is the byte, 
+
 => composite embeddings in the last section
 
 instead of building monolithic and unrelated embeddings:
@@ -31,13 +43,16 @@ out of the 3 input embeddings, composite embeddings achieve:
 - sequence compression by arbitrary factor
 - numeric proximity <=> semantic similarity
 
+process = simple embeddings + reshape => cf implementation
+cf comparison for detailed analysis of perf
+
 you will find a detailed explanation for each of these points [below](#comparison-with-tokenization).
 
 - standard: Unicode is shared worldwide, while vocabularies are specific to regions / models
 - international: all languages are covered
 - native: no training required
 - compression: smallest tensor size possible
-- fixed: all tokens have the same dimension, chosen freely
+- consistent: all tokens have the same dimension, chosen freely
 - structured: Unicode has 
 - numbers: the encoding is correlated to actual number values
 - composition: embeddings now 
@@ -77,10 +92,18 @@ All in all,
     - [Codepoint Embeddings](#codepoint-embeddings)
     - [Byte Embeddings](#byte-embeddings)
 - [Composite Embeddings](#composite-embeddings)
-- [Implementation](#implementation)
 - [Comparison With Tokenization](#comparison-with-tokenization)
+    - [Meta Parameters](#meta-parameters)
+    - [Training](#training)
+    - [Consistency](#consistency)
     - [Compression](#compression)
-    - [Errors](#errors)
+        - [Weights](#weights)
+        - [Inputs](#inputs)
+        - [Outputs](#outputs)
+    - [Prediction Errors](#prediction-errors)
+- [Implementations](#implementation)
+    - [Composite Embeddings](#composite-embeddings)
+    - [Binary Predictions](#binary-predictions)
 - [Next](#next)
 
 ## Notice
@@ -328,7 +351,120 @@ And each of these embeddings is actually made from the concatenation of 64 byte 
 
 Now the LLM knows the composition of each token and can natively perform calculations, create and understand "out-of-vocabulary" words, etc.
 
-## Implementation
+## Comparison With Tokenization
+
+The following hyper parameters are set for all the comparisons below:
+
+- the reference tokenizer is o200k
+- batch dimension: `B = 128`
+- sequence dimension: `S = 32,768` characters
+- token dimension: `T = 64`
+- embedding dimensions:
+    - for each byte: `E = 64`
+    - inside the model: `H = 4096`
+
+### Meta-Parameters
+
+While the length is highly variable from token to token in a traditional tokenizer, it is now fixed.
+
+Rather than being the product the vocabulary size and training data, **the token length is now a choice**.
+
+For the purpose of this comparison, I chose 16 (64 bytes) as token dimension.
+Depending on the model architecture, the task and localization, this hyper-parameter can be adjusted **to optimize performances**.
+
+### Training
+
+There is no vocabulary to gather, so:
+
+- there is **no training step**
+- the process **doesn't change with time**, while word frequencies vary and vocabularies grow
+
+### Consistency
+
+Token sizes are irregular, while UTF-32-BE allows to group bytes into fixed size chunks.
+
+Since the Unicode standard covers all modern languages, this group size is always the same, regardless of the underlying script.
+
+### Compression
+
+#### Weights
+
+The embedding kernel has a shape `(256, E)`, here `(256, 64)`.
+In contrast, the kernel for the vocabulary o200k is `(199998, H)`, which is `(199998, 4096)`.
+
+The latter kernel requires enormous amounts of data so that each token in the vocabulary is witnessed in several contexts.
+On the contrary, all the byte values are seen in countless combinations, each will get a solid training.
+
+Similarly, the projection layers have are shaped:
+
+- `(199998, H) = (199998, 4096)` in case of a dot-product and the transpose for a softmax head
+- `(H, 8 * T) = (4096, 512)` with the sigmoid activation for binary predictions
+
+In short, kernels are 50000 and 400 times smaller with composite embeddings and binary predictions.
+
+#### Inputs
+
+The sequence dimension `S = 32,768` leads to:
+
+- a context dimension of `C = 8,192` with tokenization (on average, with o200k, for the purpose of comparing)
+- a sequence of `4 * S = 131,072` bytes
+
+After embedding, the input tensors are:
+
+- `(8192, 4096)` with tokenization
+- `(4 * S / T, 4096) = (2048, 4096)` with composite embeddings
+
+The composite embeddings are a combination of `T = 64` vectors of dimension `E = 64` for a total of 4096.
+
+While UTF-32 temporarily expands the input sequence, it is then reduced into a smaller tensor.
+
+#### Outputs
+
+As for the outputs, they are:
+
+- `(8192, 199998)` with tokenization
+- `(4 * S / T, 8 * T) = (2048, 512)` with binary predictions
+
+Binary prediction 1600 times smaller and very dense in comparison.
+
+### Prediction Errors
+
+With tokenization:
+
+- a prediction is a whole subword, taken from a vocabulary
+- tokens are listed in a chaotic order, and neighbors are unrelated
+- the numeric error spans the whole output dimension (vocabulary size)
+
+With binary predictions:
+
+- the next chunk of text is predicted one byte at a time
+- bytes are ordered according to the Unicode std, which is very structured
+- each prediction bit contributes to a portion of the prediction / error
+
+So if the next token was `e`, the target would be:
+
+- a one-hot vector with a 1 at index `327`, for a model with tokenizer (199997 zeros and a one)
+- `(0, 0, 0, 101)` or `((0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 1, 1, 0, 0, 1, 0, 1))` in binary
+
+And a wrong prediction would be respectively:
+
+- index 328 or ` of`
+- `((0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 1, 1, 0, 0, 1, 1, 1))` or `(0, 0, 0, 103)` for `g`
+
+From my experience the model rarely fails to predict the null bytes (even with a class weights `0.3`).
+
+To sum up:
+
+- the errors on token predictions are random
+- binary errors are in the neighborhood of the target, which means that it is similar thanks to Unicode
+- token predictions are always meaningful subwords
+- while byte level predictions can have "typos" in the middle
+
+So there are pros and cons to both approaches.
+
+## Implementations
+
+### Composite Embeddings
 
 The composite embeddings can be implemented in a very simple layer.
 For example, in Keras:
@@ -344,57 +480,55 @@ class TokunEmbedding(keras.layers.Embedding):
 ```
 
 The `einsum` operation could be replaced with a more generic "merge" operation independent of the rank of its input.
+For example, the `einsum` equation could be generated according to the rank of the input:
+
+```python
+def _equation(self, inputs: keras.Input) -> str:
+    __rank = len(keras.ops.shape(inputs))
+    __indices = [chr(97 + __i) for __i in range(__rank + 1)] # embedding adds an axis
+    return '{} -> {}({})'.format(''.join(__indices), ''.join(__indices[:-2]), ''.join(__indices[-2:]))
+```
+
+### Binary Predictions
 
 The targets for the binary predictions are calculated by decomposing the inputs in base 2:
 
 ```python
-
+def expand_base(data: tf.Tensor, base: int, depth: int) -> tf.Tensor:
+    __shape = len(list(data.shape)) * [1] + [depth]
+    # base indexes, in big endian
+    __idx = range(depth)[::-1]
+    # base divisor and modulus
+    __div = tf.convert_to_tensor([base ** __e for __e in __idx], dtype=data.dtype)
+    __mod = tf.convert_to_tensor([base ** (__e + 1) for __e in __idx], dtype=data.dtype)
+    # match the input shape
+    __div = tf.reshape(__div, shape=__shape)
+    __mod = tf.reshape(__mod, shape=__shape)
+    # Euclidean algorithm
+    __digits = tf.math.floordiv(x=tf.math.floormod(x=tf.expand_dims(data, axis=-1), y=__mod), y=__div)
+    # format
+    return tf.cast(__digits, dtype=data.dtype)
 ```
 
 During inference, the predictions can be interpreted by doing the reverse operation:
 
 ```python
-
+def _reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> tf.Tensor:
+    # select the dimension of the given axis
+    __shape = mlable.shaping.filter_shape(shape=data.shape, axes=[axis])
+    # exponents
+    __exp = range(__shape[axis])[::-1] if bigendian else range(__shape[axis])
+    # base, in big endian
+    __base = tf.convert_to_tensor([base ** __e for __e in __exp], dtype=data.dtype)
+    # match the input shape
+    __base = tf.reshape(__base, shape=__shape)
+    # recompose the number
+    return tf.reduce_sum(data * __base, axis=axis, keepdims=keepdims)
 ```
 
 This layer can then be trained and the embeddings for each byte can be adjusted by the model.
 
 It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
-
-## Comparison With Tokenization
-
-The following hyper parameters are set for all the comparisons below:
-
-- batch dimension
-- context dimension
-- embedding dimension
-
-### Localization
-
-byte representations based on the unicode standard:
-
-### Training
-
-none
-
-### Overall Process
-
-### Compression Of Inputs, Outputs And Weights
-
-token dimension = choice
-
-- kernel size
-- input size
-- output size
-
-### Prediction Errors
-
-close numeric errors <=> close semantic error
-
-one advantage of tokenization = pick their predictions among a predefined vocabulary, which guarantees that each position has a meaningful (sub)word.
-
-on the contrary, these embeddings and prediction schemes can generate errors at the character level.
-in practice, it is not disturbing since our brain automatically corrects typos and interprets text in chunks.
 
 ## Next
 
@@ -403,6 +537,9 @@ LLMs are still in the stone age
 why / how did tokenization last so long?
 
 compiler + llm using tokun embeddings
+
+composition <=> embeddings
+weaker form of semantic similarity => improved?
 
 can these embedding and prediction techniques be further improved?
 
