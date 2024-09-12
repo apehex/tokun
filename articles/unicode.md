@@ -4,84 +4,50 @@
 
 > `tokun` took tokens to t-can
 
-In machine learning 3 worlds / visions are at odds: the computer, math and human sides.
+In machine learning 3 worlds are at odds: the computer, math and human sides.
 
 Tokenization bridges the gap from machine encoding to tensor embeddings using human intuition, with algorithms like BPE.
 
 In my [previous article][huggingface-tokenization-1], I proposed to train a model to translate / compress the encoding bytes into embeddings.
 
-Actually, none of this is necessary: Unicode can be used as the basis for LLM embeddings.
+Actually, none of this is necessary: Unicode can be directly used as the basis for LLM embeddings.
 
-## TLDR
+## TL;DR
 
-90%
+This article proposes to get rid of the tokenization step and to mirror the decomposition of words into characters in the embeddings.
 
-With only 26 letters and 10 digits, it is possible to compose 3,760,620,109,779,061 "words"
+It can be achieved with small changes to the transformer architecture, on the input and output layers.
 
-The expressive power of a basis is exponentially greater than a collection of elements.
+First, the inputs instead of building monolithic and unrelated embeddings:
+- the text is encoded using UTF-32-BE into a sequence of bytes (values in $\left[ 0 .. 256 \right[$)
+- each byte is embedded independently using a `(256, E)` kernel
+- the byte embeddings are merged by groups of size `T`
 
-similarly = generative set of base elements to compose all others
-
-This article proposes to rethink the first and last layers of LLMs in an effort to rationalize
-
-the unit of encoding is the byte, 
-
-=> composite embeddings in the last section
-
-instead of building monolithic and unrelated embeddings:
-- split
-- embed the bytes
-- merge the byte embeddings into a token embedding
-
-embeddings built on the Unicode structure
+Starting from the UTF-32-BE bytes, the process is illustrated below:
 
 <img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
 
-It's extremely surprising to me that this isn't the standard, considering:
+With `B = 128`, `S = 8192`, `T = 32`, and `E = 64` the embeddings of 32 bytes (equivalent to 8 characters) are merged into vectors of dimension 2048.
+A sequence of 8192 characters is turned into a tensor of shape `(S / T, T * E) = (256, 2048)` and a whole batch is `(128, 256, 2048)`.
 
-out of the 3 input embeddings, composite embeddings achieve:
-- sequence compression by arbitrary factor
-- numeric proximity <=> semantic similarity
+The bytes can be given independent meaning thanks to the embedding table.
+And the overall combination pattern of these vectors holds the information on composition.
 
-process = simple embeddings + reshape => cf implementation
-cf comparison for detailed analysis of perf
-
-you will find a detailed explanation for each of these points [below](#comparison-with-tokenization).
-
-- standard: Unicode is shared worldwide, while vocabularies are specific to regions / models
-- international: all languages are covered
-- native: no training required
-- compression: smallest tensor size possible
-- consistent: all tokens have the same dimension, chosen freely
-- structured: Unicode has 
-- numbers: the encoding is correlated to actual number values
-- composition: embeddings now 
-- timeless: the Unicode standard has little variations over time
-
-- arbitrary token length: hyper-parameter
-
-- reduce the sequence length: faster processing, less resources
-- give "meaning"
-- avoid "meaningless" predictions and constrain to
-
-desired properties:
-
-- compression
-- proximity
-- composition
-- timeless: concepts and dates appear more / less frequently depending on the period
-
-OUTPUT = binary predictions leverage the numeric locality != categorical (softmax) predictions
-
-instead of predicting an index out of 200k, predict the base 2 representation of the index
+The output layer could be a standard softmax of depth 256 for each byte prediction.
+But instead of evaluating each of the 256 options, it is more efficient to predict the value, as a vector of 8 bits:
 
 <img src=".images/binary/predictions.png" width="100%" style="margin: auto;"/>
 
-more specifically, this scheme is especially suited to predict byte values: each can be represented in base 2 by a vector of **dimension 8**.
+To this end, the head activation is replaced with a sigmoid, which returns an independent probability for each bit.
 
-suppose the token dimension is set to 16 characters, that's 64 bytes to predict per token or a vector of dimension 512.
+Just [like the previous iteration of tokun](tokun.md) this scheme covers most tokenization shortcomings.
+Plus:
 
-All in all,
+- the token length is now a hyper-parameter, it can be freely chosen
+- there is no need for extra preprocessing and / or training
+- it brings some minor model optimization, with smaller kernels
+
+You'll find more details in the [comparison section](#comparison-with-tokenization).
 
 ## TOC
 
@@ -106,14 +72,9 @@ All in all,
     - [Binary Predictions](#binary-predictions)
 - [Next](#next)
 
-## Notice
-
-western language
-interested on perspective other culture / continent
-
 ## Tokenization And Ancient Languages
 
-Essentially, tokenization merges individual characters (bytes) into monolithic chunks.
+Essentially, tokenization merges individual characters (bytes) into **monolithic chunks**.
 Here, 56 cyrillic characters are grouped into 20 tokens:
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
@@ -189,7 +150,7 @@ binary error => close prediction
 but, close tokens are unrelated
 => other input repr
 
-## Language Basis
+## Language Bases
 
 - computer: sequence => codepoint => byte => bits
 - math: tensors => axes => dimensions
@@ -491,7 +452,8 @@ def _equation(self, inputs: keras.Input) -> str:
 
 ### Binary Predictions
 
-The targets for the binary predictions are calculated by decomposing the inputs in base 2:
+The targets for the binary predictions are calculated by decomposing the inputs in base 2.
+For example in Tensorflow:
 
 ```python
 def expand_base(data: tf.Tensor, base: int, depth: int) -> tf.Tensor:
@@ -513,7 +475,7 @@ def expand_base(data: tf.Tensor, base: int, depth: int) -> tf.Tensor:
 During inference, the predictions can be interpreted by doing the reverse operation:
 
 ```python
-def _reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> tf.Tensor:
+def reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> tf.Tensor:
     # select the dimension of the given axis
     __shape = mlable.shaping.filter_shape(shape=data.shape, axes=[axis])
     # exponents
@@ -542,6 +504,9 @@ composition <=> embeddings
 weaker form of semantic similarity => improved?
 
 can these embedding and prediction techniques be further improved?
+
+obviously this research of western centric, because of my limited knowledge.
+I'd be interested to have other POV, don't hesitate to reach out :)
 
 [huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [image-pca-bytes]: .images/projector/bytes.pca.gif
