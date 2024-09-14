@@ -274,10 +274,13 @@ Then an input tensor with a batch dimension `B` of 128 and sequence dimension of
 - and exit the composite embedding layer as a tensor of shape `(B, S / T, T * C) = (128, 256, 4608)`
 
 The LLM would process the input as a sequence of 256 embeddings, each representing 16 characters.
-
 And each of these embeddings is actually made from the concatenation of 64 byte embeddings.
 
-Now the LLM knows the composition of each token and can natively perform calculations, create and understand "out-of-vocabulary" words, etc.
+This layer can then be trained and the embeddings for each byte can be adjusted by the model.
+It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
+
+Now the LLM knows the composition of each token.
+It can natively perform calculations, create and understand neologisms, etc.
 
 ## Comparison With Tokenization
 
@@ -390,6 +393,26 @@ To sum up:
 
 So there are pros and cons to both approaches.
 
+## Next
+
+With this, LLMs can parse inputs up to the byte level, allowing:
+
+- number calculations
+- handling rare words
+- 
+
+LLMs are still in the stone age
+
+compiler + llm using tokun embeddings
+
+composition <=> embeddings
+weaker form of semantic similarity => improved?
+
+can these embedding and prediction techniques be further improved?
+
+obviously this research of western centric, because of my limited knowledge.
+I'd be interested to have other POV, don't hesitate to reach out :)
+
 ## Implementations
 
 ### Composite Embeddings
@@ -405,6 +428,17 @@ class TokunEmbedding(keras.layers.Embedding):
         __outputs = super(TokunEmbedding, self).call(inputs)
         # concatenate the embeddings
         return keras.ops.einsum('bste -> bs(te)', __outputs)
+```
+
+Or in PyTorch:
+
+```python
+class TokunEmbedding(torch.nn.Embedding):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # embed each element separately
+        __outputs = super(TokunEmbedding, self).forward(inputs)
+        # concatenate the embeddings
+        return torch.einsum('bste -> bs(te)', __outputs)
 ```
 
 The `einsum` operation could be replaced with a more generic "merge" operation independent of the rank of its input.
@@ -423,11 +457,11 @@ The targets for the binary predictions are calculated by decomposing the inputs 
 For example in Tensorflow:
 
 ```python
-def expand_base(data: tf.Tensor, base: int, depth: int) -> tf.Tensor:
+def expand_base(data: tf.Tensor, base: int, depth: int, bigendian: bool=True) -> tf.Tensor:
     __shape = len(list(data.shape)) * [1] + [depth]
-    # base indexes, in big endian
-    __idx = range(depth)[::-1]
-    # base divisor and modulus
+    # base indexes
+    __idx = range(depth)[::-1] if bigendian else range(depth)
+    # base divisor and moduli
     __div = tf.convert_to_tensor([base ** __e for __e in __idx], dtype=data.dtype)
     __mod = tf.convert_to_tensor([base ** (__e + 1) for __e in __idx], dtype=data.dtype)
     # match the input shape
@@ -439,15 +473,35 @@ def expand_base(data: tf.Tensor, base: int, depth: int) -> tf.Tensor:
     return tf.cast(__digits, dtype=data.dtype)
 ```
 
+In PyTorch:
+
+```python
+def expand_base(data: torch.Tensor, base: int, depth: int, bigendian: bool=True) -> torch.Tensor:
+    __shape = data.dim() * [1] + [depth]
+    # base indexes
+    __idx = range(depth)[::-1] if bigendian else range(depth)
+    # base divisors and moduli
+    __div = torch.tensor([base ** __e for __e in __idx], dtype=data.dtype, device=data.device)
+    __mod = torch.tensor([base ** (__e + 1) for __e in __idx], dtype=data.dtype, device=data.device)
+    # match the input shape
+    __div = __div.view(__shape)
+    __mod = __mod.view(__shape)
+    # Euclidean algorithm
+    __digits = torch.div(torch.remainder(data.unsqueeze(-1), __mod), __div, rounding_mode='floor')
+    # format
+    return __digits.to(data.dtype)
+```
+
 During inference, the predictions can be interpreted by doing the reverse operation:
 
 ```python
 def reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> tf.Tensor:
+    __rank = len(data.shape)
     # select the dimension of the given axis
-    __shape = mlable.shaping.filter_shape(shape=data.shape, axes=[axis])
+    __shape = [__d if (__i - axis) % __rank == 0 else 1 for __i, __d in enumerate(list(data.shape))]
     # exponents
     __exp = range(__shape[axis])[::-1] if bigendian else range(__shape[axis])
-    # base, in big endian
+    # base multipliers
     __base = tf.convert_to_tensor([base ** __e for __e in __exp], dtype=data.dtype)
     # match the input shape
     __base = tf.reshape(__base, shape=__shape)
@@ -455,25 +509,22 @@ def reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, 
     return tf.reduce_sum(data * __base, axis=axis, keepdims=keepdims)
 ```
 
-This layer can then be trained and the embeddings for each byte can be adjusted by the model.
+Or, in PyTorch:
 
-It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
-
-## Next
-
-LLMs are still in the stone age
-
-why / how did tokenization last so long?
-
-compiler + llm using tokun embeddings
-
-composition <=> embeddings
-weaker form of semantic similarity => improved?
-
-can these embedding and prediction techniques be further improved?
-
-obviously this research of western centric, because of my limited knowledge.
-I'd be interested to have other POV, don't hesitate to reach out :)
+```python
+def reduce_base(data: torch.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> torch.Tensor:
+    __rank = len(data.shape)
+    # select the dimension of the given axis
+    __shape = [__d if (__i - axis) % __rank == 0 else 1 for __i, __d in enumerate(list(data.shape))]
+    # exponents
+    __exp = torch.arange(__shape[axis] - 1, -1, -1) if bigendian else torch.arange(__shape[axis])
+    # base multipliers
+    __base = torch.pow(base, __exp).to(data.device).to(data.dtype)
+    # match the input shape
+    __base = __base.view(__shape)
+    # Recompose the number
+    return torch.sum(data * __base, dim=axis, keepdim=keepdims)
+```
 
 ## Language Bases
 
