@@ -2,50 +2,56 @@
 
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
-> `tokun` took tokens to t-can
-
 In machine learning 3 worlds are at odds: the computer, math and human sides.
 
 Tokenization bridges the gap from machine encoding to tensor embeddings using human intuition, with algorithms like BPE.
 
-In my [previous article][huggingface-tokenization-1], I proposed to train a model to translate / compress the encoding bytes into embeddings.
+In my [previous article][huggingface-tokenization-1], I proposed to let the model itself translate the encoding bytes into embeddings.
 
 Actually, none of this is necessary: Unicode can be directly used as the basis for LLM embeddings.
 
 ## TL;DR
 
-This article proposes to get rid of the tokenization step and to mirror the decomposition of words into characters in the embeddings.
+Rather than merging the encodings outside of the model, the idea is to **combine elementary embeddings inside the model**.
 
 It can be achieved with small changes to the transformer architecture, on the input and output layers.
 
-First, the inputs instead of building monolithic and unrelated embeddings:
-- the text is encoded using UTF-32-BE into a sequence of bytes (values in $\left[ 0 .. 256 \right[$)
+First, the input pipeline:
+
+- the text is encoded using UTF-32-BE into a sequence of bytes (values in `[ 0 .. 256[`)
 - each byte is embedded independently using a `(256, E)` kernel
 - the byte embeddings are merged by groups of size `T`
 
-Starting from the UTF-32-BE bytes, the process is illustrated below:
+Starting from the UTF-32-BE bytes, the process is:
 
 <img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
 
-With `B = 128`, `S = 8192`, `T = 32`, and `E = 64` the embeddings of 32 bytes (equivalent to 8 characters) are merged into vectors of dimension 2048.
-A sequence of 8192 characters is turned into a tensor of shape `(S / T, T * E) = (256, 2048)` and a whole batch is `(128, 256, 2048)`.
+In the configuration above, the embeddings of 8 bytes (2 characters) are merged into the input embeddings.
+
+`T` and `E` can be **chosen freely**: the token length could be 4, 8 or even 16.
+With a matching embedding dimension for the bytes, `T * E` is brought to the model dimension, say 4096.
 
 The bytes can be given independent meaning thanks to the embedding table.
-And the overall combination pattern of these vectors holds the information on composition.
+Each one contributes to a specific portion of the final embedding:
 
-The output layer could be a standard softmax of depth 256 for each byte prediction.
-But instead of evaluating each of the 256 options, it is more efficient to predict the value, as a vector of 8 bits:
+<img src=".images/composite/contribution.png" width="100%" style="margin: auto;"/>
+
+And the overall combination pattern in the final embedding vector holds the information on token composition.
+
+Then, the output layer could be a standard softmax of depth 256 for each byte prediction.
+But instead of evaluating each of the 256 options, it is more efficient to **predict the value, as a vector of 8 bits**:
 
 <img src=".images/binary/predictions.png" width="100%" style="margin: auto;"/>
 
 To this end, the head activation is replaced with a sigmoid, which returns an independent probability for each bit.
 
-Just [like the previous iteration of tokun](tokun.md) this scheme covers most tokenization shortcomings.
+Just [like the previous iteration of tokun](tokun.md) this scheme solves most tokenization shortcomings.
 Plus:
 
-- the token length is now a hyper-parameter, it can be freely chosen
+- the **token length is now a hyper-parameter**, it can be freely chosen
 - there is no need for extra preprocessing and / or training
 - it brings some minor model optimization, with smaller kernels
+- the model predicts the input values which are **correlated with composition**
 
 You'll find more details in the [comparison section](#comparison-with-tokenization).
 
@@ -79,7 +85,7 @@ Here, 56 cyrillic characters are grouped into 20 tokens:
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
-LLMs are only aware of the index values on the right and lose the information on token composition.
+LLMs are only aware of the index values on the right side and lose the information on token composition.
 
 Imagine using a [unique symbol for every number and word variation][twitter-karpathy-emojis]!
 
@@ -90,13 +96,13 @@ For example the plural form is obtained by tripling a logogram or adding 3 bars 
 
 Meanwhile o200k has "house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
 
-Most modern languages developped rules to derive new meanings from **combinations** of symbols.
+Most modern languages developped rules to derive new meanings from **combinations of symbols**.
 
 In particular, phonetic and positional systems allow to compose words and numbers.
 And the composition of a word gives many indications on its meaning.
 
-The Unicode standard indexed 149813 symbols from 161 scripts.
-It is an obvious basis to build embeddings.
+The Unicode standard indexes 149813 symbols, which can be used to compose all the words from modern languages.
+It will be the language basis for the LLM embeddings.
 
 ## Binary Predictions
 
@@ -106,8 +112,9 @@ Suppose GPT-4o processed the following sentence:
 This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
 ```
 
-For each position in the sequence, the model outputs a vector of probabilities for the next token.
-Given every before, the prediction for the token "201" might look like this:
+For each position in the sequence, the model evaluates the probability of every single token.
+
+Given everything before the token "201" the probability vector might look like this:
 
 | Index         | 0     | ...   | 290       | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
 | ------------- | ----- | ----- | --------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
@@ -115,76 +122,34 @@ Given every before, the prediction for the token "201" might look like this:
 | Target        | 0     | ...   | 0         | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
 | Prediction    | 0     | ...   | 0.15      | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
 
-This one-hot vector has a dimension of 200k and is usually obtained with either:
+This one-hot vector has a **dimension of 200k** and is usually obtained with either:
 
-- a softmax
-- dot projection
+- a softmax activation
+- dot projection on the embedding vectors
 
-instead, every number below 200k can be represented with **just 18 bits**.
-the target index `667` for the next token "201" is `110110010100000000` in base 2.
+Instead, every number below 200k can be represented with **just 18 bits**.
+The target index `667` for the next token "201" is `110110010100000000` in base 2.
 
-each bit can be predicted by an **independent probability** by switching the activation from softmax to a **sigmoid**:
+Each bit can be predicted by an **independent probability** by switching the activation from softmax to a **sigmoid**:
 
 | Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
 | ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
 | Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
 
-the head layer would have a kernel of 
-more importantly, each bit prediction is informed by many more neurons
-embed = 4096 = >
-
 The binary vector above encodes the prediction "671": 
-With this output scheme, prediction errors are numerically closer (the model puts more emphasis on significant bits).
+With this output scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
 
-unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
-tokens surrounding "201" in o200k: " can", "п", "201", " me", " с", b"\xe0\xb3".
+Unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
+For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " с", b"\xe0\xb3".
 
-error = close numeric prediction
-would like that numeric proximity <=> semantic similarity
-
-output = probability of next token, by index
-softmax = one true
-
-binary error => close prediction
-but, close tokens are unrelated
-=> other input repr
-
-## Language Bases
-
-- computer: sequence => codepoint => byte => bits
-- math: tensors => axes => dimensions
-- human: paragraph => sentence => word => symbols / letters
-
-common denominator = the macro elements all break down into simpler parts.
-while there are the number of possible macro elements grows exponantially, there are very few basis elements:
-
-- computer: 2 bits
-- human: 26 lowercase letters and a few symbols for Latin languages
-- math: real numbers, actually infinite
-
-all these schemes take advantage of the rules of combinatorics
-
-tokenization = opposite!
-base elements are 
+Now that the representation of the predictions is improved, it is time to address *what* is being predicted.
 
 ## Unicode Embeddings
 
-unicode is very structured => position is strongly correlated with composition
-
-composition = form of similarity:
-
-- word type (gerundive, verbs, tense have markers)
-- declinations (plurals, etc)
-
-all examples: 16 characters = 16 UTF-32 codepoints = 64 UTF-32 bytes
-
 ### Codepoint Embeddings
 
-A first approximation for semantic similarity is composition.
-Indeed:
-
-Each token index is equivalent to the sequence of Unicode codepoints.
+Each token index ino200k is equivalent to the underlying sequence of Unicode codepoints.
 The latter is actually a new composite index that is more informative:
 
 | Position      | Token         | o200k     | UTF-32-BE                                 |
@@ -206,7 +171,7 @@ Now that all the indexes are Unicode, there is no reason to keep the uneven chun
 | 3         | ` rea`        | `(32, 114, 101, 97)`  | `(0.00012207, 0.00043488, 0.00038528, 0.00037003)`    |
 | ...       | ...           | ...                   | ...                                                   |
 
-This operation might look banal, but we moved data from the sequence axis to the feature axis!
+This operation might look banal, but we moved data **from the sequence axis to the feature axis**!
 Now, the table is looking like an actual embedding tensor!
 
 After normalizing the values, the codepoints can be directly treated as embeddings.
@@ -228,27 +193,27 @@ Dimensionality reduction shows how the vectors made from similar characters are 
 | ![][image-pca-codepoints] | ![][image-umap-codepoints]   |
 
 Since the standard defines the Unicode space into themed ranges of values, the embeddings are natively correlated with content.
-For example there are regions for each character set (Latin, Cyrillic, ), for emojis, for symbols, for special characters, etc.
+For example there are regions for each character set (Latin, Cyrillic, etc), for emojis, for symbols, for special characters, etc.
 
 For more informations see:
 
 - the Wikipedia article on [Unicode planes][wikipedia-unicode-planes]
 - the Unicode table at [symbl.cc][symbl-blocks]
 
-These normalized embeddings would serve as input tensor for a LLM which can then extend the embedding dimension for further processing.
+These normalized embeddings can serve as input tensor for a LLM.
+The model can then extend the embedding dimension for further processing.
 
-This scheme inherits from the properties of Unicode and has already most of the advantages [listed in the TLDR](#tldr).
-
-The last point is made in contrast with the training of current tokenizer, where the tokens depend on the frequency of combinations of symbols.
-For example "2024" will not be as frequent in 20 years, new words and proper nouns will appear, etc.
+This scheme inherits from the properties of Unicode and has already most of the advantages [listed in the TL;DR](#tl-dr).
 
 Still, there is a lot to improve too:
 
 - brittle: the embedding values are very precise and they are separated by `1 / 0x40000 = 3.8147-06` only
-- there are 262144 "basic" elements, similar to regular tokenizer vocabularies
 - linearity: the embeddings are regularly spaced even though certain codepoints have very different meanings from their neighbors
+- size: there are 262144 "basic" elements, which is *not* an improvement over regular vocabularies
 
 ### Byte Embeddings
+
+Unicode codepoints can be split further into bytes:
 
 | Position  | Chunk         | UTF-32-BE                                                     | Embeddings                                                                |
 | --------- | ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -285,7 +250,9 @@ Could this feature be mixed with base decomposition?
 The previous embedding mapped each byte with its value divided by 256.
 
 Actually, the integer bytes can be interpreted as an index in a traditional embedding layer.
-After concatening the embeddings from each byte, a "token" embedding is formed.
+After concatening the embeddings from each byte, a "token" embedding is formed:
+
+<img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
 
 Even with random vectors for each byte, the merged embeddings keep the information on token composition:
 
@@ -293,8 +260,8 @@ Even with random vectors for each byte, the merged embeddings keep the informati
 | ------------------------- | ----------------------------- |
 | ![][image-pca-composite]  | ![][image-umap-composite]     |
 
-Now, the "token" length is a hyper-parameter of the model.
-The Gemma2-27B architecture could be tweaked like this:
+Now, the "token" length is **a hyper-parameter of the model**.
+For example, the Gemma2-27B architecture could be tweaked like this:
 
 - the embed dimension `E` is kept at 4608
 - the token dimension `T` is set to 64 (bytes, which amount to 16 Unicode characters)
@@ -303,8 +270,8 @@ The Gemma2-27B architecture could be tweaked like this:
 
 Then an input tensor with a batch dimension `B` of 128 and sequence dimension of 16384 (4096 characters) would be:
 
-- first reshaped as `(128, 256, 64)`
-- and exit the composite embedding layer as a tensor of shape `(128, 256, 4608)`
+- first reshaped as `(B, S / T, T) = (128, 256, 64)`
+- and exit the composite embedding layer as a tensor of shape `(B, S / T, T * C) = (128, 256, 4608)`
 
 The LLM would process the input as a sequence of 256 embeddings, each representing 16 characters.
 
@@ -314,7 +281,7 @@ Now the LLM knows the composition of each token and can natively perform calcula
 
 ## Comparison With Tokenization
 
-The following hyper parameters are set for all the comparisons below:
+The hyper parameters are set for all the comparisons below:
 
 - the reference tokenizer is o200k
 - batch dimension: `B = 128`
@@ -507,6 +474,24 @@ can these embedding and prediction techniques be further improved?
 
 obviously this research of western centric, because of my limited knowledge.
 I'd be interested to have other POV, don't hesitate to reach out :)
+
+## Language Bases
+
+- computer: sequence => codepoint => byte => bits
+- math: tensors => axes => dimensions
+- human: paragraph => sentence => word => symbols / letters
+
+common denominator = the macro elements all break down into simpler parts.
+while there are the number of possible macro elements grows exponantially, there are very few basis elements:
+
+- computer: 2 bits
+- human: 26 lowercase letters and a few symbols for Latin languages
+- math: real numbers, actually infinite
+
+all these schemes take advantage of the rules of combinatorics
+
+tokenization = opposite!
+base elements are 
 
 [huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [image-pca-bytes]: .images/projector/bytes.pca.gif
