@@ -2,7 +2,7 @@
 
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
-In machine learning, three domains —computer science, mathematics, and linguistics— often find themselves at odds.
+In machine learning, three domains —computer science, mathematics, and linguistics— are often at odds.
 
 Each domain handles text in a different form:
 
@@ -10,11 +10,12 @@ Each domain handles text in a different form:
 - mathematics manipulates tensors and vector
 - while linguistics focuses on graphemes (characters) and their combinations (words)
 
-Tokenization has long been used as a bridge, transforming human-readable text into a machine-friendly format, often relying on algorithms like [BPE][wikipedia-bpe] that draw on human intuition.
+Tokenization has long been used as a bridge, transforming human-readable text into a machine-friendly format.
+It relies on algorithms like [BPE][wikipedia-bpe], which draw on human intuition.
 
 In my [previous article][huggingface-tokenization-1], I proposed to let the model itself learn the mapping from raw bytes to embeddings.
 
-However, there's a simpler alternative: using Unicode directly as the foundation for embeddings in LLMs.
+However, there's a more straightforward alternative: using Unicode directly as the foundation for embeddings in LLMs.
 
 ## TL;DR
 
@@ -22,17 +23,17 @@ Rather than merging encoding bytes outside of the model (BPE, etc), the idea is 
 
 It can be achieved with small changes to the transformer architecture, on the input and output layers.
 
-First, the input pipeline:
+### Input Pipeline
+
+The inputs are processed as follows:
 
 - the text is encoded using UTF-32-BE into a sequence of bytes (values in `[0 .. 256[`)
 - each byte is embedded independently using a `(256, E)` kernel
 - the byte embeddings are merged by groups of size `T`
 
-Starting from the UTF-32-BE bytes, the process is:
+Starting from the UTF-32-BE bytes, and with `T = 2`:
 
 <img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
-
-In the configuration above, the embeddings of 8 bytes (2 characters) are merged into the input embeddings.
 
 `T` and `E` can be **chosen freely**: the token length could be 4, 8 or even 16.
 With a matching embedding dimension for the bytes, `T * E` is brought to the model dimension, say 4096.
@@ -42,24 +43,32 @@ Each one contributes to a specific portion of the final embedding:
 
 <img src=".images/composite/contribution.png" width="100%" style="margin: auto;"/>
 
-And the overall combination pattern in the final embedding vector holds the information on token composition.
+And the overall combination pattern holds the information on token composition.
 
-Then, the output layer could be a standard softmax of depth 256 for each byte prediction.
-But instead of evaluating each of the 256 options, it is more efficient to **predict the value, as a vector of 8 bits**:
+### Output Pipeline
+
+The output layer could be a standard softmax of depth 256 for each byte prediction.
+
+But, instead of evaluating each of the 256 options, it is more efficient to **predict the value, as a vector of 8 bits**:
 
 <img src=".images/binary/predictions.png" width="100%" style="margin: auto;"/>
 
-To this end, the head activation is replaced with a sigmoid, which returns an independent probability for each bit.
+The head activation is replaced with a sigmoid, which returns an independent probability for each bit.
+
+### Advantages
 
 Just [like the previous iteration of tokun](tokun.md) this scheme solves most tokenization shortcomings.
 Plus:
 
-- the **token length is now a hyper-parameter**, it can be freely chosen
-- there is no need for extra preprocessing and / or training
-- it brings some minor model optimization, with smaller kernels
-- the model predicts the input values which are **correlated with composition**
+- **token length**: the token length can be freely chosen, it is **now a hyper-parameter**
+- **straightforward**: there is no need for extra preprocessing or training
+- **optimizations** (minor): the kernels of the input and output layers are smaller
+- **correlation**: there is a direct match between predictions and text composition
 
 You'll find more details in the [comparison section](#comparison-with-tokenization).
+
+In particular, the last point has wide ranging implications:
+for example, digits are encoded as `48 + d` in Unicode, hence number representation is shifted but preserved.
 
 ## TOC
 
@@ -109,6 +118,22 @@ And the composition of a word gives many indications on its meaning.
 
 The Unicode standard indexes 149813 symbols, which can be used to compose all the words from modern languages.
 It will be the language basis for the LLM embeddings.
+
+- computer: sequence => codepoint => byte => bits
+- math: tensors => axes => dimensions
+- human: paragraph => sentence => word => symbols / letters
+
+common denominator = the macro elements all break down into simpler parts.
+while there are the number of possible macro elements grows exponantially, there are very few basis elements:
+
+- computer: 2 bits
+- human: 26 lowercase letters and a few symbols for Latin languages
+- math: real numbers, actually infinite
+
+all these schemes take advantage of the rules of combinatorics
+
+tokenization = opposite!
+base elements are 
 
 ## Binary Predictions
 
@@ -537,31 +562,23 @@ can these embedding and prediction techniques be further improved?
 obviously this research of western centric, because of my limited knowledge.
 I'd be interested to have other POV, don't hesitate to reach out :)
 
-## Language Bases
+## Resources
 
-- computer: sequence => codepoint => byte => bits
-- math: tensors => axes => dimensions
-- human: paragraph => sentence => word => symbols / letters
+Reference implementations:
 
-common denominator = the macro elements all break down into simpler parts.
-while there are the number of possible macro elements grows exponantially, there are very few basis elements:
+- in Tensorflow + Keras: [mlable PyPi package][pypi-mlable]
+- in PyTorch: notebook in a [fork of GPT2 by Mr Karpathy][github-gpt2]
 
-- computer: 2 bits
-- human: 26 lowercase letters and a few symbols for Latin languages
-- math: real numbers, actually infinite
-
-all these schemes take advantage of the rules of combinatorics
-
-tokenization = opposite!
-base elements are 
-
-[huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
 [image-pca-bytes]: .images/projector/bytes.pca.gif
 [image-umap-bytes]: .images/projector/bytes.umap.gif
 [image-pca-codepoints]: .images/projector/codes.pca.gif
 [image-umap-codepoints]: .images/projector/codes.umap.gif
 [image-pca-composite]: .images/projector/compo.pca.gif
 [image-umap-composite]: .images/projector/compo.umap.gif
+
+[github-gpt2]: https://github.com/apehex/gpt2
+[huggingface-tokenization-1]: https://huggingface.co/blog/apehex/tokenization-is-a-dead-weight
+[pypi-mlable]: https://pypi.org/project/mlable/
 [symbl-blocks]: https://symbl.cc/en/unicode/blocks/
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
 [twitter-karpathy-emojis]: https://x.com/karpathy/status/1816637781659254908
