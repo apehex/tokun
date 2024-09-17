@@ -73,12 +73,11 @@ for example, digits are encoded as `48 + d` in Unicode, hence number representat
 ## TOC
 
 - [Tokenization And Ancient Language](#tokenization-and-ancient-languages)
-- [Binary Predictions](#binary-predictions)
-- [Language Basis](#language-basis)
 - [Unicode Embeddings](#codepoint-embeddings)
     - [Codepoint Embeddings](#codepoint-embeddings)
     - [Byte Embeddings](#byte-embeddings)
 - [Composite Embeddings](#composite-embeddings)
+- [Binary Predictions](#binary-predictions)
 - [Comparison With Tokenization](#comparison-with-tokenization)
     - [Meta Parameters](#meta-parameters)
     - [Training](#training)
@@ -109,72 +108,26 @@ The early written languages like hieroglyphs started with such logograms, but th
 For example the plural form is obtained by tripling a logogram or adding 3 bars next to it:
 "house" is "𓉐" and "houses" is "𓉐 𓏪".
 
-Meanwhile o200k has "house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
+Meanwhile o200k has " house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
 
 Most modern languages developped rules to derive new meanings from **combinations of symbols**.
 
 In particular, phonetic and positional systems allow to compose words and numbers.
 And the composition of a word gives many indications on its meaning.
 
-The Unicode standard indexes 149813 symbols, which can be used to compose all the words from modern languages.
+In all three domains mentioned earlier, macro elements break down into simpler parts.
+For text, the different scales are roughly:
+
+- computer science: sequences => codepoints => bytes => bits
+- mathematics: tensors => axes => dimensions
+- linguistics: paragraphs => sentences => words => symbols / letters
+
+Tokenization cuts the decomposition short: it stops between sequences and codepoints on the computer side, which is somewhere between sentences and graphemes for linguistics.
+
+On the contrary, the Unicode standard indexes 149813 symbols.
+They can be used to compose all the words from modern languages.
+
 It will be the language basis for the LLM embeddings.
-
-- computer: sequence => codepoint => byte => bits
-- math: tensors => axes => dimensions
-- human: paragraph => sentence => word => symbols / letters
-
-common denominator = the macro elements all break down into simpler parts.
-while there are the number of possible macro elements grows exponantially, there are very few basis elements:
-
-- computer: 2 bits
-- human: 26 lowercase letters and a few symbols for Latin languages
-- math: real numbers, actually infinite
-
-all these schemes take advantage of the rules of combinatorics
-
-tokenization = opposite!
-base elements are 
-
-## Binary Predictions
-
-Suppose GPT-4o processed the following sentence:
-
-```
-This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
-```
-
-For each position in the sequence, the model evaluates the probability of every single token.
-
-Given everything before the token "201" the probability vector might look like this:
-
-| Index         | 0     | ...   | 290       | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
-| ------------- | ----- | ----- | --------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
-| Token         | `!`   | ...   | ` the`    | ...   | `201` | ...   | `200` | ...   | `202` | ...   | ` september`  | ...   | ` cocos`  |
-| Target        | 0     | ...   | 0         | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
-| Prediction    | 0     | ...   | 0.15      | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
-
-This one-hot vector has a **dimension of 200k** and is usually obtained with either:
-
-- a softmax activation
-- dot projection on the embedding vectors
-
-Instead, every number below 200k can be represented with **just 18 bits**.
-The target index `667` for the next token "201" is `110110010100000000` in base 2.
-
-Each bit can be predicted by an **independent probability** by switching the activation from softmax to a **sigmoid**:
-
-| Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
-| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-| Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
-
-The binary vector above encodes the prediction "671": 
-With this output scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
-
-Unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
-For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " с", b"\xe0\xb3".
-
-Now that the representation of the predictions is improved, it is time to address *what* is being predicted.
 
 ## Unicode Embeddings
 
@@ -317,6 +270,49 @@ It allows the model to set an independent meaning to each byte, contrary to the 
 
 Now the LLM knows the composition of each token.
 It can natively perform calculations, create and understand neologisms, etc.
+
+## Binary Predictions
+
+Since the format of the inputs changed, the targets should have a matching representation.
+
+Let's get back to the current models (2024) and suppose GPT-4o processed the following sentence:
+
+```
+This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
+```
+
+For each position in the sequence, the model evaluates the probability of every single token.
+
+Given everything before the token "201" the probability vector might look like this:
+
+| Index         | 0     | ...   | 290       | ...   | 667   | ...   | 1179  | ...   | 1323  | ...   | 34902         | ...   | 199,997   |
+| ------------- | ----- | ----- | --------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------------- | ----- | --------- |
+| Token         | `!`   | ...   | ` the`    | ...   | `201` | ...   | `200` | ...   | `202` | ...   | ` september`  | ...   | ` cocos`  |
+| Target        | 0     | ...   | 0         | ...   | 1     | ...   | 0     | ...   | 0     | ...   | 0             | ...   | 0         |
+| Prediction    | 0     | ...   | 0.15      | ...   | 0.4   | ...   | 0.1   | ...   | 0.25  | ...   | 0.08          | ...   | 0         |
+
+This one-hot vector has a **dimension of 200k** and is usually obtained with either:
+
+- a softmax activation
+- dot projection on the embedding vectors
+
+Instead, every number below 200k can be represented with **just 18 bits**.
+The target index `667` for the next token "201" is `110110010100000000` in base 2.
+
+Each bit can be predicted by an **independent probability** by switching the activation from softmax to a **sigmoid**:
+
+| Index         | 0     | 1     | 2     | 3     | 4     | 5     | 6     | 7     | 8     | 9     | 10    | 11    | 12    | 13    | 14    | 15    | 16    | 17    |
+| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
+
+The binary vector above encodes the prediction "671": 
+With this output scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
+
+Unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
+For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " с", b"\xe0\xb3".
+
+Now that the representation of the predictions is improved, it is time to address *what* is being predicted.
 
 ## Comparison With Tokenization
 
