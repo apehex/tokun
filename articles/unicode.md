@@ -2,23 +2,29 @@
 
 <img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
-In machine learning 3 worlds are at odds: the computer, math and human sides.
+In machine learning, three domains —computer science, mathematics, and linguistics— often find themselves at odds.
 
-Tokenization bridges the gap from machine encoding to tensor embeddings using human intuition, with algorithms like BPE.
+Each domain handles text in a different form:
 
-In my [previous article][huggingface-tokenization-1], I proposed to let the model itself translate the encoding bytes into embeddings.
+- computers deal with raw numbers like byte sequences
+- mathematics manipulates tensors and vector
+- while linguistics focuses on graphemes (characters) and their combinations (words)
 
-Actually, none of this is necessary: Unicode can be directly used as the basis for LLM embeddings.
+Tokenization has long been used as a bridge, transforming human-readable text into a machine-friendly format, often relying on algorithms like [BPE][wikipedia-bpe] that draw on human intuition.
+
+In my [previous article][huggingface-tokenization-1], I proposed to let the model itself learn the mapping from raw bytes to embeddings.
+
+However, there's a simpler alternative: using Unicode directly as the foundation for embeddings in LLMs.
 
 ## TL;DR
 
-Rather than merging the encodings outside of the model, the idea is to **combine elementary embeddings inside the model**.
+Rather than merging encoding bytes outside of the model (BPE, etc), the idea is to **combine elementary embeddings inside the model**.
 
 It can be achieved with small changes to the transformer architecture, on the input and output layers.
 
 First, the input pipeline:
 
-- the text is encoded using UTF-32-BE into a sequence of bytes (values in `[ 0 .. 256[`)
+- the text is encoded using UTF-32-BE into a sequence of bytes (values in `[0 .. 256[`)
 - each byte is embedded independently using a `(256, E)` kernel
 - the byte embeddings are merged by groups of size `T`
 
@@ -146,6 +152,11 @@ For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " �
 Now that the representation of the predictions is improved, it is time to address *what* is being predicted.
 
 ## Unicode Embeddings
+
+BPE stands for Byte Pair Encoding: it generates numbers to index specific tuples of characters.
+
+Still, after several generations of encodings, computer scientists have formed an international standard: the Unicode.
+Is BPE really necessary, let alone useful?
 
 ### Codepoint Embeddings
 
@@ -393,26 +404,6 @@ To sum up:
 
 So there are pros and cons to both approaches.
 
-## Next
-
-With this, LLMs can parse inputs up to the byte level, allowing:
-
-- number calculations
-- handling rare words
-- 
-
-LLMs are still in the stone age
-
-compiler + llm using tokun embeddings
-
-composition <=> embeddings
-weaker form of semantic similarity => improved?
-
-can these embedding and prediction techniques be further improved?
-
-obviously this research of western centric, because of my limited knowledge.
-I'd be interested to have other POV, don't hesitate to reach out :)
-
 ## Implementations
 
 ### Composite Embeddings
@@ -526,6 +517,26 @@ def reduce_base(data: torch.Tensor, base: int, axis: int=-1, keepdims: bool=Fals
     return torch.sum(data * __base, dim=axis, keepdim=keepdims)
 ```
 
+## Next
+
+With this, LLMs can parse inputs up to the byte level, allowing:
+
+- number calculations
+- handling rare words
+- 
+
+LLMs are still in the stone age
+
+compiler + llm using tokun embeddings
+
+composition <=> embeddings
+weaker form of semantic similarity => improved?
+
+can these embedding and prediction techniques be further improved?
+
+obviously this research of western centric, because of my limited knowledge.
+I'd be interested to have other POV, don't hesitate to reach out :)
+
 ## Language Bases
 
 - computer: sequence => codepoint => byte => bits
@@ -554,4 +565,5 @@ base elements are
 [symbl-blocks]: https://symbl.cc/en/unicode/blocks/
 [tiktokenizer-gpt-4]: https://tiktokenizer.vercel.app/?model=gpt-4
 [twitter-karpathy-emojis]: https://x.com/karpathy/status/1816637781659254908
+[wikipedia-bpe]: https://en.wikipedia.org/wiki/Byte_pair_encoding
 [wikipedia-unicode-planes]: https://en.wikipedia.org/wiki/Plane_(Unicode)
