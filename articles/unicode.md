@@ -79,8 +79,6 @@ for example, digits are encoded as `48 + d` in Unicode, hence number representat
 - [Composite Embeddings](#composite-embeddings)
 - [Binary Predictions](#binary-predictions)
 - [Comparison With Tokenization](#comparison-with-tokenization)
-    - [Meta Parameters](#meta-parameters)
-    - [Training](#training)
     - [Consistency](#consistency)
     - [Compression](#compression)
         - [Weights](#weights)
@@ -99,18 +97,19 @@ Here, 56 cyrillic characters are grouped into 20 tokens:
 
 <img src=".images/tiktoken/russian.gpt4o.png" width="75%" style="margin: auto;"/>
 
-LLMs are only aware of the index values on the right side and lose the information on token composition.
+LLMs are only aware of the index values on the right side and lose the information about the original composition of these tokens.
 
-Imagine using a [unique symbol for every number and word variation][twitter-karpathy-emojis]!
+Imagine having a unique symbol for every number and word variation, like [communicating with emojis only][twitter-karpathy-emojis]!
 
-The early written languages like hieroglyphs started with such logograms, but they still had rebus rules to form nuanced meanings out of combinations of symbols.
+Early written languages, such as hieroglyphs, were based on such logograms: symbols representing whole concepts.
+However, they still had rebus rules to form nuanced meanings out of combinations of symbols.
 
-For example the plural form is obtained by tripling a logogram or adding 3 bars next to it:
+For instance, to form the plural in Egyptian hieroglyphs you could triple a logogram or add 3 bars next to it:
 "house" is "𓉐" and "houses" is "𓉐 𓏪".
 
-Meanwhile o200k has " house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
+In contrast, the popular tokenizer o200k has " house" (4276), " House" (7826), "house" (9983), " houses" (20327), "House" (27796), "-house" (46400) etc.
 
-Most modern languages developped rules to derive new meanings from **combinations of symbols**.
+This approach overlooks how modern languages derive meaning from **combinations of symbols**.
 
 In particular, phonetic and positional systems allow to compose words and numbers.
 And the composition of a word gives many indications on its meaning.
@@ -118,28 +117,28 @@ And the composition of a word gives many indications on its meaning.
 In all three domains mentioned earlier, macro elements break down into simpler parts.
 For text, the different scales are roughly:
 
-- computer science: sequences => codepoints => bytes => bits
-- mathematics: tensors => axes => dimensions
-- linguistics: paragraphs => sentences => words => symbols / letters
+- computer science: sequences &#8594; codepoints &#8594; bytes &#8594; bits
+- mathematics: tensors &#8594; axes &#8594; dimensions
+- linguistics: paragraphs &#8594; sentences &#8594; words &#8594; symbols / letters
 
 Tokenization cuts the decomposition short: it stops between sequences and codepoints on the computer side, which is somewhere between sentences and graphemes for linguistics.
 
-On the contrary, the Unicode standard indexes 149813 symbols.
-They can be used to compose all the words from modern languages.
-
-It will be the language basis for the LLM embeddings.
+To keep the compositional expressiveness, we'll start over from the fundamental graphemes.
 
 ## Unicode Embeddings
 
-BPE stands for Byte Pair Encoding: it generates numbers to index specific tuples of characters.
+On a computer, the language units are translated into numbers by the Unicode standard.
+It is universal, with 149813 symbols from 161 scripts.
 
-Still, after several generations of encodings, computer scientists have formed an international standard: the Unicode.
-Is BPE really necessary, let alone useful?
+Most digital text is expressed in this standard, including this very web page.
 
 ### Codepoint Embeddings
 
-Each token index ino200k is equivalent to the underlying sequence of Unicode codepoints.
-The latter is actually a new composite index that is more informative:
+And traditional tokenization algorithms like BPE start from Unicode.
+As the name Byte Pair Encoding suggests, it generates new indices by merging characters two by two.
+
+The vocabulary of o200K was created by iterating this process on the most frequent pairs in a training set.
+So each index in o200k is equivalent to the underlying sequence of Unicode codepoints:
 
 | Position      | Token         | o200k     | UTF-32-BE                                 |
 | ------------- | ------------- | --------- | ----------------------------------------- |
@@ -181,13 +180,8 @@ Dimensionality reduction shows how the vectors made from similar characters are 
 | ------------------------- | ---------------------------- |
 | ![][image-pca-codepoints] | ![][image-umap-codepoints]   |
 
-Since the standard defines the Unicode space into themed ranges of values, the embeddings are natively correlated with content.
+Since the standard organizes the Unicode space into themed ranges of values, the embeddings are natively correlated with content.
 For example there are regions for each character set (Latin, Cyrillic, etc), for emojis, for symbols, for special characters, etc.
-
-For more informations see:
-
-- the Wikipedia article on [Unicode planes][wikipedia-unicode-planes]
-- the Unicode table at [symbl.cc][symbl-blocks]
 
 These normalized embeddings can serve as input tensor for a LLM.
 The model can then extend the embedding dimension for further processing.
@@ -197,12 +191,12 @@ This scheme inherits from the properties of Unicode and has already most of the 
 Still, there is a lot to improve too:
 
 - brittle: the embedding values are very precise and they are separated by `1 / 0x40000 = 3.8147-06` only
-- linearity: the embeddings are regularly spaced even though certain codepoints have very different meanings from their neighbors
-- size: there are 262144 "basic" elements, which is *not* an improvement over regular vocabularies
+- linear: the embeddings are regularly spaced even though certain codepoints have very different meanings from their neighbors
+- expensive: there are 262144 "basic" elements, which is **not** an improvement over regular vocabularies
 
 ### Byte Embeddings
 
-Unicode codepoints can be split further into bytes:
+The decomposition can be pushed further: the 32 bits of each Unicode codepoint can be split into bytes.
 
 | Position  | Chunk         | UTF-32-BE                                                     | Embeddings                                                                |
 | --------- | ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -212,12 +206,8 @@ Unicode codepoints can be split further into bytes:
 | 3         | ` rea`        | `(0, 0, 0,  32, 0, 0, 0, 114, 0, 0, 0, 101, 0, 0, 0,  97)`    | `(0 0 0 0.125 0 0 0 0.4453125 0 0 0 0.39453125 0 0 0 0.37890625)`         |
 | ...       | ...           | ...                                                           | ...                                                                       |
 
-There are a lot of zeros because all the characters from the example come from the ASCII table, which is right at the start of the Unicode table.
-For example "Unicode" is "유니코드" in Korean which is encoded as `(0, 0, 199, 32, 0, 0, 178, 200, 0, 0, 207, 84, 0, 0, 180, 220)` in UTF-32-BE.
-
-Rather than dividing by `0x40000`, each byte can be normalized by `256`.
-
-The structure of Unicode is even more apparent with these embeddings:
+Dividing by 256 is now enough to preform the normalization.
+And the structure of Unicode is even more apparent with these embeddings:
 
 | PCA                  | UMAP                   |
 | -------------------- | ---------------------- |
@@ -225,25 +215,20 @@ The structure of Unicode is even more apparent with these embeddings:
 
 This transformation solves 2 of the shortcomings of the previous method:
 
-- embeddings are composed from 256 base elements rather than 200k
-- there is more separation between values
+- reduced complexity: embeddings are now derived from 256 base elements instead of 200k
+- increased separation: byte values are further apart in the embedding space
 
 Still, the embeddings are lineary distributed.
 It would be better to distinguish special values, in particular the null byte.
 
-Traditional embeddings are totally independent and arbitrary.
-Could this feature be mixed with base decomposition?
-
 ## Composite Embeddings
-
-The previous embedding mapped each byte with its value divided by 256.
 
 Actually, the integer bytes can be interpreted as an index in a traditional embedding layer.
 After concatening the embeddings from each byte, a "token" embedding is formed:
 
 <img src=".images/composite/embeddings.png" width="100%" style="margin: auto;"/>
 
-Even with random vectors for each byte, the merged embeddings keep the information on token composition:
+Even when the embeddings for each byte are initialized randomly, the merged embeddings keep the information on token composition:
 
 | PCA                       | UMAP                          |
 | ------------------------- | ----------------------------- |
@@ -253,29 +238,28 @@ Now, the "token" length is **a hyper-parameter of the model**.
 For example, the Gemma2-27B architecture could be tweaked like this:
 
 - the embed dimension `E` is kept at 4608
-- the token dimension `T` is set to 64 (bytes, which amount to 16 Unicode characters)
-- the byte dimension `C` is then 4608 / 64 = 72
-- the context dimension `S` and all other values remain the same
+- the token dimension `T` is set to 32 (bytes, which amount to 8 Unicode characters)
+- the byte dimension `C` is then 4608 / 32 = 144
 
-Then an input tensor with a batch dimension `B` of 128 and sequence dimension of 16384 (4096 characters) would be:
+With this setup, an input tensor with a batch dimension `B` of 128 and sequence dimension of 16384 (4096 characters) would be:
 
 - first reshaped as `(B, S / T, T) = (128, 256, 64)`
 - and exit the composite embedding layer as a tensor of shape `(B, S / T, T * C) = (128, 256, 4608)`
 
-The LLM would process the input as a sequence of 256 embeddings, each representing 16 characters.
-And each of these embeddings is actually made from the concatenation of 64 byte embeddings.
+The LLM would process the input as a sequence of 256 embeddings, each representing 8 characters.
+And each of these embeddings is formed by concatenating 32 byte embeddings.
 
 This layer can then be trained and the embeddings for each byte can be adjusted by the model.
 It allows the model to set an independent meaning to each byte, contrary to the two schemes in the sections above.
 
-Now the LLM knows the composition of each token.
+Finally the LLM is aware of the composition of each token through its embedding.
 It can natively perform calculations, create and understand neologisms, etc.
 
 ## Binary Predictions
 
 Since the format of the inputs changed, the targets should have a matching representation.
 
-Let's get back to the current models (2024) and suppose GPT-4o processed the following sentence:
+Let's get back to the current models (as of 2024) and suppose GPT-4o processed the following sentence:
 
 ```
 This paper was based mainly on the attention mechanism developed by Bahdanau et al. in 2014.[11]
@@ -307,12 +291,24 @@ Each bit can be predicted by an **independent probability** by switching the act
 | Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
 
 The binary vector above encodes the prediction "671": 
-With this output scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
+With this scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
 
 Unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
 For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " с", b"\xe0\xb3".
 
-Now that the representation of the predictions is improved, it is time to address *what* is being predicted.
+Again, the Unicode representation proves useful as targets.
+Like the input tensor, the targets can be shaped as a tensor of `(B, S / T, T)` bytes.
+Then, each byte prediction is a vector of dimension 8 (bits) and the final output is `(B, S / T, 8 * T)`.
+
+For the patch of text "201", the target prediction would be:
+
+- `(0, 0, 0, 50, 0, 0, 0, 48, 0, 0, 0, 49)` in bytes
+- or `(0, 0, 1, 1, 0, 0, 0, 1)` as final binary target for the byte `49`
+
+As you can see, the 3 bytes to predict -48, 49 and 50- are close like the characters they represent.
+Even with errors in the binary outputs, the predictions would not land far.
+
+Now that the model's output align with the input's binary nature, we can explore how these changes impact the model's performance.
 
 ## Comparison With Tokenization
 
@@ -326,44 +322,49 @@ The hyper parameters are set for all the comparisons below:
     - for each byte: `E = 64`
     - inside the model: `H = 4096`
 
-### Meta-Parameters
-
-While the length is highly variable from token to token in a traditional tokenizer, it is now fixed.
-
-Rather than being the product the vocabulary size and training data, **the token length is now a choice**.
-
-For the purpose of this comparison, I chose 16 (64 bytes) as token dimension.
-Depending on the model architecture, the task and localization, this hyper-parameter can be adjusted **to optimize performances**.
-
-### Training
-
-There is no vocabulary to gather, so:
-
-- there is **no training step**
-- the process **doesn't change with time**, while word frequencies vary and vocabularies grow
-
 ### Consistency
 
-Token sizes are irregular, while UTF-32-BE allows to group bytes into fixed size chunks.
+Token sizes are irregular, while UTF-32-BE allows to group bytes into **fixed size chunks**.
+The number of characters covered by each embedding becomes a **tunable hyper-parameter**.
 
-Since the Unicode standard covers all modern languages, this group size is always the same, regardless of the underlying script.
+Also, the vocabularies of tokenizers depend on the training data:
+
+- token frequencies change with time: dates, proper nouns, events, slang, etc
+- training data is often limited:
+    - geographically, to a few languages
+    - by the lexical field, because of the context
+
+While Unicode is **timeless and universal**.
 
 ### Compression
 
-#### Weights
+#### Embedding Weights
 
-The embedding kernel has a shape `(256, E)`, here `(256, 64)`.
+The kernel of composite embeddings has a shape `(256, E)`, here `(256, 64)`.
 In contrast, the kernel for the vocabulary o200k is `(199998, H)`, which is `(199998, 4096)`.
 
 The latter kernel requires enormous amounts of data so that each token in the vocabulary is witnessed in several contexts.
 On the contrary, all the byte values are seen in countless combinations, each will get a solid training.
 
-Similarly, the projection layers have are shaped:
+Also, the composite embedding kernels have 50000 times less parameters.
+
+#### Projection Weights
+
+Similarly, the projection layers are shaped:
 
 - `(199998, H) = (199998, 4096)` in case of a dot-product and the transpose for a softmax head
 - `(H, 8 * T) = (4096, 512)` with the sigmoid activation for binary predictions
 
-In short, kernels are 50000 and 400 times smaller with composite embeddings and binary predictions.
+The head is 400 times smaller too.
+
+#### Weights Of The Inner Layers
+
+Howver, the scope of inputs and outputs is greatly expanded to cover all modern languages.
+While the impact of this expansion is difficult to quantify, my experience indicates that it requires a larger model.
+
+To match the performance of token-based models, I had to increase by about 1.5 times the embedding dimension in the inner layers.
+
+Consequently, while composite embeddings reduce the size of input and output kernels, the **overall model often ends up with more parameters**.
 
 #### Inputs
 
@@ -383,7 +384,7 @@ While UTF-32 temporarily expands the input sequence, it is then reduced into a s
 
 #### Outputs
 
-As for the outputs, they are:
+Finally, the outputs are significantly smaller:
 
 - `(8192, 199998)` with tokenization
 - `(4 * S / T, 8 * T) = (2048, 512)` with binary predictions
@@ -427,6 +428,9 @@ So there are pros and cons to both approaches.
 
 ## Implementations
 
+I'll only provide Tensorflow / Keras implementations here.
+Look at the [resource section](#resources) for the PyTorch version and more.
+
 ### Composite Embeddings
 
 The composite embeddings can be implemented in a very simple layer.
@@ -440,17 +444,6 @@ class TokunEmbedding(keras.layers.Embedding):
         __outputs = super(TokunEmbedding, self).call(inputs)
         # concatenate the embeddings
         return keras.ops.einsum('bste -> bs(te)', __outputs)
-```
-
-Or in PyTorch:
-
-```python
-class TokunEmbedding(torch.nn.Embedding):
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        # embed each element separately
-        __outputs = super(TokunEmbedding, self).forward(inputs)
-        # concatenate the embeddings
-        return torch.einsum('bste -> bs(te)', __outputs)
 ```
 
 The `einsum` operation could be replaced with a more generic "merge" operation independent of the rank of its input.
@@ -485,25 +478,6 @@ def expand_base(data: tf.Tensor, base: int, depth: int, bigendian: bool=True) ->
     return tf.cast(__digits, dtype=data.dtype)
 ```
 
-In PyTorch:
-
-```python
-def expand_base(data: torch.Tensor, base: int, depth: int, bigendian: bool=True) -> torch.Tensor:
-    __shape = data.dim() * [1] + [depth]
-    # base indexes
-    __idx = range(depth)[::-1] if bigendian else range(depth)
-    # base divisors and moduli
-    __div = torch.tensor([base ** __e for __e in __idx], dtype=data.dtype, device=data.device)
-    __mod = torch.tensor([base ** (__e + 1) for __e in __idx], dtype=data.dtype, device=data.device)
-    # match the input shape
-    __div = __div.view(__shape)
-    __mod = __mod.view(__shape)
-    # Euclidean algorithm
-    __digits = torch.div(torch.remainder(data.unsqueeze(-1), __mod), __div, rounding_mode='floor')
-    # format
-    return __digits.to(data.dtype)
-```
-
 During inference, the predictions can be interpreted by doing the reverse operation:
 
 ```python
@@ -521,42 +495,13 @@ def reduce_base(data: tf.Tensor, base: int, axis: int=-1, keepdims: bool=False, 
     return tf.reduce_sum(data * __base, axis=axis, keepdims=keepdims)
 ```
 
-Or, in PyTorch:
-
-```python
-def reduce_base(data: torch.Tensor, base: int, axis: int=-1, keepdims: bool=False, bigendian: bool=True) -> torch.Tensor:
-    __rank = len(data.shape)
-    # select the dimension of the given axis
-    __shape = [__d if (__i - axis) % __rank == 0 else 1 for __i, __d in enumerate(list(data.shape))]
-    # exponents
-    __exp = torch.arange(__shape[axis] - 1, -1, -1) if bigendian else torch.arange(__shape[axis])
-    # base multipliers
-    __base = torch.pow(base, __exp).to(data.device).to(data.dtype)
-    # match the input shape
-    __base = __base.view(__shape)
-    # Recompose the number
-    return torch.sum(data * __base, dim=axis, keepdim=keepdims)
-```
-
 ## Next
 
-With this, LLMs can parse inputs up to the byte level, allowing:
+With these input and output representations, LLM have a finer and wider understanding of text.
+It may come at the cost of an expansion in the inner layers though.
 
-- number calculations
-- handling rare words
-- 
-
-LLMs are still in the stone age
-
-compiler + llm using tokun embeddings
-
-composition <=> embeddings
-weaker form of semantic similarity => improved?
-
-can these embedding and prediction techniques be further improved?
-
-obviously this research of western centric, because of my limited knowledge.
-I'd be interested to have other POV, don't hesitate to reach out :)
+To get a better sense of the practical value of composite embeddings, I built a serie of models called `llaminate`.
+In particular, I may write a short review of a neural compiler that came out of this project.
 
 ## Resources
 
@@ -564,6 +509,11 @@ Reference implementations:
 
 - in Tensorflow + Keras: [mlable PyPi package][pypi-mlable]
 - in PyTorch: notebook in a [fork of GPT2 by Mr Karpathy][github-gpt2]
+
+Unicode:
+
+- the Wikipedia article on [Unicode planes][wikipedia-unicode-planes]
+- the Unicode table at [symbl.cc][symbl-blocks]
 
 [image-pca-bytes]: .images/projector/bytes.pca.gif
 [image-umap-bytes]: .images/projector/bytes.umap.gif
