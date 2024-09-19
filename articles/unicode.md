@@ -7,7 +7,7 @@ In machine learning, three domains —computer science, mathematics, and linguis
 Each domain handles text in a different form:
 
 - computers deal with raw numbers like byte sequences
-- mathematics manipulates tensors and vector
+- mathematics manipulates tensors and vectors
 - while linguistics focuses on graphemes (characters) and their combinations (words)
 
 Tokenization has long been used as a bridge, transforming human-readable text into a machine-friendly format.
@@ -15,7 +15,7 @@ It relies on algorithms like [BPE][wikipedia-bpe], which draw on human intuition
 
 In my [previous article][huggingface-tokenization-1], I proposed to let the model itself learn the mapping from raw bytes to embeddings.
 
-However, there's a more straightforward alternative: using Unicode directly as the foundation for embeddings in LLMs.
+However, there's a more efficient alternative: using Unicode directly as the foundation for embeddings in LLMs.
 
 ## TL;DR
 
@@ -81,9 +81,11 @@ for example, digits are encoded as `48 + d` in Unicode, hence number representat
 - [Comparison With Tokenization](#comparison-with-tokenization)
     - [Consistency](#consistency)
     - [Compression](#compression)
-        - [Weights](#weights)
-        - [Inputs](#inputs)
-        - [Outputs](#outputs)
+        - [Input Tensors](#input-tensors)
+        - [Output Tensors](#output-tensors)
+        - [Embedding Weights](#embedding-weights)
+        - [Projection Weights](#projection-weights)
+        - [Weights Of The Inner Layers](#weights-of-the-inner-layers)
     - [Prediction Errors](#prediction-errors)
 - [Implementations](#implementation)
     - [Composite Embeddings](#composite-embeddings)
@@ -342,6 +344,31 @@ While Unicode is **timeless and universal**.
 
 ### Compression
 
+#### Input Tensors
+
+The sequence dimension `S = 32,768` leads to:
+
+- a context dimension of `C = 8,192` with tokenization (on average, with o200k, for the purpose of comparing)
+- a sequence of `4 * S = 131,072` bytes
+
+After embedding, the input tensors are:
+
+- `(8192, 4096)` with tokenization
+- `(4 * S / T, 4096) = (2048, 4096)` with composite embeddings
+
+The composite embeddings are a combination of `T = 64` vectors of dimension `E = 64` for a total of 4096.
+
+While UTF-32 temporarily expands the input sequence, it is then reduced into a smaller tensor.
+
+#### Output Tensors
+
+Finally, the outputs are significantly smaller:
+
+- `(8192, 199998)` with tokenization
+- `(4 * S / T, 8 * T) = (2048, 512)` with binary predictions
+
+Binary prediction 1600 times smaller and very dense in comparison.
+
 #### Embedding Weights
 
 The kernel of composite embeddings has a shape `(256, E)`, here `(256, 64)`.
@@ -369,31 +396,6 @@ While the impact of this expansion is difficult to quantify, my experience indic
 To match the performance of token-based models, I had to increase by about 1.5 times the embedding dimension in the inner layers.
 
 Consequently, while composite embeddings reduce the size of input and output kernels, the **overall model often ends up with more parameters**.
-
-#### Inputs
-
-The sequence dimension `S = 32,768` leads to:
-
-- a context dimension of `C = 8,192` with tokenization (on average, with o200k, for the purpose of comparing)
-- a sequence of `4 * S = 131,072` bytes
-
-After embedding, the input tensors are:
-
-- `(8192, 4096)` with tokenization
-- `(4 * S / T, 4096) = (2048, 4096)` with composite embeddings
-
-The composite embeddings are a combination of `T = 64` vectors of dimension `E = 64` for a total of 4096.
-
-While UTF-32 temporarily expands the input sequence, it is then reduced into a smaller tensor.
-
-#### Outputs
-
-Finally, the outputs are significantly smaller:
-
-- `(8192, 199998)` with tokenization
-- `(4 * S / T, 8 * T) = (2048, 512)` with binary predictions
-
-Binary prediction 1600 times smaller and very dense in comparison.
 
 ### Prediction Errors
 
