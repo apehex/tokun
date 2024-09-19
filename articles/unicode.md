@@ -91,6 +91,7 @@ for example, digits are encoded as `48 + d` in Unicode, hence number representat
     - [Composite Embeddings](#composite-embeddings)
     - [Binary Predictions](#binary-predictions)
 - [Next](#next)
+- [Resources](#resources)
 
 ## Tokenization And Ancient Languages
 
@@ -193,7 +194,7 @@ This scheme inherits from the properties of Unicode and has already most of the 
 Still, there is a lot to improve too:
 
 - brittle: the embedding values are very precise and they are separated by `1 / 0x40000 = 3.8147-06` only
-- linear: the embeddings are regularly spaced even though certain codepoints have very different meanings from their neighbors
+- linear: the embeddings are regularly spaced despite the discontinuities in meaning
 - expensive: there are 262144 "basic" elements, which is **not** an improvement over regular vocabularies
 
 ### Byte Embeddings
@@ -208,7 +209,7 @@ The decomposition can be pushed further: the 32 bits of each Unicode codepoint c
 | 3         | ` rea`        | `(0, 0, 0,  32, 0, 0, 0, 114, 0, 0, 0, 101, 0, 0, 0,  97)`    | `(0 0 0 0.125 0 0 0 0.4453125 0 0 0 0.39453125 0 0 0 0.37890625)`         |
 | ...       | ...           | ...                                                           | ...                                                                       |
 
-Dividing by 256 is now enough to preform the normalization.
+Dividing by 256 is now enough to perform the normalization.
 And the structure of Unicode is even more apparent with these embeddings:
 
 | PCA                  | UMAP                   |
@@ -239,14 +240,14 @@ Even when the embeddings for each byte are initialized randomly, the merged embe
 Now, the "token" length is **a hyper-parameter of the model**.
 For example, the Gemma2-27B architecture could be tweaked like this:
 
-- the embed dimension `E` is kept at 4608
+- the embed dimension `H` is kept at 4608
 - the token dimension `T` is set to 32 (bytes, which amount to 8 Unicode characters)
-- the byte dimension `C` is then 4608 / 32 = 144
+- the byte dimension `E` is then 4608 / 32 = 144
 
 With this setup, an input tensor with a batch dimension `B` of 128 and sequence dimension of 16384 (4096 characters) would be:
 
 - first reshaped as `(B, S / T, T) = (128, 256, 64)`
-- and exit the composite embedding layer as a tensor of shape `(B, S / T, T * C) = (128, 256, 4608)`
+- and exit the composite embedding layer as a tensor of shape `(B, S / T, T * E) = (128, 256, 4608)`
 
 The LLM would process the input as a sequence of 256 embeddings, each representing 8 characters.
 And each of these embeddings is formed by concatenating 32 byte embeddings.
@@ -292,8 +293,8 @@ Each bit can be predicted by an **independent probability** by switching the act
 | Target        | 1     | 1     | 0     | 1     | 1     | 0     | 0     | 1     | 0     | 1     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | Prediction    | 0.6   | 0.58  | 0.55  | 0.7   | 0.64  | 0.37  | 0.2   | 0.8   | 0.25  | 0.9   | 0.08  | 0.12  | 0.04  | 0.1   | 0.02  | 0     | 0     | 0     |
 
-The binary vector above encodes the prediction "671": 
-With this scheme, prediction errors are numerically close, because each bit only contributes to a portion of the prediction.
+The binary vector above has a prediction error at index 2 and encodes the prediction "671": 
+With this scheme, errors are numerically close, because each bit only contributes to a portion of the prediction.
 
 Unfortunately, the vocabulary of tokenizers are chaotic: **numeric proximity** is unrelated to **semantic similarity**.
 For example, the tokens surrounding "201" in o200k are: " can", "п", " me", " с", b"\xe0\xb3".
@@ -367,7 +368,7 @@ Finally, the outputs are significantly smaller:
 - `(8192, 199998)` with tokenization
 - `(4 * S / T, 8 * T) = (2048, 512)` with binary predictions
 
-Binary prediction 1600 times smaller and very dense in comparison.
+Binary predictions are 1600 times smaller and very dense in comparison.
 
 #### Embedding Weights
 
@@ -408,7 +409,7 @@ With tokenization:
 With binary predictions:
 
 - the next chunk of text is predicted one byte at a time
-- bytes are ordered according to the Unicode std, which is very structured
+- bytes are ordered according to the Unicode standard, which is very structured
 - each prediction bit contributes to a portion of the prediction / error
 
 So if the next token was `e`, the target would be:
@@ -421,7 +422,7 @@ And a wrong prediction would be respectively:
 - index 328 or ` of`
 - `((0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0, 0, 0), (0, 1, 1, 0, 0, 1, 1, 1))` or `(0, 0, 0, 103)` for `g`
 
-From my experience the model rarely fails to predict the null bytes (even with a class weights `0.3`).
+From my experience the model rarely (virtually never) fails to predict the null bytes.
 
 To sum up:
 
