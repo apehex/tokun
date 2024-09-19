@@ -300,6 +300,10 @@ Again, the Unicode representation proves useful as targets.
 Like the input tensor, the targets can be shaped as a tensor of `(B, S / T, T)` bytes.
 Then, each byte prediction is a vector of dimension 8 (bits) and the final output is `(B, S / T, 8 * T)`.
 
+With `L = 8`, the whole process is:
+
+<img src=".images/binary/predictions.png" width="100%" style="margin: auto;"/>
+
 For the patch of text "201", the target prediction would be:
 
 - `(0, 0, 0, 50, 0, 0, 0, 48, 0, 0, 0, 49)` in bytes
