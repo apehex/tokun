@@ -1,6 +1,6 @@
 # This Title Is Already Tokenized (Tokun Part 2)
 
-<img src="../.github/header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
+<img src=".images/fusion.webp" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
 
 In machine learning, three domains —computer science, mathematics, and linguistics— are often at odds.
 
