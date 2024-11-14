@@ -1,8 +1,30 @@
 # tokun
 
-> `to-kun` took tokens to t-can
-
 <img src="header.png" alt="Neural tokenization" title="Source: Image by Author and generated with MidJourney" width="100%" style="margin: auto;"/>
+
+> **!** this project is largely obsolete, replaced by the layer [TokunEmbedding](https://github.com/apehex/mlable?tab=readme-ov-file#TokunEmbedding)
+
+The patching technique used in image / video model can be used on text as explained in [this article](https://huggingface.co/blog/apehex/this-title-is-already-tokenized).
+
+In short, this method reduces 2D spatial data into a 1D sequence fit for transformer architectures.
+
+Conversely, text data can be treated as 2D as follows:
+
+- a scalar tensor of `B` strings is encoded using UTF-32-BE: `(B,) => (B, 4S)`
+- the bytes are grouped by chunks of `N`: `(B, 4S) => (B, 4S/N, N)`
+- the bytes are embeded independently: `(B, 4S/N, N) => (B, 4S/N, N, E)`
+- the embeddings are merged N by N: `(B, 4S/N, N, E) => (B, 4S/N, NE)`
+
+`S` is the limit length for the string inputs and the factor 4 is the number of bytes per character.
+
+The merged byte embeddings form actual "token" embeddings, while keeping the information on composition.
+Hence the name "composite emheddings".
+
+There is no more need for a VAE or any model to learn token or sentence embeddings.
+
+## Overview
+
+> `to-kun` took tokens to t-can
 
 Current tokenizers have notorious issues that are bringing all the LLMs down.
 
