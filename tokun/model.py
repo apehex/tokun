@@ -5,7 +5,7 @@ import functools
 import keras
 import tensorflow as tf
 
-import mlable.layers.reshaping
+import mlable.layers.shaping
 import tokun.layers
 
 # ENCODER #####################################################################
@@ -186,7 +186,7 @@ class TokunEncoder(tf.keras.models.Model):
             'feature_axis': feature_axis,}
         # layers
         self._factor = tf.cast(1. / input_dim, tf.float32)
-        self._divide = mlable.layers.reshaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=True, name='divide') # (B, S * T) => (B, S, T)
+        self._divide = mlable.layers.shaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=True, name='divide') # (B, S * T) => (B, S, T)
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         return tf.cast(self._factor, inputs.dtype) * self._divide(inputs)
@@ -222,7 +222,7 @@ class TokunDecoder(tf.keras.models.Model):
             'feature_axis': feature_axis,}
         # layers
         self._factor = tf.cast(output_dim, tf.float32)
-        self._merge = mlable.layers.reshaping.Merge(left_axis=sequence_axis, right_axis=feature_axis, left=True, name='merge') # (B, S, T) => (B, S * T)
+        self._merge = mlable.layers.shaping.Merge(left_axis=sequence_axis, right_axis=feature_axis, left=True, name='merge') # (B, S, T) => (B, S * T)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return tf.cast(self._factor, inputs.dtype) * self._merge(inputs)
