@@ -3,6 +3,7 @@
 
 # python env
 .python-version
+.venv
 poetry.lock
 
 # temp
