@@ -1,5 +1,4 @@
 import functools
-import math
 
 import tensorflow as tf
 
@@ -18,14 +17,6 @@ def mask(data: tf.Tensor, padding_value: int=0, padding_weight: float=0.0, data_
     __weights = tf.cast(__weights, dtype=dtype)
     # rescale the weights
     return data_weight * __weights + padding_weight * (1. - __weights)
-
-# BINARIZE #####################################################################
-
-def binarize(data: tf.Tensor) -> tf.Tensor:
-    #  decompose in base 2
-    __output = mlable.ops.expand_base(data, base=2, depth=8) # 8 bits / byte
-    # merge all the bits in a single sequence
-    return mlable.shaping.merge(__output, left_axis=-2, right_axis=-1, left=True)
 
 # PREPROCESS ###################################################################
 
@@ -62,7 +53,7 @@ def _formatter_factory(batch_dim: int, sample_dim: int) -> callable:
 def _embedder_factory() -> callable:
     # embed all
     def __embedder(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
-        return (inputs, binarize(targets))
+        return (inputs, mlable.ops.expand_base(targets, base=2, depth=8))
     # customized fn
     return __embedder
 
