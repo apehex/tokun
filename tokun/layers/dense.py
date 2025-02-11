@@ -12,10 +12,10 @@ import mlable.layers.transformer
 class TokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
-        sequence_axis: int=0,
+        sequence_axis: int=1,
         feature_axis: int=-1,
         token_dim: int=4,
-        embedding_dim: int=256,
+        latent_dim: int=256,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
@@ -26,13 +26,13 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'token_dim': token_dim,
-            'embedding_dim': embedding_dim,
+            'latent_dim': latent_dim,
             'activation': activation,
             'epsilon': epsilon,}
         # layers
         self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=False, scale=False, name='normalization') # normalize each token unit independently
         self._divide = mlable.layers.shaping.Divide(input_axis=sequence_axis, output_axis=feature_axis, factor=token_dim, insert=False, name='reshaping') # (B, S * G, E) => (B, S, G * E)
-        self._dense = tf.keras.layers.Dense(units=embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
+        self._dense = tf.keras.layers.Dense(units=latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='compression') # (B, S, G * E) => (B, S, L), typically L = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(self._divide(self._normalize(inputs)))
@@ -52,10 +52,10 @@ class TokenizeBlock(tf.keras.layers.Layer):
 class DetokenizeBlock(tf.keras.layers.Layer):
     def __init__(
         self,
-        sequence_axis: int=0,
+        sequence_axis: int=1,
         feature_axis: int=-1,
         token_dim: int=4,
-        embedding_dim: int=256,
+        latent_dim: int=256,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
@@ -66,11 +66,11 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'token_dim': token_dim,
-            'embedding_dim': embedding_dim,
+            'latent_dim': latent_dim,
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._dense = tf.keras.layers.Dense(units=token_dim * embedding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, S, L) => (B, S, G * E), typically L = E
+        self._dense = tf.keras.layers.Dense(units=token_dim * latent_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='decompression') # (B, S, L) => (B, S, G * E), typically L = E
         self._divide = mlable.layers.shaping.Divide(input_axis=feature_axis, output_axis=sequence_axis, insert=False, factor=token_dim, name='reshaping') # (B, S, G * E) => (B, S * G, E)
         self._normalize = tf.keras.layers.LayerNormalization(axis=feature_axis, epsilon=epsilon, center=False, scale=False, name='normalization') # normalize each token unit independently
 
@@ -92,15 +92,14 @@ class DetokenizeBlock(tf.keras.layers.Layer):
 class HeadBlock(tf.keras.layers.Layer):
     def __init__(
         self,
-        encoding_dim: int=256,
-        activation: str='softmax',
+        output_dim: int=8,
         **kwargs
     ) -> None:
         super(HeadBlock, self).__init__(**kwargs)
         # config
-        self._config = {'encoding_dim': encoding_dim, 'activation': activation}
+        self._config = {'output_dim': output_dim,}
         # layers
-        self._dense = tf.keras.layers.Dense(units=encoding_dim, activation=activation, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
+        self._dense = tf.keras.layers.Dense(units=output_dim, use_bias=True, activation='linear', kernel_initializer='glorot_uniform', bias_initializer='zeros', name='projection') # (..., G, E) => (..., G, U), typically U = E
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._dense(inputs)
