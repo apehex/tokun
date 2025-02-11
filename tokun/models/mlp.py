@@ -6,7 +6,7 @@ import keras
 import tensorflow as tf
 
 import mlable.layers.shaping
-import tokun.layers
+import tokun.layers.dense
 
 # ENCODER #####################################################################
 
@@ -43,7 +43,7 @@ class Encoder(tf.keras.models.Model):
                 embeddings_initializer='glorot_uniform',
                 name='embed-1'),] + [
             # (B * G ^ i, E) => (B * G ^ (i-1), E)
-            tokun.layers.TokenizeBlock(
+            tokun.layers.dense.TokenizeBlock(
                 sequence_axis=sequence_axis,
                 feature_axis=feature_axis,
                 token_dim=__g,
@@ -97,7 +97,7 @@ class Decoder(tf.keras.models.Model):
         # layers
         self._layers = [
             # (B * G ^ i, E) => (B * G ^ (i+1), E)
-            tokun.layers.DetokenizeBlock(
+            tokun.layers.dense.DetokenizeBlock(
                 sequence_axis=sequence_axis,
                 feature_axis=feature_axis,
                 token_dim=__g,
@@ -106,7 +106,7 @@ class Decoder(tf.keras.models.Model):
                 name='detokenize-{}_{}'.format(__g, __i))
             for __i, __g in enumerate(__token_dim)] + [
             # (B * G ^ D, E) => (B * G ^ D, U)
-            tokun.layers.HeadBlock(encoding_dim=encoding_dim, activation=__activation, name='project-head')]
+            tokun.layers.dense.HeadBlock(encoding_dim=encoding_dim, activation=__activation, name='project-head')]
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         return functools.reduce(lambda __x, __l: __l(__x), self._layers, x)
