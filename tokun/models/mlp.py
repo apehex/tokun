@@ -26,34 +26,46 @@ class Encoder(tf.keras.models.Model):
         super(Encoder, self).__init__(**kwargs)
         # config
         self._config = {
-            'token_dim': token_dim,
+            'token_dim': [token_dim] if isinstance(token_dim, int) else list(token_dim),
             'input_dim': input_dim,
             'latent_dim': latent_dim,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'activation': activation,}
-        # successive dimensions of the merging units
-        __token_dim = [token_dim] if isinstance(token_dim, int) else token_dim
         # layers
+        self._layers = []
+
+    def build(self, input_shape: tuple) -> None:
+        __shape = tuple(input_shape)
+        # init
         self._layers = [
-            # (B * G ^ D, U) => (B * G ^ D, E)
+            # (B, G ^ D) => (B, G ^ D, E)
             tf.keras.layers.Embedding(
-                input_dim=input_dim,
-                output_dim=latent_dim,
+                input_dim=self._config['input_dim'],
+                output_dim=self._config['latent_dim'],
                 embeddings_initializer='glorot_uniform',
-                name='embed-1'),] + [
-            # (B * G ^ i, E) => (B * G ^ (i-1), E)
+                name='encoder-0-embed'),] + [
+            # (B, G ^ i, E) => (B, G ^ (i-1), E)
             tokun.layers.dense.TokenizeBlock(
-                sequence_axis=sequence_axis,
-                feature_axis=feature_axis,
+                sequence_axis=self._config['sequence_axis'],
+                feature_axis=self._config['feature_axis'],
                 token_dim=__g,
-                latent_dim=latent_dim,
-                activation=activation,
-                name='tokenize-{}_{}'.format(__g, __i))
-            for __i, __g in enumerate(__token_dim)]
+                latent_dim=self._config['latent_dim'],
+                activation=self._config['activation'],
+                name='encoder-1-tokenize-{}_{}'.format(__g, __i))
+            for __i, __g in enumerate(self._config['token_dim'])]
+        # build
+        for __l in self._layers:
+            __l.build(__shape)
+            __shape = __l.compute_output_shape(__shape)
+        # register
+        self.built = True
+
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-        return functools.reduce(lambda __x, __l: __l(__x), self._layers, inputs)
+        return functools.reduce(lambda __x, __l: __l(__x, **kwargs), self._layers, inputs)
 
     def get_config(self) -> dict:
         __config = super(Encoder, self).get_config()
@@ -91,23 +103,39 @@ class Decoder(tf.keras.models.Model):
         # successive dimensions of the dividing units
         __token_dim = [token_dim] if isinstance(token_dim, int) else token_dim
         # layers
-        self._layers = [
-            # (B * G ^ i, E) => (B * G ^ (i+1), E)
-            tokun.layers.dense.DetokenizeBlock(
-                sequence_axis=sequence_axis,
-                feature_axis=feature_axis,
-                token_dim=__g,
-                latent_dim=latent_dim,
-                activation=activation,
-                name='detokenize-{}_{}'.format(__g, __i))
-            for __i, __g in enumerate(__token_dim)] + [
-            # (B * G ^ D, E) => (B * G ^ D, U)
-            tokun.layers.dense.HeadBlock(output_dim=output_dim, name='project-head')]
+        self._layers = []
 
-    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-        __outputs = functools.reduce(lambda __x, __l: __l(__x), self._layers, inputs)
+    def build(self, input_shape: tuple) -> tuple:
+        __shape = tuple(input_shape)
+        # init
+        self._layers = [
+            # (B, G ^ i, E) => (B, G ^ (i+1), E)
+            tokun.layers.dense.DetokenizeBlock(
+                sequence_axis=self._config['sequence_axis'],
+                feature_axis=self._config['feature_axis'],
+                token_dim=__g,
+                latent_dim=self._config['latent_dim'],
+                activation=self._config['activation'],
+                name='decoder-1-detokenize-{}_{}'.format(__g, __i))
+            for __i, __g in enumerate(self._config['token_dim'])] + [
+            # (B, G ^ D, E) => (B, G ^ D, U)
+            tokun.layers.dense.HeadBlock(
+                output_dim=self._config['output_dim'],
+                name='project-head')]
+        # build
+        for __l in self._layers:
+            __l.build(__shape)
+            __shape = __l.compute_output_shape(__shape)
+        # register
+        self.built = True
+
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
+
+    def call(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
+        __outputs = functools.reduce(lambda __x, __l: __l(__x, **kwargs), self._layers, inputs)
         # raw logits or probabilities
-        return __outputs if kwargs.get('raw', True) else tf.sigmoid(__outputs)
+        return __outputs if logits else tf.sigmoid(__outputs)
 
     def get_config(self) -> dict:
         __config = super(Decoder, self).get_config()
@@ -145,17 +173,45 @@ class AutoEncoder(tf.keras.models.Model):
             'feature_axis': feature_axis,
             'activation': activation,}
         # layers
-        self._encoder = Encoder(token_dim=token_dim, input_dim=input_dim, latent_dim=latent_dim, sequence_axis=sequence_axis, feature_axis=feature_axis, activation=activation)
-        self._decoder = Decoder(token_dim=token_dim[::-1], output_dim=output_dim, latent_dim=latent_dim, sequence_axis=sequence_axis, feature_axis=feature_axis, activation=activation)
+        self._encoder = None
+        self._decoder = None
 
-    def encode(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._encoder(inputs)
+    def build(self, input_shape: tuple) -> None:
+        __shape = tuple(input_shape)
+        # init
+        self._encoder = Encoder(
+            token_dim=self._config['token_dim'],
+            input_dim=self._config['input_dim'],
+            latent_dim=self._config['latent_dim'],
+            sequence_axis=self._config['sequence_axis'],
+            feature_axis=self._config['feature_axis'],
+            activation=self._config['activation'])
+        self._decoder = Decoder(
+            token_dim=self._config['token_dim'][::-1],
+            output_dim=self._config['output_dim'],
+            latent_dim=self._config['latent_dim'],
+            sequence_axis=self._config['sequence_axis'],
+            feature_axis=self._config['feature_axis'],
+            activation=self._config['activation'])
+        # build
+        self._encoder.build(__shape)
+        __shape = self._encoder.compute_output_shape(__shape)
+        self._decoder.build(__shape)
+        __shape = self._decoder.compute_output_shape(__shape)
+        # register
+        self.built = True
 
-    def decode(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._decoder(inputs)
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return tuple(input_shape) + (self._config['output_dim'],)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._decoder(self._encoder(inputs))
+    def encode(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+        return self._encoder(inputs, **kwargs)
+
+    def decode(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
+        return self._decoder(inputs, logits=logits, **kwargs)
+
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+        return self._decoder(self._encoder(inputs, **kwargs), logits=logits, **kwargs)
 
     def get_config(self) -> dict:
         __config = super(AutoEncoder, self).get_config()
