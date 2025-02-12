@@ -15,8 +15,9 @@ class Encoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: list,
+        latent_dim: list,
+        embed_dim: int,
         input_dim: int,
-        latent_dim: int,
         sequence_axis: int=1,
         feature_axis: int=-1,
         activation: str='gelu',
@@ -27,8 +28,9 @@ class Encoder(tf.keras.models.Model):
         # config
         self._config = {
             'token_dim': [token_dim] if isinstance(token_dim, int) else list(token_dim),
+            'latent_dim': [latent_dim] if isinstance(latent_dim, int) else list(latent_dim),
             'input_dim': input_dim,
-            'latent_dim': latent_dim,
+            'embed_dim': embed_dim,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'activation': activation,}
@@ -42,18 +44,18 @@ class Encoder(tf.keras.models.Model):
             # (B, G ^ D) => (B, G ^ D, E)
             tf.keras.layers.Embedding(
                 input_dim=self._config['input_dim'],
-                output_dim=self._config['latent_dim'],
+                output_dim=self._config['embed_dim'],
                 embeddings_initializer='glorot_uniform',
                 name='encoder-0-embed'),] + [
             # (B, G ^ i, E) => (B, G ^ (i-1), E)
             tokun.layers.dense.TokenizeBlock(
                 sequence_axis=self._config['sequence_axis'],
                 feature_axis=self._config['feature_axis'],
-                token_dim=__g,
-                latent_dim=self._config['latent_dim'],
+                token_dim=__t,
+                latent_dim=__e,
                 activation=self._config['activation'],
-                name='encoder-1-tokenize-{}_{}'.format(__g, __i))
-            for __i, __g in enumerate(self._config['token_dim'])]
+                name='encoder-1-tokenize-{}_{}-{}'.format(__i, __t, __e))
+            for __i, (__t, __e) in enumerate(zip(self._config['token_dim'], self._config['latent_dim']))]
         # build
         for __l in self._layers:
             __l.build(__shape)
@@ -83,7 +85,7 @@ class Decoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: list,
-        latent_dim: int,
+        latent_dim: list,
         output_dim: int,
         sequence_axis: int=1,
         feature_axis: int=-1,
@@ -94,14 +96,12 @@ class Decoder(tf.keras.models.Model):
         super(Decoder, self).__init__(**kwargs)
         # config
         self._config = {
-            'token_dim': token_dim,
-            'latent_dim': latent_dim,
+            'token_dim': [token_dim] if isinstance(token_dim, int) else list(token_dim),
+            'latent_dim': [latent_dim] if isinstance(latent_dim, int) else list(latent_dim),
             'output_dim': output_dim,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
             'activation': activation,}
-        # successive dimensions of the dividing units
-        __token_dim = [token_dim] if isinstance(token_dim, int) else token_dim
         # layers
         self._layers = []
 
@@ -113,11 +113,11 @@ class Decoder(tf.keras.models.Model):
             tokun.layers.dense.DetokenizeBlock(
                 sequence_axis=self._config['sequence_axis'],
                 feature_axis=self._config['feature_axis'],
-                token_dim=__g,
-                latent_dim=self._config['latent_dim'],
+                token_dim=__t,
+                latent_dim=__e,
                 activation=self._config['activation'],
-                name='decoder-1-detokenize-{}_{}'.format(__g, __i))
-            for __i, __g in enumerate(self._config['token_dim'])] + [
+                name='decoder-1-detokenize-{}_{}-{}'.format(__i, __t, __e))
+            for __i, (__t, __e) in enumerate(zip(self._config['token_dim'], self._config['latent_dim']))] + [
             # (B, G ^ D, E) => (B, G ^ D, U)
             tokun.layers.dense.HeadBlock(
                 output_dim=self._config['output_dim'],
@@ -153,9 +153,10 @@ class AutoEncoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: list,
+        latent_dim: list,
         input_dim: int,
+        embed_dim: int,
         output_dim: int,
-        latent_dim: int,
         sequence_axis: int=1,
         feature_axis: int=-1,
         activation: str='gelu',
@@ -166,8 +167,9 @@ class AutoEncoder(tf.keras.models.Model):
         # config
         self._config = {
             'token_dim': token_dim,
-            'input_dim': input_dim,
             'latent_dim': latent_dim,
+            'input_dim': input_dim,
+            'embed_dim': embed_dim,
             'output_dim': output_dim,
             'sequence_axis': sequence_axis,
             'feature_axis': feature_axis,
@@ -181,8 +183,9 @@ class AutoEncoder(tf.keras.models.Model):
         # init
         self._encoder = Encoder(
             token_dim=self._config['token_dim'],
-            input_dim=self._config['input_dim'],
             latent_dim=self._config['latent_dim'],
+            input_dim=self._config['input_dim'],
+            embed_dim=self._config['embed_dim'],
             sequence_axis=self._config['sequence_axis'],
             feature_axis=self._config['feature_axis'],
             activation=self._config['activation'])

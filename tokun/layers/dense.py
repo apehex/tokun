@@ -17,7 +17,7 @@ class TokenizeBlock(tf.keras.layers.Layer):
         sequence_axis: int=1,
         feature_axis: int=-1,
         token_dim: int=4,
-        latent_dim: int=256,
+        latent_dim: int=4,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
@@ -91,7 +91,7 @@ class DetokenizeBlock(tf.keras.layers.Layer):
         sequence_axis: int=1,
         feature_axis: int=-1,
         token_dim: int=4,
-        latent_dim: int=256,
+        latent_dim: int=4,
         activation: str='gelu',
         epsilon: float=1e-6,
         **kwargs
