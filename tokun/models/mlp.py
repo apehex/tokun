@@ -210,7 +210,7 @@ class AutoEncoder(tf.keras.models.Model):
     def decode(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
         return self._decoder(inputs, logits=logits, **kwargs)
 
-    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
         return self._decoder(self._encoder(inputs, **kwargs), logits=logits, **kwargs)
 
     def get_config(self) -> dict:
