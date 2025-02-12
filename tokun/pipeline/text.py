@@ -100,6 +100,6 @@ def sample(model: tf.keras.models.Model, text: str, **kwargs) -> tuple:
     __x = preprocess(text=text, token_dim=kwargs.get('token_dim', 16), expand_dims=kwargs.get('expand_dims', [1]), output_dtype=kwargs.get('output_dtype', tf.uint8))
     __e = model.encode(__x)
     __p = model.decode(__e)
-    __y = postprocess(__p, threshold=kwargs.get('threshold', 0.5), binary=kwargs.get('binary', True), random=kwargs.get('random', False))
+    __y = postprocess(__p, threshold=kwargs.get('threshold', 0.5), random=kwargs.get('random', False))
     __o = unpack(__y)
     return (__x, __e, __p, __y, __o)

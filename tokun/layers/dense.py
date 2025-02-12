@@ -32,47 +32,46 @@ class TokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._normalize = None # normalize each token unit independently
-        self._divide = None # (B, S * G, E) => (B, S, G * E)
-        self._dense = None # (B, S, G * E) => (B, S, L), typically L = E
+        self._layers = []
 
     def build(self, input_shape: tuple) -> None:
         __shape = tuple(input_shape)
         # init
-        self._normalize = tf.keras.layers.LayerNormalization(
-            axis=self._config['feature_axis'],
-            epsilon=self._config['epsilon'],
-            center=True,
-            scale=True,
-            name='normalization')
-        self._divide = mlable.layers.shaping.Divide(
-            input_axis=self._config['sequence_axis'],
-            output_axis=self._config['feature_axis'],
-            factor=self._config['token_dim'],
-            insert=False,
-            name='reshaping')
-        self._dense = tf.keras.layers.Dense(
-            units=self._config['latent_dim'],
-            activation=self._config['activation'],
-            use_bias=True,
-            kernel_initializer='glorot_uniform',
-            bias_initializer='zeros',
-            name='compression')
+        self._layers = [
+            # normalize each token unit independently
+            tf.keras.layers.LayerNormalization(
+                axis=self._config['feature_axis'],
+                epsilon=self._config['epsilon'],
+                center=True,
+                scale=True,
+                name='normalization'),
+            # (B, S * G, E) => (B, S, G * E)
+            mlable.layers.shaping.Divide(
+                input_axis=self._config['sequence_axis'],
+                output_axis=self._config['feature_axis'],
+                factor=self._config['token_dim'],
+                insert=False,
+                name='reshaping'),
+            # (B, S, G * E) => (B, S, L), typically L = E
+            tf.keras.layers.Dense(
+                units=self._config['latent_dim'],
+                activation=self._config['activation'],
+                use_bias=True,
+                kernel_initializer='glorot_uniform',
+                bias_initializer='zeros',
+                name='compression'),]
         # build
-        self._normalize.build(__shape)
-        __shape = self._normalize.compute_output_shape(__shape)
-        self._divide.build(__shape)
-        __shape = self._divide.compute_output_shape(__shape)
-        self._dense.build(__shape)
-        __shape = self._dense.compute_output_shape(__shape)
+        for __l in self._layers:
+            __l.build(__shape)
+            __shape = __l.compute_output_shape(__shape)
         # register
         self.built = True
 
     def compute_output_shape(self, input_shape: tuple) -> tuple:
-        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), [self._normalize, self._divide, self._dense], input_shape)
+        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._dense(self._divide(self._normalize(inputs)))
+        return functools.reduce(lambda __t, __l: __l(__t), self._layers, inputs)
 
     def get_config(self) -> dict:
         __config = super(TokenizeBlock, self).get_config()
@@ -107,47 +106,46 @@ class DetokenizeBlock(tf.keras.layers.Layer):
             'activation': activation,
             'epsilon': epsilon,}
         # layers
-        self._dense = None # (B, S, L) => (B, S, G * E), typically L = E
-        self._divide = None # (B, S, G * E) => (B, S * G, E)
-        self._normalize = None # normalize each token unit independently
+        self._layers = []
 
     def build(self, input_shape: tuple) -> None:
         __shape = tuple(input_shape)
         # init
-        self._dense = tf.keras.layers.Dense(
-            units=self._config['token_dim'] * self._config['latent_dim'],
-            activation=self._config['activation'],
-            use_bias=True,
-            kernel_initializer='glorot_uniform',
-            bias_initializer='zeros',
-            name='decompression')
-        self._divide = mlable.layers.shaping.Divide(
-            input_axis=self._config['feature_axis'],
-            output_axis=self._config['sequence_axis'],
-            insert=False,
-            factor=self._config['token_dim'],
-            name='reshaping')
-        self._normalize = tf.keras.layers.LayerNormalization(
-            axis=self._config['feature_axis'],
-            epsilon=self._config['epsilon'],
-            center=True,
-            scale=True,
-            name='normalization')
+        self._layers = [
+            # (B, S, L) => (B, S, G * E), typically L = E
+            tf.keras.layers.Dense(
+                units=self._config['token_dim'] * self._config['latent_dim'],
+                activation=self._config['activation'],
+                use_bias=True,
+                kernel_initializer='glorot_uniform',
+                bias_initializer='zeros',
+                name='decompression'),
+            # (B, S, G * E) => (B, S * G, E)
+            mlable.layers.shaping.Divide(
+                input_axis=self._config['feature_axis'],
+                output_axis=self._config['sequence_axis'],
+                insert=False,
+                factor=self._config['token_dim'],
+                name='reshaping'),
+            # normalize each token unit independently
+            tf.keras.layers.LayerNormalization(
+                axis=self._config['feature_axis'],
+                epsilon=self._config['epsilon'],
+                center=True,
+                scale=True,
+                name='normalization'),]
         # build
-        self._dense.build(__shape)
-        __shape = self._dense.compute_output_shape(__shape)
-        self._divide.build(__shape)
-        __shape = self._divide.compute_output_shape(__shape)
-        self._normalize.build(__shape)
-        __shape = self._normalize.compute_output_shape(__shape)
+        for __l in self._layers:
+            __l.build(__shape)
+            __shape = __l.compute_output_shape(__shape)
         # register
         self.built = True
 
     def compute_output_shape(self, input_shape: tuple) -> tuple:
-        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), [self._dense, self._divide, self._normalize], input_shape)
+        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return self._normalize(self._divide(self._dense(inputs)))
+        return functools.reduce(lambda __t, __l: __l(__t), self._layers, inputs)
 
     def get_config(self) -> dict:
         __config = super(DetokenizeBlock, self).get_config()
