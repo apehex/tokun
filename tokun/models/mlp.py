@@ -166,8 +166,8 @@ class AutoEncoder(tf.keras.models.Model):
         super(AutoEncoder, self).__init__(**kwargs)
         # config
         self._config = {
-            'token_dim': token_dim,
-            'latent_dim': latent_dim,
+            'token_dim': [token_dim] if isinstance(token_dim, int) else list(token_dim),
+            'latent_dim': [latent_dim] if isinstance(latent_dim, int) else list(latent_dim),
             'input_dim': input_dim,
             'embed_dim': embed_dim,
             'output_dim': output_dim,
