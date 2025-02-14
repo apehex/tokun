@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tokun"
-version = "0.14.1"
+version = "0.14.2"
 description = "Byte level VAE models."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
@@ -15,8 +15,6 @@ pytest = "*"
 
 [tool.poetry.group.dev.dependencies]
 tensorflow-datasets = ">=4.9"
-transformers = ">=4.42"
-huggingface-hub = {extras = ["cli"], version = ">=0.23"}
 
 [build-system]
 requires = ["poetry-core"]
