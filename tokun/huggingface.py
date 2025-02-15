@@ -116,3 +116,20 @@ class ByteTokenizer(transformers.PreTrainedTokenizer):
         __cls_ids = [ord(__t) for __t in self._tokenize(self.cls_token)]
         __token_ids = token_ids_0 + __cls_ids + token_ids_1 if token_ids_1 else token_ids_0
         return __bos_ids + __token_ids + __eos_ids
+
+    def get_special_tokens_mask(self, token_ids_0: list, token_ids_1: list=None, already_has_special_tokens: bool=False) -> list:
+        if already_has_special_tokens:
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=already_has_special_tokens)
+        # mask matching `build_inputs_with_special_tokens`
+        if token_ids_1:
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
+        # default
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(self, token_ids_0: list, token_ids_1: list=None) -> list:
+        if token_ids_1:
+            return (len(token_ids_0 + token_ids_1) + 3) * [0] # count the special tokens
+        return (len(token_ids_0) + 2) * [0]
