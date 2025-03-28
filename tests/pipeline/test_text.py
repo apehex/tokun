@@ -10,11 +10,11 @@ import tokun.pipeline.text
 class EncodeDecodeCodepointsTest(tf.test.TestCase):
     def setUp(self):
         super(EncodeDecodeCodepointsTest, self).setUp()
-        self._config = {'token_size': 16, 'sample_size': 4 * 1024, 'output_dtype': tf.int32}
+        self._config = {'token_dim': 16, 'sample_dim': 4 * 1024, 'output_dtype': tf.int32}
         # specify encoding parameters
         self._encode = functools.partial(tokun.pipeline.text.encode, **self._config)
         # load the data
-        self._dataset_origin = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None)
+        self._dataset_origin = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, batch_size=None)
         # join the features
         self._dataset_origin = self._dataset_origin.map(lambda __x: tf.strings.join([__x['context'], __x['question']], separator='\x1d'))
         # encode the strings
@@ -24,7 +24,7 @@ class EncodeDecodeCodepointsTest(tf.test.TestCase):
 
     def test_dataset_specs(self):
         # >
-        self.assertEqual(self._dataset_encoded.element_spec.shape, (self._config['sample_size'] // 4,))
+        self.assertEqual(self._dataset_encoded.element_spec.shape, (self._config['sample_dim'] // 4,))
         self.assertEqual(self._dataset_encoded.element_spec.dtype, self._config['output_dtype'])
         # <
         self.assertEqual(self._dataset_decoded.element_spec.shape, ())
@@ -40,7 +40,7 @@ class EncodeDecodeCodepointsTest(tf.test.TestCase):
             __o = __o.numpy().strip(b'\x00')
             __d = __d.numpy().strip(b'\x00')
             # check
-            self.assertEqual(__o[:self._config['sample_size'] // 4], __d[:self._config['sample_size'] // 4])
+            self.assertEqual(__o[:self._config['sample_dim'] // 4], __d[:self._config['sample_dim'] // 4])
 
     def test_specific_values(self):
         __s = 'Hello world!'
@@ -55,11 +55,11 @@ class EncodeDecodeCodepointsTest(tf.test.TestCase):
 class EncodeDecodeBytesTest(tf.test.TestCase):
     def setUp(self):
         super(EncodeDecodeBytesTest, self).setUp()
-        self._config = {'token_size': 16, 'sample_size': 4 * 1024, 'output_dtype': tf.uint8}
+        self._config = {'token_dim': 16, 'sample_dim': 4 * 1024, 'output_dtype': tf.uint8}
         # specify encoding parameters
         self._encode = functools.partial(tokun.pipeline.text.encode, **self._config)
         # load the data
-        self._dataset_origin = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, data_dir='~/.cache/tensorflow/', batch_size=None)
+        self._dataset_origin = tfds.load('mlqa/en', split='test', as_supervised=False, shuffle_files=True, batch_size=None)
         # join the features
         self._dataset_origin = self._dataset_origin.map(lambda __x: tf.strings.join([__x['context'], __x['question']], separator='\x1d'))
         # encode the strings
@@ -70,7 +70,7 @@ class EncodeDecodeBytesTest(tf.test.TestCase):
 
     def test_dataset_specs(self):
         # >
-        self.assertEqual(self._dataset_encoded.element_spec.shape, (self._config['sample_size'],))
+        self.assertEqual(self._dataset_encoded.element_spec.shape, (self._config['sample_dim'],))
         self.assertEqual(self._dataset_encoded.element_spec.dtype, self._config['output_dtype'])
         # <
         self.assertEqual(self._dataset_decoded.element_spec.shape, ())
@@ -86,7 +86,7 @@ class EncodeDecodeBytesTest(tf.test.TestCase):
             __o = __o.numpy().strip(b'\x00')
             __d = __d.numpy().strip(b'\x00')
             # check
-            self.assertEqual(__o[:self._config['sample_size'] // 4], __d[:self._config['sample_size'] // 4])
+            self.assertEqual(__o[:self._config['sample_dim'] // 4], __d[:self._config['sample_dim'] // 4])
 
 # PREPROCESSING ###############################################################
 
@@ -94,17 +94,17 @@ class PreprocessTest(tf.test.TestCase):
 
     def test_shapes(self):
         __s0 = 'hello world'
-        __x0 = tokun.pipeline.text.preprocess(text=__s0, token_size=16, output_dtype=tf.uint8, expand_dims=[])
-        __x1 = tokun.pipeline.text.preprocess(text=__s0, token_size=16, output_dtype=tf.uint8, expand_dims=[1])
-        __x2 = tokun.pipeline.text.preprocess(text=__s0, token_size=64, output_dtype=tf.int32, expand_dims=[])
+        __x0 = tokun.pipeline.text.preprocess(text=__s0, token_dim=16, output_dtype=tf.uint8, expand_dims=[])
+        __x1 = tokun.pipeline.text.preprocess(text=__s0, token_dim=16, output_dtype=tf.uint8, expand_dims=[1])
+        __x2 = tokun.pipeline.text.preprocess(text=__s0, token_dim=64, output_dtype=tf.int32, expand_dims=[])
         self.assertEqual(tuple(__x0.shape), (48,))
         self.assertEqual(tuple(__x1.shape), (1, 48,))
-        self.assertEqual(tuple(__x2.shape), (16,))
+        self.assertEqual(tuple(__x2.shape), (64,))
 
     def test_padding(self):
         __s0 = 'hello world'
-        __x0 = tokun.pipeline.text.preprocess(text=__s0, token_size=16, output_dtype=tf.uint8, expand_dims=[])
-        __x1 = tokun.pipeline.text.preprocess(text=__s0, token_size=64, output_dtype=tf.int32, expand_dims=[])
+        __x0 = tokun.pipeline.text.preprocess(text=__s0, token_dim=16, output_dtype=tf.uint8, expand_dims=[])
+        __x1 = tokun.pipeline.text.preprocess(text=__s0, token_dim=64, output_dtype=tf.int32, expand_dims=[])
         __p0 = (-len(__s0) % 4) * 4
         __p1 = (-len(__s0) % 16)
         self.assertAllClose(__x0[-__p0:], tf.zeros(shape=(__p0,), dtype=tf.dtypes.uint8))
