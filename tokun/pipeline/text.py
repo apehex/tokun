@@ -19,6 +19,16 @@ CODE_GS = b'\x1d'
 CODE_RS = b'\x1e'
 CODE_US = b'\x1f'
 
+# SPLIT ########################################################################
+
+def split(data: tf.Tensor, height_dim: int, separator_str: str='\n', padding_str: str='') -> tf.Tensor:
+    # add an axis for the substrings
+    __shape = tuple(data.shape) + (height_dim,)
+    # don't limit the number of splits yet
+    __outputs = tf.strings.split(data, sep=separator_str, maxsplit=-1)
+    # pad and truncate to enforce the shape
+    return __outputs.to_tensor(default_value=padding_str, shape=__shape)
+
 # ENCODE #######################################################################
 
 def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.dtypes.DType=tf.uint8) -> tf.Tensor:
