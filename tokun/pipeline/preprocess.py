@@ -20,30 +20,36 @@ def mask(data: tf.Tensor, padding_value: int=0, padding_weight: float=0.0, data_
 
 # PREPROCESS ###################################################################
 
-def _parser_factory(token_dim: int, features: list, separator: str='\x1d') -> callable:
+def _parser_factory(features: list, separator: str='\x1d') -> callable:
     def __parser(inputs) -> tuple:
         # fetch the relevant features
         __inputs = tf.strings.join(inputs=[inputs[__f] for __f in features], separator=separator)
         # (input, target) objective = reconstructing the input
-        return (__inputs, __inputs) # tokun.pipeline.text.offset(data=__inputs, ticks=token_dim // 4) # the target is the next token for each input
+        return (__inputs, __inputs)
     # customized fn
     return __parser
 
-def _encoder_factory(token_dim: int, sample_dim: int) -> callable:
+def _encoder_factory(token_dim: int, height_dim: int, width_dim: int) -> callable:
+    __identity = lambda __x: __x
+    # split each sample into substrings
+    __split = functools.partial(tokun.pipeline.text.split, height_dim=height_dim, separator_str='\n', padding_str='')
+    # ignore when the output is flat
+    __split = __split if (height_dim > 1) else __identity
     # text encoding (UTF-32-BE)
-    __utf32 = functools.partial(tokun.pipeline.text.encode, token_dim=token_dim, sample_dim=sample_dim, output_dtype=tf.uint8)
+    __utf32 = functools.partial(tokun.pipeline.text.encode, token_dim=token_dim, sample_dim=width_dim, output_dtype=tf.uint8)
     # encode all
     def __encoder(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
-        return (__utf32(inputs), __utf32(targets))
+        return (__utf32(__split(inputs)), __utf32(__split(targets)))
     # customized fn
     return __encoder
 
-def _formatter_factory(batch_dim: int, sample_dim: int) -> callable:
+def _formatter_factory(batch_dim: int, height_dim: int, width_dim: int) -> callable:
+    __shape = (batch_dim, height_dim, width_dim) if (height_dim > 0) else (batch_dim, width_dim)
     # enforce types
     __cast_i = functools.partial(tf.cast, dtype=tf.int32)
     __cast_t = functools.partial(tf.cast, dtype=tf.float32)
     # enforce shapes
-    __reshape = functools.partial(tf.reshape, shape=(batch_dim, sample_dim))
+    __reshape = functools.partial(tf.reshape, shape=__shape)
     # chain the operations
     def __formatter(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
         return (__cast_i(__reshape(inputs)), __cast_t(__reshape(targets)))
@@ -79,11 +85,11 @@ def _wrapper(inputs: tf.Tensor, parser: callable, encoder: callable, embedder: c
     # pack both sourcecode and bytecode into the model inputs
     return (__inputs, __targets) # __weights
 
-def factory(batch_dim: int, sample_dim: int, token_dim: int, features: list, separator: str='\x1d') -> callable: # data_weight: float=1.0, padding_weight: float=0.0
+def factory(batch_dim: int, height_dim: int, width_dim: int, token_dim: int, features: list, separator: str='\x1d') -> callable: # data_weight: float=1.0, padding_weight: float=0.0
     # custom fn
-    __parser = _parser_factory(token_dim=token_dim, features=features, separator=separator)
-    __encoder = _encoder_factory(sample_dim=sample_dim, token_dim=token_dim)
-    __formatter = _formatter_factory(batch_dim=batch_dim, sample_dim=sample_dim)
+    __parser = _parser_factory(features=features, separator=separator)
+    __encoder = _encoder_factory(height_dim=height_dim, width_dim=width_dim, token_dim=token_dim)
+    __formatter = _formatter_factory(batch_dim=batch_dim, height_dim=height_dim, width_dim=width_dim)
     __embedder = _embedder_factory()
     # __masker = _masker_factory(data_weight=data_weight, padding_weight=padding_weight)
     # actual preprocessing function
