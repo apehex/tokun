@@ -80,7 +80,7 @@ def decode(data: tf.Tensor) -> tf.Tensor:
 
 # > ############################################################################
 
-def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.dtypes.DType=tf.uint8, output_dtype: tf.dtypes.DType=tf.int32) -> tf.Tensor:
+def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.dtypes.DType=tf.uint8, output_dtype: tf.dtypes.DType=tf.uint8) -> tf.Tensor:
     # as tensor
     __data = tf.convert_to_tensor(text, dtype=tf.dtypes.string)
     # list of bytes / codepoints

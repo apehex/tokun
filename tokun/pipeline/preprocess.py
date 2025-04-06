@@ -60,7 +60,7 @@ def _encoder_factory(token_dim: int, height_dim: int, width_dim: int) -> callabl
 def _formatter_factory(batch_dim: int, height_dim: int, width_dim: int) -> callable:
     __shape = (batch_dim, height_dim, width_dim) if (height_dim > 0) else (batch_dim, width_dim)
     # enforce types
-    __cast_i = functools.partial(tf.cast, dtype=tf.int32)
+    __cast_i = functools.partial(tf.cast, dtype=tf.uint8)
     __cast_t = functools.partial(tf.cast, dtype=tf.float32)
     # enforce shapes
     __reshape = functools.partial(tf.reshape, shape=__shape)
