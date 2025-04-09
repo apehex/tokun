@@ -97,8 +97,8 @@ def unpack(data: tf.Tensor) -> list:
     __data = data.numpy().tolist()
     return [__s.decode('utf-8') for __s in __data]
 
-def postprocess(prediction: tf.Tensor, threshold: float=0.5, random: bool=False) -> tf.Tensor:
-    __outputs = mlable.sampling.binary(prediction=prediction, threshold=threshold, random=random)
+def postprocess(logits: tf.Tensor, threshold: float=0.0, temp: float=1.0, topp: float=0.0, topk: int=0, dtype: tf.DType=tf.uint8) -> tf.Tensor:
+    __outputs = mlable.sampling.binary(logits=logits, threshold=threshold, temp=temp, topp=topp, topk=topk, dtype=dtype)
     # merge the bytes into codepoints
     __outputs = codepoint(data=__outputs)
     # decode the UTF-32-BE codepoints
