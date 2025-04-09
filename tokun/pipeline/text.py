@@ -31,7 +31,7 @@ def split(data: tf.Tensor, height_dim: int, separator_str: str='\n', padding_str
 
 # ENCODE #######################################################################
 
-def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.dtypes.DType=tf.uint8) -> tf.Tensor:
+def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.DType=tf.uint8) -> tf.Tensor:
     # factor 4 because of the UTF-32 encoding
     __dim = math.ceil(sample_dim / token_dim) * token_dim
     # decode bytes from UTF-8
@@ -57,24 +57,6 @@ def untrim(data: tf.Tensor, count: int=1) -> tf.Tensor:
     # flatten the data back
     return mlable.shaping.merge(__outputs, left_axis=-2, right_axis=-1, left=True)
 
-# RESHAPE ######################################################################
-
-def chunk(seq: list, size: int, repeats: bool=True) -> list:
-    __chunks = (seq[__i:__i+size] for __i in range(0, len(seq), size))
-    return list(__chunks if repeats else set(__chunks))
-
-def merge(chunks: list) -> list:
-    return list(itertools.chain.from_iterable(chunks))
-
-def shape(expand: list=[]) -> list:
-    return expand + [-1]
-
-def reshape(data: tf.Tensor, expand: list=[]) -> tf.Tensor:
-    # group by token unit
-    __shape = shape(expand=expand)
-    # partition or flatten the data
-    return tf.reshape(tensor=data, shape=__shape) # for example (-1, G, G, G) the first dimension is not B
-
 # AUGMENT ######################################################################
 
 def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
@@ -84,7 +66,7 @@ def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
 
 def codepoint(data: tf.Tensor) -> tf.Tensor:
     # make sure the dtype is large enough for UTF-32 codepoints
-    __data = tf.cast(data, dtype=tf.dtypes.int32)
+    __data = tf.cast(data, dtype=tf.int32)
     # group the bytes 4 by 4
     __bytes = mlable.shaping.divide(data=__data, input_axis=-2, output_axis=-1, factor=4, insert=True)
     # compute the UTF-32-BE codepoints
@@ -98,13 +80,13 @@ def decode(data: tf.Tensor) -> tf.Tensor:
 
 # > ############################################################################
 
-def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.dtypes.DType=tf.uint8, output_dtype: tf.dtypes.DType=tf.uint8) -> tf.Tensor:
+def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.DType=tf.uint8, output_dtype: tf.DType=tf.uint8) -> tf.Tensor:
     # as tensor
-    __data = tf.convert_to_tensor(text, dtype=tf.dtypes.string)
+    __data = tf.convert_to_tensor(text, dtype=tf.string)
     # list of bytes / codepoints
     __bytes = encode(data=__data, token_dim=token_dim, sample_dim=4 * len(text), output_dtype=encode_dtype)
     # expand with unitary batch dim + cast
-    return tf.cast(reshape(data=__bytes, expand=expand_dims), dtype=output_dtype)
+    return tf.cast(tf.expand_dims(__bytes, axis=0), dtype=output_dtype)
 
 # < ############################################################################
 
@@ -116,11 +98,11 @@ def unpack(data: tf.Tensor) -> list:
     return [__s.decode('utf-8') for __s in __data]
 
 def postprocess(prediction: tf.Tensor, threshold: float=0.5, random: bool=False) -> tf.Tensor:
-    __output = mlable.sampling.binary(prediction=prediction, threshold=threshold, random=random)
+    __outputs = mlable.sampling.binary(prediction=prediction, threshold=threshold, random=random)
     # merge the bytes into codepoints
-    __output = codepoint(data=__output)
+    __outputs = codepoint(data=__outputs)
     # decode the UTF-32-BE codepoints
-    return decode(data=__output)
+    return decode(data=__outputs)
 
 # SAMPLING #####################################################################
 
