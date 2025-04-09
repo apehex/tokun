@@ -31,11 +31,11 @@ def split(data: tf.Tensor, height_dim: int, separator_str: str='\n', padding_str
 
 # ENCODE #######################################################################
 
-def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.DType=tf.uint8) -> tf.Tensor:
+def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.DType=tf.uint8, output_encoding: str='UTF-32-BE') -> tf.Tensor:
     # factor 4 because of the UTF-32 encoding
     __dim = math.ceil(sample_dim / token_dim) * token_dim
     # decode bytes from UTF-8
-    __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding='UTF-32-BE') # (B,)
+    __bytes = tf.strings.unicode_transcode(input=data, input_encoding='UTF-8', output_encoding=output_encoding) # (B,)
     # decode byte strings to arrays of byte integers
     return tf.io.decode_raw(__bytes, out_type=output_dtype, fixed_length=__dim, little_endian=False) # (B, 4 * S) or (B, S) depending on the dtype (1 or 4 bytes)
 
@@ -80,11 +80,11 @@ def decode(data: tf.Tensor) -> tf.Tensor:
 
 # > ############################################################################
 
-def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.DType=tf.uint8, output_dtype: tf.DType=tf.uint8) -> tf.Tensor:
+def preprocess(text: str, token_dim: int, expand_dims: list=[1], encode_dtype: tf.DType=tf.uint8, output_dtype: tf.DType=tf.uint8, output_encoding: str='UTF-32-BE') -> tf.Tensor:
     # as tensor
     __data = tf.convert_to_tensor(text, dtype=tf.string)
     # list of bytes / codepoints
-    __bytes = encode(data=__data, token_dim=token_dim, sample_dim=4 * len(text), output_dtype=encode_dtype)
+    __bytes = encode(data=__data, token_dim=token_dim, sample_dim=4 * len(text), output_dtype=encode_dtype, output_encoding=output_encoding)
     # expand with unitary batch dim + cast
     return tf.cast(tf.expand_dims(__bytes, axis=0), dtype=output_dtype)
 
