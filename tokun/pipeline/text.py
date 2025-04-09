@@ -39,6 +39,24 @@ def encode(data: tf.Tensor, token_dim: int, sample_dim: int, output_dtype: tf.dt
     # decode byte strings to arrays of byte integers
     return tf.io.decode_raw(__bytes, out_type=output_dtype, fixed_length=__dim, little_endian=False) # (B, 4 * S) or (B, S) depending on the dtype (1 or 4 bytes)
 
+# DROP #########################################################################
+
+def trim(data: tf.Tensor, count: int=1) -> tf.Tensor:
+    # group the bytes 4 by 4 (one UTF-32 character)
+    __outputs = mlable.shaping.divide(data, input_axis=-2, output_axis=-1, factor=4, insert=True)
+    # remove the most significant bytes (most often 0 in UTF-32)
+    __outputs = tf.gather(__outputs, indices=range(count, 4), axis=-1)
+    # flatten the data back
+    return mlable.shaping.merge(__outputs, left_axis=-2, right_axis=-1, left=True)
+
+def untrim(data: tf.Tensor, count: int=1) -> tf.Tensor:
+    # group the bytes codepoint by codepoint (4 bytes minus the ones that were trimmed)
+    __outputs = mlable.shaping.divide(data, input_axis=-2, output_axis=-1, factor=4 - count, insert=True)
+    # add leading 0s to each group / codepoint
+    __outputs = tf.concat([tf.zeros_like(__outputs[..., :count], dtype=__outputs.dtype), __outputs[..., :]], axis=-1)
+    # flatten the data back
+    return mlable.shaping.merge(__outputs, left_axis=-2, right_axis=-1, left=True)
+
 # RESHAPE ######################################################################
 
 def chunk(seq: list, size: int, repeats: bool=True) -> list:
