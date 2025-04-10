@@ -19,7 +19,7 @@ CODE_GS = b'\x1d'
 CODE_RS = b'\x1e'
 CODE_US = b'\x1f'
 
-# SPLIT ########################################################################
+# 2D ###########################################################################
 
 def split(data: tf.Tensor, height_dim: int, separator_str: str='\n', padding_str: str='') -> tf.Tensor:
     # add an axis for the substrings
@@ -28,6 +28,11 @@ def split(data: tf.Tensor, height_dim: int, separator_str: str='\n', padding_str
     __outputs = tf.strings.split(data, sep=separator_str, maxsplit=-1)
     # pad and truncate to enforce the shape
     return __outputs.to_tensor(default_value=padding_str, shape=__shape)
+
+# TARGETS ######################################################################
+
+def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
+    return tf.convert_to_tensor([ticks * b'\x00']) + data
 
 # ENCODE #######################################################################
 
@@ -59,11 +64,6 @@ def untrim(data: tf.Tensor, count: int=1, outof: int=4) -> tf.Tensor:
     # flatten the data back
     return mlable.shaping.merge(__outputs, left_axis=-2, right_axis=-1, left=True)
 
-# AUGMENT ######################################################################
-
-def offset(data: tf.Tensor, ticks: int=1) -> tf.Tensor:
-    return tf.convert_to_tensor([ticks * b'\x00']) + data
-
 # DECODE #######################################################################
 
 def codepoint(data: tf.Tensor) -> tf.Tensor:
@@ -81,6 +81,15 @@ def decode(data: tf.Tensor, encoding: str='UTF-32-BE') -> tf.Tensor:
     # convert to standard UTF-8
     return tf.strings.unicode_transcode(input=__data, input_encoding=encoding, output_encoding='UTF-8')
 
+# CLEAN ########################################################################
+
+def unpack(data: tf.Tensor) -> list:
+    __data = data.numpy().tolist()
+    return [__s.decode('utf-8') for __s in __data]
+
+def unpad(text: str) -> str:
+    return text.strip('\x00')
+
 # > ############################################################################
 
 def preprocess(text: str, token_dim: int, output_dtype: tf.DType=tf.uint8, output_encoding: str='UTF-32-BE') -> tf.Tensor:
@@ -92,13 +101,6 @@ def preprocess(text: str, token_dim: int, output_dtype: tf.DType=tf.uint8, outpu
     return tf.cast(tf.expand_dims(__bytes, axis=0), dtype=output_dtype)
 
 # < ############################################################################
-
-def unpad(text: str) -> str:
-    return text.strip('\x00')
-
-def unpack(data: tf.Tensor) -> list:
-    __data = data.numpy().tolist()
-    return [__s.decode('utf-8') for __s in __data]
 
 def postprocess(logits: tf.Tensor, threshold: float=0.0, temp: float=1.0, topp: float=0.0, topk: int=0, dtype: tf.DType=tf.uint8) -> tf.Tensor:
     __outputs = mlable.sampling.binary(logits=logits, threshold=threshold, temp=temp, topp=topp, topk=topk, dtype=dtype)
