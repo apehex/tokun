@@ -74,11 +74,12 @@ def codepoint(data: tf.Tensor) -> tf.Tensor:
     # compute the UTF-32-BE codepoints
     return mlable.ops.reduce_base(data=__bytes, base=256, axis=-1, keepdims=False)
 
-def decode(data: tf.Tensor) -> tf.Tensor:
+def decode(data: tf.Tensor, encoding: str='UTF-32-BE') -> tf.Tensor:
+    __data = tf.cast(data, dtype=tf.int32)
     # input = array of unicode codepoints
-    __utf32 = tf.strings.unicode_encode(data, output_encoding='UTF-32-BE')
+    __data = tf.strings.unicode_encode(__data, output_encoding=encoding)
     # convert to standard UTF-8
-    return tf.strings.unicode_transcode(input=__utf32, input_encoding='UTF-32-BE', output_encoding='UTF-8')
+    return tf.strings.unicode_transcode(input=__data, input_encoding=encoding, output_encoding='UTF-8')
 
 # > ############################################################################
 
