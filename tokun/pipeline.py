@@ -4,7 +4,7 @@ import tensorflow as tf
 
 import mlable.ops
 import mlable.shaping
-import tokun.pipeline.text
+import mlable.text
 
 # CONSTANTS ####################################################################
 
@@ -46,11 +46,11 @@ def _cleaner_factory(pattern: str=ANSI_REGEX, rewrite: str='') -> callable:
 def _encoder_factory(token_dim: int, height_dim: int, width_dim: int) -> callable:
     __identity = lambda __x: __x
     # split each sample into substrings
-    __split = functools.partial(tokun.pipeline.text.split, height_dim=height_dim, separator_str='\n', padding_str='')
+    __split = functools.partial(mlable.text.split, height_dim=height_dim, separator_str='\n', padding_str='')
     # ignore when the output is flat
     __split = __split if (height_dim > 1) else __identity
     # text encoding (UTF-32-BE)
-    __utf32 = functools.partial(tokun.pipeline.text.encode, token_dim=token_dim, sample_dim=width_dim, output_dtype=tf.uint8)
+    __utf32 = functools.partial(mlable.text.encode, token_dim=token_dim, sample_dim=width_dim, output_dtype=tf.uint8)
     # encode all
     def __encoder(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
         return (__utf32(__split(inputs)), __utf32(__split(targets)))
