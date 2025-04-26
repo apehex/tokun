@@ -47,10 +47,10 @@ class TokenizeBlock(tf.keras.layers.Layer):
                 name='normalization'),
             # (B, S * G, E) => (B, S, G * E)
             mlable.layers.shaping.Divide(
-                input_axis=self._config['sequence_axis'],
-                output_axis=self._config['feature_axis'],
+                axis=self._config['sequence_axis'],
                 factor=self._config['token_dim'],
                 insert=False,
+                right=True,
                 name='reshaping'),
             # (B, S, G * E) => (B, S, L), typically L = E
             tf.keras.layers.Dense(
@@ -122,10 +122,10 @@ class DetokenizeBlock(tf.keras.layers.Layer):
                 name='decompression'),
             # (B, S, G * E) => (B, S * G, E)
             mlable.layers.shaping.Divide(
-                input_axis=self._config['feature_axis'],
-                output_axis=self._config['sequence_axis'],
-                insert=False,
+                axis=self._config['feature_axis'],
                 factor=self._config['token_dim'],
+                insert=False,
+                right=False,
                 name='reshaping'),
             # normalize each token unit independently
             tf.keras.layers.LayerNormalization(
