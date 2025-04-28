@@ -59,10 +59,10 @@ def _formatter_factory(batch_dim: int, token_dim: int, order_num: int, rank_num:
     # customized fn
     return __formatter
 
-def _embedder_factory() -> callable:
+def _embedder_factory(bigendian: bool=True) -> callable:
     # embed all
     def __embedder(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
-        return (inputs, mlable.shaping.axes.merge(mlable.maths.ops.expand_base(targets, base=2, depth=8, bigendian=True), axis=-1, right=False))
+        return (inputs, mlable.shaping.axes.merge(mlable.maths.ops.expand_base(targets, base=2, depth=8, bigendian=bigendian), axis=-1, right=False))
     # customized fn
     return __embedder
 
@@ -82,13 +82,13 @@ def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: ca
     # pack both sourcecode and bytecode into the model inputs
     return (__inputs, __targets) # __weights
 
-def factory(batch_dim: int, token_dim: int, order_num: int, rank_num: int, features: list, pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-8') -> callable:
+def factory(batch_dim: int, token_dim: int, order_num: int, rank_num: int, features: list, pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-8', bigendian: bool=True) -> callable:
     __sample_dim = token_dim * (1 << (rank_num * order_num))
     # custom fn
     __parser = _parser_factory(features=features, separator=separator)
     __cleaner = _cleaner_factory(pattern=pattern, rewrite=rewrite)
     __encoder = _encoder_factory(sample_dim=__sample_dim, encoding=encoding)
     __formatter = _formatter_factory(batch_dim=batch_dim, token_dim=token_dim, order_num=order_num, rank_num=rank_num)
-    __embedder = _embedder_factory()
+    __embedder = _embedder_factory(bigendian=bigendian)
     # actual preprocessing function
     return functools.partial(_wrapper, parser=__parser, cleaner=__cleaner, encoder=__encoder, embedder=__embedder, formatter=__formatter)
