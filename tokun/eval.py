@@ -9,7 +9,7 @@ import tensorflow as tf
 # ACCURACY ####################################################################
 
 def compare(left: str, right: str) -> float:
-    return sum(__l == __r for __l, __r in zip(left, right)) / max(1, len(left))
+    return sum(__l == __r for __l, __r in zip(left, right)) / max(1, min(len(left), len(right)))
 
 # TOKEN CONTENT ###############################################################
 
