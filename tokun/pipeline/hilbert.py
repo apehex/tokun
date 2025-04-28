@@ -62,7 +62,7 @@ def _formatter_factory(batch_dim: int, token_dim: int, order_num: int, rank_num:
 def _embedder_factory() -> callable:
     # embed all
     def __embedder(inputs: tf.Tensor, targets: tf.Tensor) -> tuple:
-        return (inputs, mlable.shaping.axes.merge(mlable.maths.ops.expand_base(targets, base=2, depth=8), axis=-1, right=False))
+        return (inputs, mlable.shaping.axes.merge(mlable.maths.ops.expand_base(targets, base=2, depth=8, bigendian=True), axis=-1, right=False))
     # customized fn
     return __embedder
 
