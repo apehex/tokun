@@ -56,10 +56,23 @@ class Encoder(tf.keras.models.Model):
         # register
         self.built = True
 
+    def compute_embedding_kl_loss(self, beta: float=1.0) -> tf.Tensor:
+        __e = self._layers[0].embeddings
+        # mean (E,)
+        __m = tf.reduce_mean(__e, axis=0)
+        # variance (E,)
+        __v = tf.math.reduce_variance(__e, axis=0)
+        # KL divergence ()
+        return beta * 0.5 * tf.reduce_sum(__v + tf.square(__m) - 1. - tf.math.log(__v + 1e-8))
+
     def compute_output_shape(self, input_shape: tuple) -> tuple:
         return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
 
-    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
+        # KL divergence of the embeddings to N(0, I)
+        if training:
+            self.add_loss(tf.cast(self.compute_embedding_kl_loss(beta=1.0), dtype=tf.float32))
+        # composite embeddings, token by token (B, ..., T) => (B, ..., T * E)
         return functools.reduce(lambda __x, __l: __l(__x, **kwargs), self._layers, inputs)
 
     def get_config(self) -> dict:
@@ -112,7 +125,7 @@ class Decoder(tf.keras.models.Model):
     def compute_output_shape(self, input_shape: tuple) -> tuple:
         return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
 
-    def call(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor, logits: bool=True, training: bool=False, **kwargs) -> tf.Tensor:
         __outputs = functools.reduce(lambda __x, __l: __l(__x, **kwargs), self._layers, inputs)
         # raw logits or probabilities
         return __outputs if logits else tf.sigmoid(__outputs)
@@ -133,9 +146,9 @@ class AutoEncoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: int,
-        input_dim: int,
         embed_dim: int,
-        binary_dim: int,
+        input_dim: int=256,
+        binary_dim: int=8,
         trainable: bool=True,
         **kwargs
     ) -> None:
@@ -173,14 +186,17 @@ class AutoEncoder(tf.keras.models.Model):
     def compute_output_shape(self, input_shape: tuple) -> tuple:
         return self._decoder.compute_output_shape(self._encoder.compute_output_shape(input_shape))
 
-    def encode(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-        return self._encoder(inputs, **kwargs)
+    def encode(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
+        return self._encoder(inputs, training=training, **kwargs)
 
-    def decode(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
-        return self._decoder(inputs, logits=logits, **kwargs)
+    def decode(self, inputs: tf.Tensor, logits: bool=True, training: bool=False, **kwargs) -> tf.Tensor:
+        return self._decoder(inputs, logits=logits, training=training, **kwargs)
 
-    def call(self, inputs: tf.Tensor, logits: bool=True, **kwargs) -> tf.Tensor:
-        return self._decoder(self._encoder(inputs, **kwargs), logits=logits, **kwargs)
+    def call(self, inputs: tf.Tensor, logits: bool=True, training: bool=False, **kwargs) -> tf.Tensor:
+        # composite embeddings (B, ..., T) => (B, ..., T * E)
+        __outputs = self._encoder(inputs, training=training, **kwargs)
+        # binary encoding of each token (B, ..., T * E) => (B, ..., T * U)
+        return self._decoder(__outputs, logits=logits, training=training, **kwargs)
 
     def get_config(self) -> dict:
         __config = super(AutoEncoder, self).get_config()
