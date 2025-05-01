@@ -183,6 +183,9 @@ class AutoEncoder(tf.keras.models.Model):
         # register
         self.built = True
 
+    def compute_latent_shape(self, input_shape: tuple) -> tuple:
+        return self._encoder.compute_output_shape(input_shape)
+
     def compute_output_shape(self, input_shape: tuple) -> tuple:
         return self._decoder.compute_output_shape(self._encoder.compute_output_shape(input_shape))
 
