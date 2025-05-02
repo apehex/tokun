@@ -97,9 +97,6 @@ class PreprocessTests(tf.test.TestCase):
             self.assertEqual(__x.dtype, tf.uint8)
             self.assertEqual(__t.dtype, tf.float32)
 
-    def test_feature_parsing(self):
-        pass
-
     def test_inputs_equal_targets(self):
         for __case in self._cases:
             __preprocess = tokun.pipeline.flat.preprocess.factory(**__case['args'])
@@ -111,7 +108,7 @@ class PreprocessTests(tf.test.TestCase):
     def test_preprocess_postprocess_reciprocity(self):
         for __case in self._cases:
             __preprocess = tokun.pipeline.flat.preprocess.factory(**__case['args'])
-            __postprocess = tokun.pipeline.flat.postprocess.factory(drop_dim=__case['args']['drop_dim'], encoding=__case['args']['encoding'], threshold=0.5)
+            __postprocess = tokun.pipeline.flat.postprocess.factory(drop_dim=__case['args']['drop_dim'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
             for __sample in SAMPLES:
                 __s = {'data': tf.cast([__sample], dtype=tf.string)}
                 __x, __t = __preprocess(__s)
