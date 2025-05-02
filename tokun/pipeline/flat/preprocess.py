@@ -15,7 +15,7 @@ ANSI_REGEX = r'\x1b\[[0-9;]*[mGKHF]'
 def _parser_factory(features: list, separator: str='\x1d') -> callable:
     def __parser(inputs) -> tuple:
         # fetch the relevant features
-        __inputs = tf.strings.join(inputs=[inputs[__f] for __f in features], separator=separator)
+        __inputs = tf.strings.join([inputs[__f] for __f in features], separator=separator)
         # (input, target) objective = reconstructing the input
         return (__inputs, __inputs)
     # customized fn
@@ -46,7 +46,7 @@ def _formatter_factory(batch_dim: int, sample_dim: int, token_dim: int=1, drop_d
     # sample dimension after grouping by token
     __sample_dim = __sample_dim // max(1, token_dim)
     # final shape
-    __shape = (batch_dim, __sample_dim, token_dim) if (token_dim > 1) else (batch_dim, __sample_dim)
+    __shape = (batch_dim, __sample_dim, max(1, token_dim))
     # remove the leading 0s in UTF-32-BE
     __trim = functools.partial(mlable.text.trim, count=drop_dim, outof=encoding_dim)
     # enforce types
