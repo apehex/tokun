@@ -31,19 +31,15 @@ def _formatter_factory() -> callable:
 
 # DECODING #####################################################################
 
-def _decoder_factory(drop_dim: int=0, encoding: str='UTF-32-BE') -> callable:
+def _decoder_factory(drop_dim: int=0, encoding: str='UTF-32-BE', errors: str='replace') -> callable:
     __encoding_dim = 4 if '32' in encoding else 1
     # restore the leading zeros in UTF-32 encoding
     __restore = functools.partial(mlable.text.untrim, count=drop_dim, outof=__encoding_dim)
-    # merge bytes 4 by 4 into UTF-32 codepoints
-    __codepoint = functools.partial(mlable.text.codepoint, bigendian=True)
-    # ignore when the encoding is UTF-8
-    __codepoint = __codepoint if ('32' in encoding) else (lambda __o: __o)
     # decode the sequence of bytes into strings
-    __string = functools.partial(mlable.text.decode, encoding=encoding)
+    __string = functools.partial(mlable.text.decode, encoding=encoding, errors=errors)
     # from bytes to characters
     def __decoder(outputs: tf.Tensor) -> tf.Tensor:
-        return __string(__codepoint(__restore(outputs)))
+        return __string(__restore(outputs))
     # customized fn
     return __decoder
 
@@ -59,10 +55,10 @@ def _wrapper(outputs: tf.Tensor, sampler: callable, formatter: callable, decoder
     # get rid of the padding
     return cleaner(__outputs)
 
-def factory(drop_dim: int=0, threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, bigendian: bool=True, encoding: str='UTF-32-BE') -> callable:
+def factory(drop_dim: int=0, threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, bigendian: bool=True, encoding: str='UTF-32-BE', errors: str='replace') -> callable:
     # custom fn
     __sampler = _sampler_factory(threshold=threshold, temp=temp, topp=topp, topk=topk, bigendian=bigendian)
     __formatter = _formatter_factory()
-    __decoder = _decoder_factory(drop_dim=drop_dim, encoding=encoding)
+    __decoder = _decoder_factory(drop_dim=drop_dim, encoding=encoding, errors=errors)
     # actual preprocessing function
     return functools.partial(_wrapper, sampler=__sampler, formatter=__formatter, decoder=__decoder, cleaner=mlable.text.unpad)
