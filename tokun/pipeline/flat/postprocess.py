@@ -4,7 +4,7 @@ import math
 import tensorflow as tf
 
 import mlable.sampling
-import mlable.shapes
+import mlable.shaping.axes
 import mlable.text
 
 # SAMPLING #####################################################################
@@ -21,11 +21,9 @@ def _sampler_factory(threshold: float=0.0, temp: float=1.0, topp: float=-1.0, to
 # FORMATTING ###################################################################
 
 def _formatter_factory() -> callable:
-    # merge all the spatial axes
+    # merge the token axis
     def __formatter(outputs: tf.Tensor) -> tf.Tensor:
-        __shape = mlable.shapes.normalize(outputs.shape)
-        __shape = tuple(__shape[:1]) + (math.prod(__shape[1:]),)
-        return tf.reshape(outputs, shape=__shape)
+        return mlable.shaping.axes.merge(outputs, axis=-1, right=False)
     # customized fn
     return __formatter
 
