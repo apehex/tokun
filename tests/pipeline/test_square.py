@@ -115,6 +115,6 @@ class PreprocessTests(tf.test.TestCase):
             for __sample in SAMPLES:
                 __s = {'data': tf.cast([__sample], dtype=tf.string)}
                 __x, __t = __preprocess(__s)
-                __o = mlable.text.unpack(__postprocess(__t))
-                __o = '\n'.join(__o[0])
+                __o = __postprocess(__t).numpy().tolist()
+                __o = b'\n'.join(__o[0]).decode('UTF-8', errors='ignore')
                 assert int(tokun.eval.compare(__sample, __o[0])) == 1
