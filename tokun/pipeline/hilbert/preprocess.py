@@ -16,7 +16,7 @@ ANSI_REGEX = r'\x1b\[[0-9;]*[mGKHF]'
 def _parser_factory(features: list, separator: str='\x1d') -> callable:
     def __parser(inputs) -> tuple:
         # fetch the relevant features
-        __inputs = tf.strings.join(inputs=[inputs[__f] for __f in features], separator=separator)
+        __inputs = tf.strings.join([inputs[__f] for __f in features], separator=separator)
         # (input, target) objective = reconstructing the input
         return (__inputs, __inputs)
     # customized fn
@@ -68,7 +68,7 @@ def _embedder_factory(bigendian: bool=True) -> callable:
 
 # > END-TO-END #################################################################
 
-def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: callable, embedder: callable, formatter: callable) -> tuple: # masker: callable
+def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: callable, embedder: callable, formatter: callable) -> tuple:
     # fetch the relevant features
     __inputs, __targets = parser(inputs=inputs)
     # sanitize
@@ -77,9 +77,9 @@ def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: ca
     __inputs, __targets = encoder(inputs=__inputs, targets=__targets)
     # enforce types + shapes
     __inputs, __targets = formatter(inputs=__inputs, targets=__targets)
-    # embed with tokun
+    # represent the output in binary
     __inputs, __targets = embedder(inputs=__inputs, targets=__targets)
-    # pack both sourcecode and bytecode into the model inputs
+    # targets = inputs (in binary) for the autoencoder
     return (__inputs, __targets) # __weights
 
 def factory(batch_dim: int, token_dim: int, order_num: int, rank_num: int, features: list, pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-8', bigendian: bool=True) -> callable:
