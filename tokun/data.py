@@ -55,8 +55,8 @@ def random_dataset(sample_count: int, sample_size: int, lower_plane: int=0, uppe
     # sample generator
     def __generator() -> iter:
         for _ in range(sample_count):
-            yield {'data': random_string(sample_size=sample_size, lower_plane=lower_plane, upper_plane=upper_plane)}
+            yield random_string(sample_size=sample_size, lower_plane=lower_plane, upper_plane=upper_plane)
     # wrap into a dataset
     return tf.data.Dataset.from_generator(
         generator=__generator,
-        output_signature={'data': tf.TensorSpec(shape=(), dtype=tf.string)})
+        output_signature=tf.TensorSpec(shape=(), dtype=tf.string))

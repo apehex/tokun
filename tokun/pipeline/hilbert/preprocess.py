@@ -13,12 +13,17 @@ ANSI_REGEX = r'\x1b\[[0-9;]*[mGKHF]'
 
 # PREPROCESS ###################################################################
 
-def _parser_factory(features: list, separator: str='\x1d') -> callable:
+def _parser_factory(features: list=[], separator: str='\x1d') -> callable:
+    # select the relevant features
+    __list = lambda __sample: [__sample[__f] for __f in features]
+    # join them
+    __join = functools.partial(tf.strings.join, separator=separator)
+    # ignore if no features were given
+    __list = __list if features else lambda __x: __x
+    __join = __join if features else lambda __x: __x
+    # inputs = targets for the autoencoders
     def __parser(inputs) -> tuple:
-        # fetch the relevant features
-        __inputs = tf.strings.join([inputs[__f] for __f in features], separator=separator)
-        # (input, target) objective = reconstructing the input
-        return (__inputs, __inputs)
+        return (__join(__list(inputs)), __join(__list(inputs)))
     # customized fn
     return __parser
 
@@ -82,7 +87,7 @@ def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: ca
     # targets = inputs (in binary) for the autoencoder
     return (__inputs, __targets) # __weights
 
-def factory(batch_dim: int, token_dim: int, order_num: int, rank_num: int, features: list, pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-8', bigendian: bool=True) -> callable:
+def factory(batch_dim: int, token_dim: int, order_num: int, rank_num: int, features: list=[], pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-8', bigendian: bool=True) -> callable:
     __sample_dim = token_dim * (1 << (rank_num * order_num))
     # custom fn
     __parser = _parser_factory(features=features, separator=separator)

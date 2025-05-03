@@ -33,7 +33,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 4,
                     'drop_dim': 0,
                     'encoding': 'UTF-8',
-                    'features': ['data'],},
+                    'features': [],},
                 'shapes': {
                     'inputs': [1, 32, 64 // 4, 4],
                     'targets': [1, 32, 64 // 4, 32],},},
@@ -45,7 +45,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 1,
                     'drop_dim': 0,
                     'encoding': 'UTF-8',
-                    'features': ['data'],},
+                    'features': [],},
                 'shapes': {
                     'inputs': [1, 32, 64, 1],
                     'targets': [1, 32, 64, 8],},},
@@ -57,7 +57,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 6,
                     'drop_dim': 1,
                     'encoding': 'UTF-32-BE',
-                    'features': ['data'],},
+                    'features': [],},
                 'shapes': {
                     'inputs': [1, 32, 64 // 8, 6],
                     'targets': [1, 32, 64 // 8, 48],},},
@@ -69,7 +69,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 1,
                     'drop_dim': 1,
                     'encoding': 'UTF-32-BE',
-                    'features': ['data'],},
+                    'features': [],},
                 'shapes': {
                     'inputs': [1, 32, 3 * (64 // 4), 1],
                     'targets': [1, 32, 3 * (64 // 4), 8],},},]
@@ -78,7 +78,7 @@ class PreprocessTests(tf.test.TestCase):
         for __case in self._cases:
             __preprocess = tokun.pipeline.square.preprocess.factory(**__case['args'])
             for __sample in SAMPLES:
-                __s = {'data': tf.cast([__sample], dtype=tf.string)}
+                __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
                 # shapes
                 self.assertEqual(tuple(__x.shape), tuple(__case['shapes']['inputs']))
@@ -89,7 +89,7 @@ class PreprocessTests(tf.test.TestCase):
 
     def test_on_dataset_batches(self):
         __dataset = iter(DATASET.batch(16))
-        __preprocess = tokun.pipeline.square.preprocess.factory(batch_dim=16, height_dim=32, width_dim=128, token_dim=4, drop_dim=0, encoding='UTF-8', features=['data'],)
+        __preprocess = tokun.pipeline.square.preprocess.factory(batch_dim=16, height_dim=32, width_dim=128, token_dim=4, drop_dim=0, encoding='UTF-8', features=[],)
         for _ in range(4):
             __s = next(__dataset)
             __x, __t = __preprocess(__s)
@@ -104,7 +104,7 @@ class PreprocessTests(tf.test.TestCase):
         for __case in self._cases:
             __preprocess = tokun.pipeline.square.preprocess.factory(**__case['args'])
             for __sample in SAMPLES:
-                __s = {'data': tf.cast([__sample], dtype=tf.string)}
+                __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
                 self.assertAllEqual(__x, mlable.sampling.binary(__t, depth=8, threshold=0.5, dtype=tf.int32))
 
@@ -113,7 +113,7 @@ class PreprocessTests(tf.test.TestCase):
             __preprocess = tokun.pipeline.square.preprocess.factory(**__case['args'])
             __postprocess = tokun.pipeline.square.postprocess.factory(drop_dim=__case['args']['drop_dim'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
             for __sample in SAMPLES:
-                __s = {'data': tf.cast([__sample], dtype=tf.string)}
+                __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
                 __o = __postprocess(__t).numpy().tolist()
                 __o = b'\n'.join(__o[0]).decode('UTF-8', errors='ignore')
