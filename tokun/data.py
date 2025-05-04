@@ -40,7 +40,17 @@ def random_string(sample_size: int, lower_plane: int=0, upper_plane: int=0x323af
 
 # DATASET ######################################################################
 
-def _random_dataset(sample_count: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x323af, binary: bool=False) -> tf.data.Dataset:
+def random_dataset_of_bytes(sample_count: int, sample_size: int) -> tf.data.Dataset:
+    # sample generator
+    def __generator() -> iter:
+        for _ in range(sample_count):
+            yield [random.randint(0, 0xff) for _ in range(sample_size)]
+    # wrap into a dataset
+    return tf.data.Dataset.from_generator(
+        generator=__generator,
+        output_signature=tf.TensorSpec(shape=(sample_size,), dtype=tf.int32))
+
+def random_dataset_of_codepoints(sample_count: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x323af, binary: bool=False) -> tf.data.Dataset:
     __factor = 32 if binary else 4
     # sample generator
     def __generator() -> iter:
@@ -51,7 +61,7 @@ def _random_dataset(sample_count: int, sample_size: int, lower_plane: int=0, upp
         generator=__generator,
         output_signature=tf.TensorSpec(shape=(__factor * sample_size,), dtype=tf.int32))
 
-def random_dataset(sample_count: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x323af) -> tf.data.Dataset:
+def random_dataset_of_strings(sample_count: int, sample_size: int, lower_plane: int=0, upper_plane: int=0x323af) -> tf.data.Dataset:
     # sample generator
     def __generator() -> iter:
         for _ in range(sample_count):
