@@ -91,7 +91,7 @@ class Decoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: int,
-        binary_dim: int,
+        binary_dim: int=8, # return byte predictions
         **kwargs
     ) -> None:
         # init
@@ -142,18 +142,18 @@ class Decoder(tf.keras.models.Model):
 # VAE #########################################################################
 
 @keras.saving.register_keras_serializable(package='models')
-class AutoEncoder(tf.keras.models.Model):
+class QuantizedAutoEncoder(tf.keras.models.Model):
     def __init__(
         self,
         token_dim: int,
         embed_dim: int,
-        input_dim: int=256,
-        binary_dim: int=8,
+        input_dim: int=256, # byte inputs
+        binary_dim: int=8, # byte predictions
         trainable: bool=True,
         **kwargs
     ) -> None:
         # init
-        super(AutoEncoder, self).__init__(**kwargs)
+        super(QuantizedAutoEncoder, self).__init__(**kwargs)
         # config
         self._config = {
             'token_dim': token_dim,
@@ -202,7 +202,7 @@ class AutoEncoder(tf.keras.models.Model):
         return self._decoder(__outputs, logits=logits, training=training, **kwargs)
 
     def get_config(self) -> dict:
-        __config = super(AutoEncoder, self).get_config()
+        __config = super(QuantizedAutoEncoder, self).get_config()
         __config.update(self._config)
         return __config
 
