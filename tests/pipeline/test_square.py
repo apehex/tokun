@@ -4,20 +4,17 @@ import mlable.sampling
 import mlable.text
 import tokun.data
 import tokun.eval
-import tokun.models.vq.mlp
 import tokun.pipeline.square.postprocess
 import tokun.pipeline.square.preprocess
 
 # CONSTANTS ####################################################################
 
-DATASET = tokun.data.random_dataset(sample_count=128, sample_size=1024)
+DATASET = tokun.data.random_dataset_of_strings(sample_count=128, sample_size=1024)
 
 SAMPLES = [
     """      ,~.\r\n   ,-'__ `-,\r\n  {,-'  `. }              ,')\r\n ,( a )   `-.__         ,',')~,\r\n<=.) (         `-.__,==' ' ' '}\r\n  (   )                      /\r\n   `-'\\   ,                  )\r\n       |  \\        `~.      /\r\n       \\   `._        \\    /\r\n        \\     `._____,'   /\r\n         `-.            ,'\r\n            `-.      ,-'\r\n               `~~~~'\r\n               //_||\r\n            __//--'/`   hjw\r\n          ,--'/`  '\r\n             '\r""",
     """ /\\___/\\\r\n \\/   \\/\r\n  \\~ ~/\r\n ==`^ ==\r\n  /   \\        |\\___/|\r\n /|   |        \\/- -\\/ ____...,...\r\n || - |         \\o o/             \\\r\n ||   |        ==`^ ==   ,        /\\\r\n ||| ||_            `.  / --- \\  / \\\\____//\r\n/\\||_|//         ;____,'      | /   ` ---\r\n\\_____/                    ;___/\r""",
     """⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⠕⠕⠕⠕⢕⢕\n⢕⢕⢕⢕⢕⠕⠕⢕⢕⢕⢕⢕⢕⢕⢕⢕⢕⠕⠁⣁⣠⣤⣤⣤⣶⣦⡄⢑\n⢕⢕⢕⠅⢁⣴⣤⠀⣀⠁⠑⠑⠁⢁⣀⣀⣀⣀⣘⢻⣿⣿⣿⣿⣿⡟⢁⢔\n⢕⢕⠕⠀⣿⡁⠄⠀⣹⣿⣿⣿⡿⢋⣥⠤⠙⣿⣿⣿⣿⣿⡿⠿⡟⠀⢔⢕\n⢕⠕⠁⣴⣦⣤⣴⣾⣿⣿⣿⣿⣇⠻⣇⠐⠀⣼⣿⣿⣿⣿⣿⣄⠀⠐⢕⢕\n⠅⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⣷⡄⠐⢕\n⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡄⠐\n⢄⠈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆\n⢕⢔⠀⠈⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿\n⢕⢕⢄⠈⠳⣶⣶⣶⣤⣤⣤⣤⣭⡍⢭⡍⢨⣯⡛⢿⣿⣿⣿⣿⣿⣿⣿⣿\n⢕⢕⢕⢕⠀⠈⠛⠿⢿⣿⣿⣿⣿⣿⣦⣤⣿⣿⣿⣦⣈⠛⢿⢿⣿⣿⣿⣿\n⢕⢕⢕⠁⢠⣾⣶⣾⣭⣖⣛⣿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡆⢸⣿⣿⣿⡟\n⢕⢕⠅⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠈⢿⣿⣿⡇\n⢕⠕⠀⠼⠟⢉⣉⡙⠻⠿⢿⣿⣿⣿⣿⣿⡿⢿⣛⣭⡴⠶⠶⠂⠀⠿⠿⠇""",]
-
-# MODEL = tf.keras.models.load_model('models/vqvae.4x64.keras', compile=False)
 
 # PREPROCESS ###################################################################
 
