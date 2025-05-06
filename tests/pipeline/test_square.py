@@ -29,6 +29,7 @@ class PreprocessTests(tf.test.TestCase):
                     'width_dim': 64,
                     'token_dim': 4,
                     'drop_dim': 0,
+                    'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
@@ -41,6 +42,7 @@ class PreprocessTests(tf.test.TestCase):
                     'width_dim': 64,
                     'token_dim': 1,
                     'drop_dim': 0,
+                    'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
@@ -53,6 +55,7 @@ class PreprocessTests(tf.test.TestCase):
                     'width_dim': 64,
                     'token_dim': 6,
                     'drop_dim': 1,
+                    'targets': True,
                     'encoding': 'UTF-32-BE',
                     'features': [],},
                 'shapes': {
@@ -65,6 +68,7 @@ class PreprocessTests(tf.test.TestCase):
                     'width_dim': 64,
                     'token_dim': 1,
                     'drop_dim': 1,
+                    'targets': True,
                     'encoding': 'UTF-32-BE',
                     'features': [],},
                 'shapes': {
@@ -86,7 +90,7 @@ class PreprocessTests(tf.test.TestCase):
 
     def test_on_dataset_batches(self):
         __dataset = iter(DATASET.batch(16))
-        __preprocess = tokun.pipeline.square.preprocess.factory(batch_dim=16, height_dim=32, width_dim=128, token_dim=4, drop_dim=0, encoding='UTF-8', features=[],)
+        __preprocess = tokun.pipeline.square.preprocess.factory(batch_dim=16, height_dim=32, width_dim=128, token_dim=4, drop_dim=0, encoding='UTF-8', features=[], targets=True)
         for _ in range(4):
             __s = next(__dataset)
             __x, __t = __preprocess(__s)
@@ -112,6 +116,19 @@ class PreprocessTests(tf.test.TestCase):
             for __sample in SAMPLES:
                 __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
+                __o = __postprocess(__t).numpy().tolist()
+                __o = b'\n'.join(__o[0]).decode('UTF-8', errors='ignore')
+                assert int(tokun.eval.compare(__sample, __o[0])) == 1
+
+    def test_preprocess_without_targets(self):
+        for __case in self._cases:
+            __args = {__k: (False if __k == 'targets' else __v) for __k, __v in __case['args'].items()}
+            __preprocess = tokun.pipeline.square.preprocess.factory(**__args)
+            __postprocess = tokun.pipeline.square.postprocess.factory(drop_dim=__case['args']['drop_dim'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
+            for __sample in SAMPLES:
+                __s = tf.cast([__sample], dtype=tf.string)
+                __x = __preprocess(__s)
+                __t = mlable.shaping.axes.merge(mlable.maths.ops.expand_base(__x, base=2, depth=8, bigendian=True), axis=-1, right=False)
                 __o = __postprocess(__t).numpy().tolist()
                 __o = b'\n'.join(__o[0]).decode('UTF-8', errors='ignore')
                 assert int(tokun.eval.compare(__sample, __o[0])) == 1

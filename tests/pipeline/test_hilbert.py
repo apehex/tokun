@@ -1,7 +1,10 @@
 import tensorflow as tf
 
+import mlable.maths.ops
 import mlable.sampling
+import mlable.shaping.axes
 import mlable.text
+
 import tokun.data
 import tokun.eval
 import tokun.pipeline.hilbert.postprocess
@@ -29,6 +32,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 4,
                     'order_num': 5,
                     'rank_num': 2,
+                    'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
@@ -40,6 +44,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 1,
                     'order_num': 5,
                     'rank_num': 2,
+                    'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
@@ -51,6 +56,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 4,
                     'order_num': 5,
                     'rank_num': 2,
+                    'targets': True,
                     'encoding': 'UTF-32-BE',
                     'features': [],},
                 'shapes': {
@@ -62,6 +68,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 1,
                     'order_num': 4,
                     'rank_num': 3,
+                    'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
@@ -83,7 +90,7 @@ class PreprocessTests(tf.test.TestCase):
 
     def test_on_dataset_batches(self):
         __dataset = iter(DATASET.batch(4))
-        __preprocess = tokun.pipeline.hilbert.preprocess.factory(batch_dim=4, token_dim=1, order_num=4, rank_num=3, encoding='UTF-8', features=[],)
+        __preprocess = tokun.pipeline.hilbert.preprocess.factory(batch_dim=4, token_dim=1, order_num=4, rank_num=3, encoding='UTF-8', features=[], targets=True)
         for _ in range(4):
             __s = next(__dataset)
             __x, __t = __preprocess(__s)
@@ -109,5 +116,17 @@ class PreprocessTests(tf.test.TestCase):
             for __sample in SAMPLES:
                 __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
+                __o = mlable.text.unpack(__postprocess(__t))
+                assert int(tokun.eval.compare(__sample, __o[0])) == 1
+
+    def test_preprocess_without_targets(self):
+        for __case in self._cases:
+            __args = {__k: (False if __k == 'targets' else __v) for __k, __v in __case['args'].items()}
+            __preprocess = tokun.pipeline.hilbert.preprocess.factory(**__args)
+            __postprocess = tokun.pipeline.hilbert.postprocess.factory(order_num=__case['args']['order_num'], rank_num=__case['args']['rank_num'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
+            for __sample in SAMPLES:
+                __s = tf.cast([__sample], dtype=tf.string)
+                __x = __preprocess(__s)
+                __t = mlable.shaping.axes.merge(mlable.maths.ops.expand_base(__x, base=2, depth=8, bigendian=True), axis=-1, right=False)
                 __o = mlable.text.unpack(__postprocess(__t))
                 assert int(tokun.eval.compare(__sample, __o[0])) == 1
