@@ -55,13 +55,12 @@ def _formatter_factory(batch_dim: int, sample_dim: int, token_dim: int=1, drop_d
     # remove the leading 0s in UTF-32-BE
     __trim = functools.partial(mlable.text.trim, count=drop_dim, outof=encoding_dim)
     # enforce types
-    __cast_i = functools.partial(tf.cast, dtype=tf.uint8)
-    __cast_t = functools.partial(tf.cast, dtype=tf.float32)
+    __cast = functools.partial(tf.cast, dtype=tf.float32)
     # enforce shapes
     __reshape = functools.partial(tf.reshape, shape=__shape)
     # chain the operations
     def __formatter(inputs: tf.Tensor, targets: tf.Tensor=None) -> tuple:
-        return (__cast_i(__reshape(__trim(inputs))), __cast_t(__reshape(__trim(targets))) if (targets is not None) else None)
+        return (__cast(__reshape(__trim(inputs))), __cast(__reshape(__trim(targets))) if (targets is not None) else None)
     # customized fn
     return __formatter
 

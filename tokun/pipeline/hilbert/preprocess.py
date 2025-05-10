@@ -54,13 +54,12 @@ def _formatter_factory(batch_dim: int, token_dim: int, order_num: int, rank_num:
     # fold along the Hilbert curve
     __fold = functools.partial(mlable.shaping.hilbert.fold, order=order_num, rank=rank_num, axis=1)
     # enforce types
-    __cast_i = functools.partial(tf.cast, dtype=tf.uint8)
-    __cast_t = functools.partial(tf.cast, dtype=tf.float32)
+    __cast = functools.partial(tf.cast, dtype=tf.float32)
     # enforce shapes
     __reshape = functools.partial(tf.reshape, shape=__shape)
     # chain the operations
     def __formatter(inputs: tf.Tensor, targets: tf.Tensor=None) -> tuple:
-        return (__cast_i(__reshape(__fold(__group(inputs)))), __cast_t(__reshape(__fold(__group(targets)))) if (targets is not None) else None)
+        return (__cast(__reshape(__fold(__group(inputs)))), __cast(__reshape(__fold(__group(targets)))) if (targets is not None) else None)
     # customized fn
     return __formatter
 
