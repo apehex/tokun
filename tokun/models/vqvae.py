@@ -5,7 +5,6 @@ import functools
 import keras
 import tensorflow as tf
 
-import mlable.layers.embedding
 import mlable.layers.shaping
 
 # ENCODER #####################################################################
