@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tokun"
-version = "0.16.4"
+version = "0.16.5"
 description = "Byte level VAE models."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
@@ -8,7 +8,7 @@ readme = ".github/README.md"
 [tool.poetry.dependencies]
 python = ">=3.10, <3.13"
 mlable = ">=0.20"
-tensorflow = ">=2.16, <2.19"
+tensorflow = ">=2.16, <2.20"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
