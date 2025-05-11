@@ -85,7 +85,7 @@ class PreprocessTests(tf.test.TestCase):
                 self.assertEqual(tuple(__x.shape), tuple(__case['shapes']['inputs']))
                 self.assertEqual(tuple(__t.shape), tuple(__case['shapes']['targets']))
                 # shapes
-                self.assertEqual(__x.dtype, tf.uint8)
+                self.assertEqual(__x.dtype, tf.float32)
                 self.assertEqual(__t.dtype, tf.float32)
 
     def test_on_dataset_batches(self):
@@ -98,7 +98,7 @@ class PreprocessTests(tf.test.TestCase):
             self.assertEqual(tuple(__x.shape), (16, 32, 32, 4))
             self.assertEqual(tuple(__t.shape), (16, 32, 32, 32))
             # shapes
-            self.assertEqual(__x.dtype, tf.uint8)
+            self.assertEqual(__x.dtype, tf.float32)
             self.assertEqual(__t.dtype, tf.float32)
 
     def test_inputs_equal_targets(self):
