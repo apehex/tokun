@@ -7,7 +7,7 @@ readme = ".github/README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.13"
-mlable = ">=0.20"
+mlable = ">=0.21"
 tensorflow = ">=2.16, <2.20"
 
 [tool.poetry.group.test.dependencies]
