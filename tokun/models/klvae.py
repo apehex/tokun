@@ -220,3 +220,97 @@ class Decoder(tf.keras.models.Model):
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
         return cls(**config)
+
+# VAE #########################################################################
+
+@keras.saving.register_keras_serializable(package='models')
+class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
+    def __init__(
+        self,
+        channel_dim: iter,
+        group_dim: int,
+        head_dim: int,
+        embed_dim: int,
+        output_dim: int,
+        input_dim: int=256,
+        layer_num: int=1,
+        trainable: bool=True,
+        step_min: int=0,
+        step_max: int=2 ** 12,
+        beta_min: float=0.0,
+        beta_max: float=1.0,
+        dropout_rate: float=DROPOUT,
+        epsilon_rate: float=EPSILON,
+        **kwargs
+    ) -> None:
+        # init
+        super(KlAutoEncoder, self).__init__(step_min=step_min, step_max=step_max, beta_min=beta_min, beta_max=beta_max, **kwargs)
+        # config
+        self._config.update({
+            'channel_dim': [channel_dim] if isinstance(channel_dim, int) else list(channel_dim),
+            'group_dim': max(1, group_dim),
+            'head_dim': max(1, head_dim),
+            'embed_dim': max(1, embed_dim),
+            'output_dim': max(1, output_dim),
+            'input_dim': max(1, input_dim),
+            'layer_num': max(1, layer_num),
+            'dropout_rate': max(0.0, dropout_rate),
+            'epsilon_rate': max(1e-8, epsilon_rate),
+            'trainable': trainable,})
+        # layers
+        self._encoder = None
+        self._decoder = None
+
+    def build(self, input_shape: tuple) -> None:
+        # init
+        self._encoder = Encoder(
+            channel_dim=self._config['channel_dim'],
+            group_dim=self._config['group_dim'],
+            head_dim=self._config['head_dim'],
+            embed_dim=self._config['embed_dim'],
+            input_dim=self._config['input_dim'],
+            layer_num=self._config['layer_num'],
+            dropout_rate=self._config['dropout_rate'],
+            epsilon_rate=self._config['epsilon_rate'],
+            trainable=self._config['trainable'])
+        self._decoder = Decoder(
+            channel_dim=list(reversed(self._config['channel_dim'])),
+            group_dim=self._config['group_dim'],
+            head_dim=self._config['head_dim'],
+            output_dim=self._config['output_dim'],
+            layer_num=self._config['layer_num'],
+            dropout_rate=self._config['dropout_rate'],
+            epsilon_rate=self._config['epsilon_rate'],
+            trainable=self._config['trainable'])
+        # build
+        __shape = tuple(input_shape)
+        self._encoder.build(__shape)
+        __shape = self.compute_latent_shape(__shape)
+        self._decoder.build(__shape)
+        # register
+        self.built = True
+
+    def compute_latent_shape(self, input_shape: tuple) -> tuple:
+        __shape = self._encoder.compute_output_shape(input_shape)
+        # split in 2, because the encoder returns both mean and logvar
+        return tuple(__shape[:-1]) + (__shape[-1] // 2,)
+
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return self._decoder.compute_output_shape(self.compute_latent_shape(input_shape))
+
+    def encode(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tuple:
+        __outputs = self._encoder(inputs, training=training, **kwargs)
+        # split in 2: mean + logvar
+        return tuple(tf.split(__outputs, num=2, num_or_size_splits=2, axis=-1))
+
+    def decode(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
+        return self._decoder(inputs, training=training, **kwargs)
+
+    def get_config(self) -> dict:
+        __config = super(KlAutoEncoder, self).get_config()
+        __config.update(self._config)
+        return __config
+
+    @classmethod
+    def from_config(cls, config) -> tf.keras.layers.Layer:
+        return cls(**config)
