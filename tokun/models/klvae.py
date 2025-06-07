@@ -6,6 +6,8 @@ import keras
 import tensorflow as tf
 
 import mlable.blocks.convolution.resnet
+import mlable.blocks.convolution.unet
+import mlable.layers.embedding
 import mlable.layers.shaping
 import mlable.models.autoencoder
 
@@ -45,82 +47,105 @@ class Encoder(tf.keras.models.Model):
             'epsilon_rate': max(1e-8, epsilon_rate),
             'trainable': trainable,}
         # layers
-        self._layers = []
+        self._embed_byte = None
+        self._merge_bytes = None
+        self._embed_height = None
+        self._embed_width = None
+        self._resnet_preprocess = None
+        self._resnet_postprocess = None
+        self._unet_blocks = []
 
     def build(self, input_shape: tuple) -> None:
         # parse
         __shape = tuple(input_shape)
         __count = len(self._config['channel_dim'])
-        # factor
-        __conv_args = {'kernel_size': 3, 'strides': 1, 'padding': 'same', 'data_format': 'channels_last',}
-        __norm_args = {'axis': -1, 'epsilon': self._config['epsilon_rate'], 'center': True, 'scale': True,}
-        __resnet_args = {'group_dim': self._config['group_dim'], 'layer_num': self._config['layer_num'], 'dropout_rate': self._config['dropout_rate'], 'epsilon_rate': self._config['epsilon_rate'],}
-        # init
-        self._layers = [
-            # embed (B, H, W, C) => (B, H, W, C, E)
-            tf.keras.layers.Embedding(
-                input_dim=self._config['input_dim'],
-                output_dim=self._config['embed_dim'],
-                name='encoder-0-embed-bytes'),
-            # merge (B, H, W, C, E) => (B, H, W, CE)
-            mlable.layers.shaping.Merge(
-                axis=-1,
-                right=False,
-                name='encoder-1-merge-embeds'),
-            # even (B, H, W, CE) => (B, H, W, L0)
-            tf.keras.layers.Conv2D(
-                filters=self._config['channel_dim'][0],
-                name='encoder-2-conv-inputs',
-                **__conv_args),] + [
-            # compress (B, H/2^i, W/2^i, Li) => (B, H/2^i+1, W/2^i+1, Li+1)
-            mlable.blocks.convolution.resnet.EncoderBlock(
+        # embed (B, H, W, C) => (B, H, W, C, E)
+        self._embed_byte = tf.keras.layers.Embedding(
+            name='encoder-0-embed-bytes',
+            **self.get_embed_byte_config())
+        # merge (B, H, W, C, E) => (B, H, W, CE)
+        self._merge_bytes = mlable.layers.shaping.Merge(
+            name='encoder-1-merge-embeds',
+            **self.get_merge_config())
+        # embed height (B, H, W, C) => (B, H, W, CE)
+        self._embed_height = mlable.layers.embedding.PositionalEmbedding(
+            name='encoder-2-embed-height',
+            **self.get_embed_height_config())
+        # embed width (B, H, W, C) => (B, H, W, CE)
+        self._embed_width = mlable.layers.embedding.PositionalEmbedding(
+            name='encoder-3-embed-width',
+            **self.get_embed_width_config())
+        # even (B, H, W, CE) => (B, H, W, L0)
+        self._resnet_preprocess = mlable.blocks.convolution.resnet.ResnetBlock(
+            channel_dim=self._config['channel_dim'][0],
+            name='encoder-4-resnet-preprocess',
+            **self.get_resnet_config())
+        # expand (B, Hn, Wn, Ln) => (B, Hn, Wn, 2Ln)
+        self._resnet_postprocess = mlable.blocks.convolution.resnet.ResnetBlock(
+            channel_dim=2 * self._config['channel_dim'][-1],
+            name=f'encoder-{__count + 5}-resnet-postprocess',
+            **self.get_resnet_config())
+        # compress (B, H/2^i, W/2^i, Li) => (B, H/2^i+1, W/2^i+1, Li+1)
+        self._unet_blocks = [
+            mlable.blocks.convolution.unet.UnetBlock(
                 channel_dim=__c,
-                downsample_on=__i < (__count - 1),
-                name=f'encoder-{__i + 3}-resnet-down',
-                **__resnet_args)
-            for __i, __c in enumerate(self._config['channel_dim'])] + [
-            # transform (B, Hn, Wn, Ln) => (B, Hn, Wn, Ln)
-            mlable.blocks.convolution.resnet.TransformerBlock(
-                channel_dim=self._config['channel_dim'][-1],
-                head_dim=self._config['head_dim'],
-                use_causal_mask=False,
-                name=f'encoder-{__count + 4}-resnet-mid',
-                **__resnet_args),
-            # normalize (B, Hn, Wn, Ln) => (B, Hn, Wn, Ln)
-            tf.keras.layers.GroupNormalization(
-                groups=self._config['group_dim'],
-                name=f'encoder-{__count + 5}-norm',
-                **__norm_args),
-            # activation (B, Hn, Wn, Ln) => (B, Hn, Wn, Ln)
-            tf.keras.layers.Activation(
-                activation='silu',
-                name=f'encoder-{__count + 6}-activation'),
-            # expand (B, Hn, Wn, Ln) => (B, Hn, Wn, 2Ln)
-            tf.keras.layers.Conv2D(
-                filters=2 * self._config['channel_dim'][-1],
-                name=f'encoder-{__count + 7}-conv-outputs',
-                **__conv_args),
-            ]
+                add_attention=__i == (__count - 1),
+                add_downsampling=__i < (__count - 1),
+                add_upsampling=False,
+                name=f'encoder-{__i + 5}-unet-down',
+                **self.get_unet_config())
+            for __i, __c in enumerate(self._config['channel_dim'])]
         # build
-        for __l in self._layers:
-            __l.build(__shape)
-            __shape = __l.compute_output_shape(__shape)
+        for __b in self.get_all_blocks():
+            __b.build(__shape)
+            __shape = __b.compute_output_shape(__shape)
         # freeze
-        for __l in self._layers:
-            __l.trainable = self._config['trainable']
+        for __b in self.get_all_blocks():
+            __b.trainable = self._config['trainable']
         # register
         self.built = True
 
-    def compute_output_shape(self, input_shape: tuple) -> tuple:
-        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
-
     def call(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
-        return functools.reduce(lambda __x, __l: __l(__x, training=training, **kwargs), self._layers, inputs)
+        return functools.reduce(lambda __x, __b: __b(__x, training=training, **kwargs), self.get_all_blocks(), inputs)
+
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return functools.reduce(lambda __s, __b: __b.compute_output_shape(__s), self.get_all_blocks(), input_shape)
+
+    def get_embed_blocks(self) -> list:
+        return [self._embed_byte, self._merge_bytes, self._embed_height, self._embed_width]
+
+    def get_resnet_blocks(self) -> list:
+        return [self._resnet_preprocess] + self._unet_blocks + [self._resnet_postprocess]
+
+    def get_all_blocks(self) -> list:
+        return self.get_embed_blocks() + self.get_resnet_blocks()
 
     def get_config(self) -> dict:
         __config = super(Encoder, self).get_config()
         __config.update(self._config)
         return __config
+
+    def get_embed_byte_config(self) -> dict:
+        return {'input_dim': self._config['input_dim'], 'output_dim': self._config['embed_dim'],}
+
+    def get_embed_height_config(self) -> dict:
+        return {'sequence_axis': 1, 'feature_axis': -1,}
+
+    def get_embed_width_config(self) -> dict:
+        return {'sequence_axis': 2, 'feature_axis': -1,}
+
+    def get_merge_config(self) -> dict:
+        return {'axis': -1, 'right': False,}
+
+    def get_resnet_config(self) -> dict:
+        return {
+            __k: self._config[__k]
+            for __k in ['group_dim', 'dropout_rate', 'epsilon_rate']}
+
+    def get_unet_config(self) -> dict:
+        return {
+            __k: self._config[__k]
+            for __k in ['group_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate']}
 
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
@@ -154,68 +179,62 @@ class Decoder(tf.keras.models.Model):
             'dropout_rate': max(0.0, dropout_rate),
             'epsilon_rate': max(1e-8, epsilon_rate),
             'trainable': trainable,}
-        # layers
-        self._layers = []
+        # blocks
+        self._unet_blocks = []
+        self._resnet_project = None
 
     def build(self, input_shape: tuple) -> None:
         # parse
         __shape = tuple(input_shape)
         __count = len(self._config['channel_dim'])
-        # factor
-        __conv_args = {'kernel_size': 3, 'strides': 1, 'padding': 'same', 'data_format': 'channels_last',}
-        __norm_args = {'axis': -1, 'epsilon': self._config['epsilon_rate'], 'center': True, 'scale': True,}
-        __resnet_args = {'group_dim': self._config['group_dim'], 'layer_num': self._config['layer_num'], 'dropout_rate': self._config['dropout_rate'], 'epsilon_rate': self._config['epsilon_rate'],}
-        # init
-        self._layers = [
-            # transform (B, Hn, Wn, Ln) => (B, Hn, Wn, Ln)
-            mlable.blocks.convolution.resnet.TransformerBlock(
-                channel_dim=self._config['channel_dim'][0],
-                head_dim=self._config['head_dim'],
-                use_causal_mask=False,
-                name=f'decoder-0-resnet-mid',
-                **__resnet_args),] + [
-            # decompress (B, H/2^i+1, W/2^i+1, Li+1) => (B, H/2^i, W/2^i, Li)
-            mlable.blocks.convolution.resnet.DecoderBlock(
+        # compress (B, H/2^i+1, W/2^i+1, Li+1) => (B, H/2^i, W/2^i, Li)
+        self._unet_blocks = [
+            mlable.blocks.convolution.unet.UnetBlock(
                 channel_dim=__c,
-                upsample_on=__i < (__count - 1),
-                name=f'decoder-{__i + 1}-resnet-up',
-                **__resnet_args)
-            for __i, __c in enumerate(self._config['channel_dim'])] + [
-            # normalize (B, H, W, L0) => (B, H, W, L0)
-            tf.keras.layers.GroupNormalization(
-                groups=self._config['group_dim'],
-                name=f'decoder-{__count + 2}-norm',
-                **__norm_args),
-            # activation (B, H, W, L0) => (B, H, W, L0)
-            tf.keras.layers.Activation(
-                activation='silu',
-                name=f'decoder-{__count + 3}-activation'),
-            # expand (B, H, W, L0) => (B, H, W, O) where O = 8C typically
-            tf.keras.layers.Conv2D(
-                filters=self._config['output_dim'],
-                name=f'decoder-{__count + 4}-conv-outputs',
-                **__conv_args),
-            ]
+                add_attention=__i == 0,
+                add_downsampling=False,
+                add_upsampling=__i > 0,
+                name=f'decoder-{__i}-unet-up',
+                **self.get_unet_config())
+            for __i, __c in enumerate(self._config['channel_dim'])]
+        # project (B, H, W, L0) => (B, H, W, O)
+        self._resnet_project = mlable.blocks.convolution.resnet.ResnetBlock(
+            channel_dim=self._config['output_dim'],
+            name=f'decoder-{__count}-resnet-project',
+            **self.get_resnet_config())
         # build
-        for __l in self._layers:
-            __l.build(__shape)
-            __shape = __l.compute_output_shape(__shape)
+        for __b in self.get_all_blocks():
+            __b.build(__shape)
+            __shape = __b.compute_output_shape(__shape)
         # freeze
-        for __l in self._layers:
-            __l.trainable = self._config['trainable']
+        for __b in self.get_all_blocks():
+            __b.trainable = self._config['trainable']
         # register
         self.built = True
 
     def compute_output_shape(self, input_shape: tuple) -> tuple:
-        return functools.reduce(lambda __s, __l: __l.compute_output_shape(__s), self._layers, input_shape)
+        return functools.reduce(lambda __s, __b: __b.compute_output_shape(__s), self.get_all_blocks(), input_shape)
 
     def call(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
-        return functools.reduce(lambda __x, __l: __l(__x, training=training, **kwargs), self._layers, inputs)
+        return functools.reduce(lambda __x, __b: __b(__x, training=training, **kwargs), self.get_all_blocks(), inputs)
+
+    def get_all_blocks(self) -> list:
+        return self._unet_blocks + [self._resnet_project]
 
     def get_config(self) -> dict:
         __config = super(Decoder, self).get_config()
         __config.update(self._config)
         return __config
+
+    def get_resnet_config(self) -> dict:
+        return {
+            __k: self._config[__k]
+            for __k in ['group_dim', 'dropout_rate', 'epsilon_rate']}
+
+    def get_unet_config(self) -> dict:
+        return {
+            __k: self._config[__k]
+            for __k in ['group_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate']}
 
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
@@ -233,12 +252,12 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         embed_dim: int,
         output_dim: int,
         input_dim: int=256,
-        layer_num: int=1,
-        trainable: bool=True,
+        layer_num: int=2,
         step_min: int=0,
         step_max: int=2 ** 12,
         beta_min: float=0.0,
         beta_max: float=1.0,
+        trainable: bool=True,
         dropout_rate: float=DROPOUT,
         epsilon_rate: float=EPSILON,
         **kwargs
@@ -263,25 +282,8 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
 
     def build(self, input_shape: tuple) -> None:
         # init
-        self._encoder = Encoder(
-            channel_dim=self._config['channel_dim'],
-            group_dim=self._config['group_dim'],
-            head_dim=self._config['head_dim'],
-            embed_dim=self._config['embed_dim'],
-            input_dim=self._config['input_dim'],
-            layer_num=self._config['layer_num'],
-            dropout_rate=self._config['dropout_rate'],
-            epsilon_rate=self._config['epsilon_rate'],
-            trainable=self._config['trainable'])
-        self._decoder = Decoder(
-            channel_dim=list(reversed(self._config['channel_dim'])),
-            group_dim=self._config['group_dim'],
-            head_dim=self._config['head_dim'],
-            output_dim=self._config['output_dim'],
-            layer_num=self._config['layer_num'],
-            dropout_rate=self._config['dropout_rate'],
-            epsilon_rate=self._config['epsilon_rate'],
-            trainable=self._config['trainable'])
+        self._encoder = Encoder(**self.get_encoder_config())
+        self._decoder = Decoder(**self.get_decoder_config())
         # build
         __shape = tuple(input_shape)
         self._encoder.build(__shape)
@@ -289,14 +291,6 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         self._decoder.build(__shape)
         # register
         self.built = True
-
-    def compute_latent_shape(self, input_shape: tuple) -> tuple:
-        __shape = self._encoder.compute_output_shape(input_shape)
-        # split in 2, because the encoder returns both mean and logvar
-        return tuple(__shape[:-1]) + (__shape[-1] // 2,)
-
-    def compute_output_shape(self, input_shape: tuple) -> tuple:
-        return self._decoder.compute_output_shape(self.compute_latent_shape(input_shape))
 
     def encode(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tuple:
         __outputs = self._encoder(inputs, training=training, **kwargs)
@@ -306,10 +300,28 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
     def decode(self, inputs: tf.Tensor, training: bool=False, **kwargs) -> tf.Tensor:
         return self._decoder(inputs, training=training, **kwargs)
 
+    def compute_latent_shape(self, input_shape: tuple) -> tuple:
+        __shape = self._encoder.compute_output_shape(input_shape)
+        # split in 2, because the encoder returns both mean and logvar
+        return tuple(__shape[:-1]) + (__shape[-1] // 2,)
+
+    def compute_output_shape(self, input_shape: tuple) -> tuple:
+        return self._decoder.compute_output_shape(self.compute_latent_shape(input_shape))
+
     def get_config(self) -> dict:
         __config = super(KlAutoEncoder, self).get_config()
         __config.update(self._config)
         return __config
+
+    def get_encoder_config(self) -> dict:
+        return {
+            __k: self._config[__k]
+            for __k in ['channel_dim', 'group_dim', 'embed_dim', 'input_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate', 'trainable']}
+
+    def get_decoder_config(self) -> dict:
+        return {
+            __k: list(reversed(self._config[__k])) if (__k == 'channel_dim') else self._config[__k]
+            for __k in ['channel_dim', 'group_dim', 'output_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate', 'trainable']}
 
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
