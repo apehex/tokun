@@ -38,8 +38,8 @@ class Encoder(tf.keras.models.Model):
         # config
         self._config = {
             'channel_dim': [channel_dim] if isinstance(channel_dim, int) else list(channel_dim),
-            'group_dim': max(1, group_dim),
-            'head_dim': max(1, head_dim),
+            'group_dim': group_dim,
+            'head_dim': head_dim,
             'embed_dim': max(1, embed_dim),
             'input_dim': max(1, input_dim),
             'layer_num': max(1, layer_num),
@@ -172,8 +172,8 @@ class Decoder(tf.keras.models.Model):
         # config
         self._config = {
             'channel_dim': [channel_dim] if isinstance(channel_dim, int) else list(channel_dim),
-            'group_dim': max(1, group_dim),
-            'head_dim': max(1, head_dim),
+            'group_dim': group_dim,
+            'head_dim': head_dim,
             'output_dim': max(1, output_dim),
             'layer_num': max(1, layer_num),
             'dropout_rate': max(0.0, dropout_rate),
@@ -267,8 +267,8 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         # config
         self._config.update({
             'channel_dim': [channel_dim] if isinstance(channel_dim, int) else list(channel_dim),
-            'group_dim': max(1, group_dim),
-            'head_dim': max(1, head_dim),
+            'group_dim': group_dim,
+            'head_dim': head_dim,
             'embed_dim': max(1, embed_dim),
             'output_dim': max(1, output_dim),
             'input_dim': max(1, input_dim),

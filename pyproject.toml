@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tokun"
-version = "0.16.7"
+version = "0.16.8"
 description = "Byte level VAE models."
 authors = ["apehex <apehex@protonmail.com>"]
 readme = ".github/README.md"
