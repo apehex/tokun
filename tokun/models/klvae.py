@@ -2,7 +2,6 @@
 
 import functools
 
-import keras
 import tensorflow as tf
 
 import mlable.blocks.convolution.resnet
@@ -18,7 +17,7 @@ EPSILON = 1e-6
 
 # ENCODER #####################################################################
 
-@keras.saving.register_keras_serializable(package='models')
+@tf.keras.utils.register_keras_serializable(package='models')
 class Encoder(tf.keras.models.Model):
     def __init__(
         self,
@@ -28,7 +27,6 @@ class Encoder(tf.keras.models.Model):
         embed_dim: int,
         input_dim: int=256,
         layer_num: int=1,
-        trainable: bool=True,
         dropout_rate: float=DROPOUT,
         epsilon_rate: float=EPSILON,
         **kwargs
@@ -44,8 +42,7 @@ class Encoder(tf.keras.models.Model):
             'input_dim': max(1, input_dim),
             'layer_num': max(1, layer_num),
             'dropout_rate': max(0.0, dropout_rate),
-            'epsilon_rate': max(1e-8, epsilon_rate),
-            'trainable': trainable,}
+            'epsilon_rate': max(1e-8, epsilon_rate),}
         # layers
         self._embed_byte = None
         self._merge_bytes = None
@@ -99,9 +96,6 @@ class Encoder(tf.keras.models.Model):
         for __b in self.get_all_blocks():
             __b.build(__shape)
             __shape = __b.compute_output_shape(__shape)
-        # freeze
-        for __b in self.get_all_blocks():
-            __b.trainable = self._config['trainable']
         # register
         self.built = True
 
@@ -162,7 +156,6 @@ class Decoder(tf.keras.models.Model):
         head_dim: int,
         output_dim: int,
         layer_num: int=1,
-        trainable: bool=True,
         dropout_rate: float=DROPOUT,
         epsilon_rate: float=EPSILON,
         **kwargs
@@ -177,8 +170,7 @@ class Decoder(tf.keras.models.Model):
             'output_dim': max(1, output_dim),
             'layer_num': max(1, layer_num),
             'dropout_rate': max(0.0, dropout_rate),
-            'epsilon_rate': max(1e-8, epsilon_rate),
-            'trainable': trainable,}
+            'epsilon_rate': max(1e-8, epsilon_rate),}
         # blocks
         self._unet_blocks = []
         self._resnet_project = None
@@ -206,9 +198,6 @@ class Decoder(tf.keras.models.Model):
         for __b in self.get_all_blocks():
             __b.build(__shape)
             __shape = __b.compute_output_shape(__shape)
-        # freeze
-        for __b in self.get_all_blocks():
-            __b.trainable = self._config['trainable']
         # register
         self.built = True
 
@@ -257,7 +246,6 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         step_max: int=2 ** 12,
         beta_min: float=0.0,
         beta_max: float=1.0,
-        trainable: bool=True,
         dropout_rate: float=DROPOUT,
         epsilon_rate: float=EPSILON,
         **kwargs
@@ -274,8 +262,7 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
             'input_dim': max(1, input_dim),
             'layer_num': max(1, layer_num),
             'dropout_rate': max(0.0, dropout_rate),
-            'epsilon_rate': max(1e-8, epsilon_rate),
-            'trainable': trainable,})
+            'epsilon_rate': max(1e-8, epsilon_rate),})
         # layers
         self._encoder = None
         self._decoder = None
@@ -316,12 +303,12 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
     def get_encoder_config(self) -> dict:
         return {
             __k: self._config[__k]
-            for __k in ['channel_dim', 'group_dim', 'embed_dim', 'input_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate', 'trainable']}
+            for __k in ['channel_dim', 'group_dim', 'embed_dim', 'input_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate']}
 
     def get_decoder_config(self) -> dict:
         return {
             __k: list(reversed(self._config[__k])) if (__k == 'channel_dim') else self._config[__k]
-            for __k in ['channel_dim', 'group_dim', 'output_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate', 'trainable']}
+            for __k in ['channel_dim', 'group_dim', 'output_dim', 'head_dim', 'layer_num', 'dropout_rate', 'epsilon_rate']}
 
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
