@@ -15,7 +15,6 @@ class Encoder(tf.keras.models.Model):
         self,
         embed_dim: int,
         input_dim: int=256,
-        trainable: bool=True,
         **kwargs
     ) -> None:
         # init
@@ -23,8 +22,7 @@ class Encoder(tf.keras.models.Model):
         # config
         self._config = {
             'input_dim': input_dim,
-            'embed_dim': embed_dim,
-            'trainable': trainable,}
+            'embed_dim': embed_dim,}
         # layers
         self._layers = []
 
@@ -49,9 +47,6 @@ class Encoder(tf.keras.models.Model):
         for __l in self._layers:
             __l.build(__shape)
             __shape = __l.compute_output_shape(__shape)
-        # freeze
-        for __l in self._layers:
-            __l.trainable = self._config['trainable']
         # register
         self.built = True
 
@@ -148,7 +143,6 @@ class QuantizedAutoEncoder(tf.keras.models.Model):
         embed_dim: int,
         input_dim: int=256, # byte inputs
         binary_dim: int=8, # byte predictions
-        trainable: bool=True,
         **kwargs
     ) -> None:
         # init
@@ -158,8 +152,7 @@ class QuantizedAutoEncoder(tf.keras.models.Model):
             'token_dim': token_dim,
             'input_dim': input_dim,
             'embed_dim': embed_dim,
-            'binary_dim': binary_dim,
-            'trainable': trainable,}
+            'binary_dim': binary_dim,}
         # layers
         self._encoder = None
         self._decoder = None
@@ -169,8 +162,7 @@ class QuantizedAutoEncoder(tf.keras.models.Model):
         # init
         self._encoder = Encoder(
             input_dim=self._config['input_dim'],
-            embed_dim=self._config['embed_dim'],
-            trainable=self._config['trainable'])
+            embed_dim=self._config['embed_dim'])
         self._decoder = Decoder(
             token_dim=self._config['token_dim'],
             binary_dim=self._config['binary_dim'],)
