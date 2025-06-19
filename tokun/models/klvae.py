@@ -212,7 +212,7 @@ class Decoder(tf.keras.models.Model):
                 'add_attention': False,
                 'add_downsampling': False,
                 'add_upsampling': False,
-                'dropout_rate': self._config['dropout_rate'],
+                'dropout_rate': 0.0,
                 'epsilon_rate': self._config['epsilon_rate'],}]
 
     @classmethod
