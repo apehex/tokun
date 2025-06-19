@@ -227,8 +227,8 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         self,
         block_cfg: iter,
         embed_dim: int,
-        output_dim: int,
         input_dim: int=256,
+        output_dim: int=256, # per token
         step_min: int=0,
         step_max: int=2 ** 12,
         beta_min: float=0.0,
@@ -251,9 +251,10 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
         self._decoder = None
 
     def build(self, input_shape: tuple) -> None:
+        __token_dim = int(input_shape[-1])
         # init
         self._encoder = Encoder(**self.get_encoder_config())
-        self._decoder = Decoder(**self.get_decoder_config())
+        self._decoder = Decoder(**self.get_decoder_config(token_dim=__token_dim))
         # build
         __shape = tuple(input_shape)
         self._encoder.build(__shape)
@@ -285,21 +286,26 @@ class KlAutoEncoder(mlable.models.autoencoder.VaeModel):
 
     def get_encoder_config(self) -> dict:
         return {
+            'input_dim': self._config['input_dim'],
+            'embed_dim': self._config['embed_dim'],
+            'dropout_rate': self._config['dropout_rate'],
+            'epsilon_rate': self._config['epsilon_rate'],
             'block_cfg': [
                 {
                     'add_downsampling' if ('sampling' in __k) else __k: __v
                     for __k, __v in __c.items()}
-                for __c in self._config['block_cfg']],
-            **{__k: self._config[__k] for __k in ['input_dim', 'embed_dim', 'dropout_rate', 'epsilon_rate']}}
+                for __c in self._config['block_cfg']],}
 
-    def get_decoder_config(self) -> dict:
+    def get_decoder_config(self, token_dim: int) -> dict:
         return {
+            'output_dim': token_dim * self._config['output_dim'],
+            'dropout_rate': self._config['dropout_rate'],
+            'epsilon_rate': self._config['epsilon_rate'],
             'block_cfg': [
                 {
                     'add_upsampling' if ('sampling' in __k) else __k: __v
                     for __k, __v in __c.items()}
-                for __c in reversed(self._config['block_cfg'])],
-            **{__k: self._config[__k] for __k in ['output_dim', 'dropout_rate', 'epsilon_rate']}}
+                for __c in reversed(self._config['block_cfg'])],}
 
     @classmethod
     def from_config(cls, config) -> tf.keras.layers.Layer:
