@@ -32,18 +32,20 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 4,
                     'order_num': 5,
                     'rank_num': 2,
+                    'binary': False,
                     'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
                     'inputs': [1, 32, 32, 4],
-                    'targets': [1, 32, 32, 32],},},
+                    'targets': [1, 32, 32, 1024],},},
             {
                 'args': {
                     'batch_dim': 1,
                     'token_dim': 1,
                     'order_num': 5,
                     'rank_num': 2,
+                    'binary': True,
                     'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
@@ -56,6 +58,7 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 4,
                     'order_num': 5,
                     'rank_num': 2,
+                    'binary': True,
                     'targets': True,
                     'encoding': 'UTF-32-BE',
                     'features': [],},
@@ -68,12 +71,13 @@ class PreprocessTests(tf.test.TestCase):
                     'token_dim': 1,
                     'order_num': 4,
                     'rank_num': 3,
+                    'binary': False,
                     'targets': True,
                     'encoding': 'UTF-8',
                     'features': [],},
                 'shapes': {
                     'inputs': [1, 16, 16, 16, 1],
-                    'targets': [1, 16, 16, 16, 8],},},]
+                    'targets': [1, 16, 16, 16, 256],},},]
 
     def test_shape_and_dtype(self):
         for __case in self._cases:
@@ -90,7 +94,7 @@ class PreprocessTests(tf.test.TestCase):
 
     def test_on_dataset_batches(self):
         __dataset = iter(DATASET.batch(4))
-        __preprocess = tokun.pipeline.hilbert.preprocess.factory(batch_dim=4, token_dim=1, order_num=4, rank_num=3, encoding='UTF-8', features=[], targets=True)
+        __preprocess = tokun.pipeline.hilbert.preprocess.factory(batch_dim=4, token_dim=1, order_num=4, rank_num=3, encoding='UTF-8', features=[], binary=True, targets=True)
         for _ in range(4):
             __s = next(__dataset)
             __x, __t = __preprocess(__s)
@@ -107,12 +111,13 @@ class PreprocessTests(tf.test.TestCase):
             for __sample in SAMPLES:
                 __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
-                self.assertAllEqual(__x, mlable.sampling.binary(__t, depth=8, threshold=0.5, dtype=tf.int32))
+                __b = mlable.sampling.binary(__t, depth=8, threshold=0.5, dtype=tf.int32) if __case['args']['binary'] else mlable.sampling.categorical(__t, depth=256, dtype=tf.int32)
+                self.assertAllEqual(__x, __b)
 
     def test_preprocess_postprocess_reciprocity(self):
         for __case in self._cases:
             __preprocess = tokun.pipeline.hilbert.preprocess.factory(**__case['args'])
-            __postprocess = tokun.pipeline.hilbert.postprocess.factory(order_num=__case['args']['order_num'], rank_num=__case['args']['rank_num'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
+            __postprocess = tokun.pipeline.hilbert.postprocess.factory(order_num=__case['args']['order_num'], rank_num=__case['args']['rank_num'], encoding=__case['args']['encoding'], binary=__case['args']['binary'], threshold=0.5, errors='ignore')
             for __sample in SAMPLES:
                 __s = tf.cast([__sample], dtype=tf.string)
                 __x, __t = __preprocess(__s)
@@ -123,7 +128,7 @@ class PreprocessTests(tf.test.TestCase):
         for __case in self._cases:
             __args = {__k: (False if __k == 'targets' else __v) for __k, __v in __case['args'].items()}
             __preprocess = tokun.pipeline.hilbert.preprocess.factory(**__args)
-            __postprocess = tokun.pipeline.hilbert.postprocess.factory(order_num=__case['args']['order_num'], rank_num=__case['args']['rank_num'], encoding=__case['args']['encoding'], threshold=0.5, errors='ignore')
+            __postprocess = tokun.pipeline.hilbert.postprocess.factory(order_num=__case['args']['order_num'], rank_num=__case['args']['rank_num'], encoding=__case['args']['encoding'], binary=True, threshold=0.5, errors='ignore')
             for __sample in SAMPLES:
                 __s = tf.cast([__sample], dtype=tf.string)
                 __x = __preprocess(__s)

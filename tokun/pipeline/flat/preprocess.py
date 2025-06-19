@@ -64,9 +64,15 @@ def _formatter_factory(batch_dim: int, sample_dim: int, token_dim: int=1, drop_d
     # customized fn
     return __formatter
 
-def _embedder_factory(bigendian: bool=True) -> callable:
+def _embedder_factory(binary: bool=True, bigendian: bool=True) -> callable:
+    __cast_i = functools.partial(tf.cast, dtype=tf.int32)
+    __cast_f = functools.partial(tf.cast, dtype=tf.float32)
+    # one-hot encoding
+    __onehot = functools.partial(tf.one_hot, depth=256, axis=-1, on_value=1, off_value=0, dtype=tf.int32)
     # decompose in base 2
-    __expand = functools.partial(mlable.maths.ops.expand_base, base=2, depth=8, bigendian=bigendian)
+    __binary = functools.partial(mlable.maths.ops.expand_base, base=2, depth=8, bigendian=bigendian)
+    # toggle
+    __expand = __binary if binary else (lambda __x: __cast_f(__onehot(__cast_i(__x))))
     # merge all the byte decompositions
     __merge = functools.partial(mlable.shaping.axes.merge, axis=-1, right=False)
     # embed all
@@ -91,13 +97,13 @@ def _wrapper(inputs: tf.Tensor, parser: callable, cleaner: callable, encoder: ca
     # targets = inputs (in binary) for the autoencoder
     return (__inputs, __targets) if (__targets is not None) else __inputs
 
-def factory(batch_dim: int, sample_dim: int, token_dim: int=1, drop_dim: int=0, features: list=[], pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-32-BE', bigendian: bool=True, targets: bool=False) -> callable:
+def factory(batch_dim: int, sample_dim: int, token_dim: int=1, drop_dim: int=0, features: list=[], pattern: str=ANSI_REGEX, rewrite: str='', separator: str='\x1d', encoding: str='UTF-32-BE', binary: bool=True, bigendian: bool=True, targets: bool=False) -> callable:
     __encoding_dim = 4 if '32' in encoding else 1
     # custom fn
     __parser = _parser_factory(features=features, separator=separator, targets=targets)
     __cleaner = _cleaner_factory(pattern=pattern, rewrite=rewrite)
     __encoder = _encoder_factory(sample_dim=sample_dim, encoding=encoding)
     __formatter = _formatter_factory(batch_dim=batch_dim, sample_dim=sample_dim, token_dim=token_dim, drop_dim=drop_dim, encoding_dim=__encoding_dim)
-    __embedder = _embedder_factory(bigendian=bigendian)
+    __embedder = _embedder_factory(binary=binary, bigendian=bigendian)
     # actual preprocessing function
     return functools.partial(_wrapper, parser=__parser, cleaner=__cleaner, encoder=__encoder, embedder=__embedder, formatter=__formatter)

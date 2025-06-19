@@ -10,9 +10,16 @@ import mlable.text
 
 # SAMPLING #####################################################################
 
-def _sampler_factory(threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, bigendian: bool=True) -> callable:
-    # compound bit level probabilities into byte probabilities
-    __bytes = functools.partial(mlable.sampling.binary, threshold=threshold, temp=temp, topp=topp, topk=topk, bigendian=bigendian, depth=8, dtype=tf.int32)
+def _sampler_factory(threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, binary: bool=True, bigendian: bool=True) -> callable:
+    __fn = mlable.sampling.binary if binary else mlable.sampling.categorical
+    # common args
+    __args = {'temp': temp, 'topp': topp, 'topk': topk, 'depth': 8 if binary else 256, 'dtype': tf.int32}
+    # binary args
+    if binary:
+        __args['bigendian'] = bigendian
+        __args['threshold'] = threshold
+    # compound individual probabilities into byte probabilities
+    __bytes = functools.partial(__fn, **__args)
     # sample from logits
     def __sampler(outputs: tf.Tensor) -> tf.Tensor:
         return __bytes(outputs)
@@ -57,9 +64,9 @@ def _wrapper(outputs: tf.Tensor, sampler: callable, formatter: callable, decoder
     # get rid of the padding
     return cleaner(__outputs)
 
-def factory(order_num: int, rank_num: int, threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, bigendian: bool=True, encoding: str='UTF-32-BE', errors: str='replace') -> callable:
+def factory(order_num: int, rank_num: int, threshold: float=0.0, temp: float=1.0, topp: float=-1.0, topk: int=-1, binary: bool=True, bigendian: bool=True, encoding: str='UTF-32-BE', errors: str='replace') -> callable:
     # custom fn
-    __sampler = _sampler_factory(threshold=threshold, temp=temp, topp=topp, topk=topk, bigendian=bigendian)
+    __sampler = _sampler_factory(threshold=threshold, temp=temp, topp=topp, topk=topk, binary=binary, bigendian=bigendian)
     __formatter = _formatter_factory(order_num=order_num, rank_num=rank_num)
     __decoder = _decoder_factory(encoding=encoding, errors=errors)
     # actual preprocessing function
